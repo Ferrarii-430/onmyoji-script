@@ -1,0 +1,118 @@
+/********************************************************************************
+** Form generated from reading UI file 'mainwindow.ui'
+**
+** Created by: Qt User Interface Compiler version 6.9.2
+**
+** WARNING! All changes made in this file will be lost when recompiling UI file!
+********************************************************************************/
+
+#ifndef UI_MAINWINDOW_H
+#define UI_MAINWINDOW_H
+
+#include <QtCore/QVariant>
+#include <QtWidgets/QApplication>
+#include <QtWidgets/QHeaderView>
+#include <QtWidgets/QLabel>
+#include <QtWidgets/QListWidget>
+#include <QtWidgets/QPlainTextEdit>
+#include <QtWidgets/QSpinBox>
+#include <QtWidgets/QTableWidget>
+#include <QtWidgets/QToolButton>
+#include <QtWidgets/QWidget>
+
+QT_BEGIN_NAMESPACE
+
+class Ui_mainwindow
+{
+public:
+    QLabel *label;
+    QListWidget *listWidget;
+    QLabel *label_2;
+    QTableWidget *tableWidget;
+    QLabel *label_3;
+    QPlainTextEdit *plainTextEdit;
+    QLabel *label_4;
+    QToolButton *startTaskButton;
+    QToolButton *stopTaskButton;
+    QLabel *label_5;
+    QSpinBox *spinBox;
+    QLabel *label_6;
+    QLabel *currentTaskName;
+
+    void setupUi(QWidget *mainwindow)
+    {
+        if (mainwindow->objectName().isEmpty())
+            mainwindow->setObjectName("mainwindow");
+        mainwindow->setEnabled(true);
+        mainwindow->resize(851, 461);
+        label = new QLabel(mainwindow);
+        label->setObjectName("label");
+        label->setGeometry(QRect(10, 10, 81, 21));
+        listWidget = new QListWidget(mainwindow);
+        listWidget->setObjectName("listWidget");
+        listWidget->setGeometry(QRect(10, 40, 171, 131));
+        label_2 = new QLabel(mainwindow);
+        label_2->setObjectName("label_2");
+        label_2->setGeometry(QRect(10, 180, 81, 21));
+        tableWidget = new QTableWidget(mainwindow);
+        tableWidget->setObjectName("tableWidget");
+        tableWidget->setGeometry(QRect(10, 200, 451, 251));
+        tableWidget->setEditTriggers(QAbstractItemView::EditTrigger::NoEditTriggers);
+        label_3 = new QLabel(mainwindow);
+        label_3->setObjectName("label_3");
+        label_3->setGeometry(QRect(200, 10, 81, 21));
+        plainTextEdit = new QPlainTextEdit(mainwindow);
+        plainTextEdit->setObjectName("plainTextEdit");
+        plainTextEdit->setGeometry(QRect(200, 40, 261, 131));
+        plainTextEdit->setReadOnly(true);
+        label_4 = new QLabel(mainwindow);
+        label_4->setObjectName("label_4");
+        label_4->setGeometry(QRect(480, 10, 131, 21));
+        startTaskButton = new QToolButton(mainwindow);
+        startTaskButton->setObjectName("startTaskButton");
+        startTaskButton->setGeometry(QRect(540, 420, 111, 31));
+        stopTaskButton = new QToolButton(mainwindow);
+        stopTaskButton->setObjectName("stopTaskButton");
+        stopTaskButton->setGeometry(QRect(690, 420, 111, 31));
+        label_5 = new QLabel(mainwindow);
+        label_5->setObjectName("label_5");
+        label_5->setGeometry(QRect(542, 350, 61, 20));
+        spinBox = new QSpinBox(mainwindow);
+        spinBox->setObjectName("spinBox");
+        spinBox->setGeometry(QRect(620, 350, 70, 21));
+        spinBox->setMaximum(999);
+        label_6 = new QLabel(mainwindow);
+        label_6->setObjectName("label_6");
+        label_6->setGeometry(QRect(520, 310, 81, 20));
+        currentTaskName = new QLabel(mainwindow);
+        currentTaskName->setObjectName("currentTaskName");
+        currentTaskName->setGeometry(QRect(620, 310, 201, 16));
+
+        retranslateUi(mainwindow);
+
+        QMetaObject::connectSlotsByName(mainwindow);
+    } // setupUi
+
+    void retranslateUi(QWidget *mainwindow)
+    {
+        mainwindow->setWindowTitle(QCoreApplication::translate("mainwindow", "mainwindow", nullptr));
+        label->setText(QCoreApplication::translate("mainwindow", "\350\204\232\346\234\254\346\226\271\346\241\210", nullptr));
+        label_2->setText(QCoreApplication::translate("mainwindow", "\346\226\271\346\241\210\345\206\205\345\256\271", nullptr));
+        label_3->setText(QCoreApplication::translate("mainwindow", "\346\227\245\345\277\227\350\276\223\345\207\272", nullptr));
+        label_4->setText(QCoreApplication::translate("mainwindow", "OpenCV\350\257\206\345\210\253\347\274\251\347\225\245\345\233\276", nullptr));
+        startTaskButton->setText(QCoreApplication::translate("mainwindow", "\345\220\257\345\212\250", nullptr));
+        stopTaskButton->setText(QCoreApplication::translate("mainwindow", "\345\201\234\346\255\242", nullptr));
+        label_5->setText(QCoreApplication::translate("mainwindow", "\345\276\252\347\216\257\346\254\241\346\225\260", nullptr));
+        label_6->setText(QCoreApplication::translate("mainwindow", "\345\275\223\345\211\215\344\273\273\345\212\241\346\226\271\346\241\210", nullptr));
+        currentTaskName->setText(QCoreApplication::translate("mainwindow", "TextLabel", nullptr));
+    } // retranslateUi
+
+};
+
+namespace Ui {
+    class mainwindow: public Ui_mainwindow {};
+} // namespace Ui
+
+QT_END_NAMESPACE
+
+#endif // UI_MAINWINDOW_H

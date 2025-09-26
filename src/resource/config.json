@@ -1,0 +1,38 @@
+[
+  {
+    "id": "CC372B66-AFEC-4CBE-9E19-671CD02CFDC3",
+    "name": "配置1",
+    "steps": [
+      {
+        "taskName": "识图别周年庆图标",
+        "type": "OPENCV",
+        "score": 0.86,
+        "randomCenter": false,
+        "imagePath": ""
+      },
+      {
+        "taskName": "等待2秒",
+        "type": "WAIT",
+        "time": 2000
+      }
+    ]
+  },
+  {
+    "id": "DC42C888-2449-41D2-A894-095606E38D12",
+    "name": "配置2",
+    "steps": [
+      {
+
+      }
+    ]
+  },
+  {
+    "id": "2B0C8FD1-F8A0-473D-A87C-8E5119563BC0",
+    "name": "配置3",
+    "steps": [
+      {
+
+      }
+    ]
+  }
+]
