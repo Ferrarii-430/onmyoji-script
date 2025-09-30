@@ -5,6 +5,7 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
+#include <qcoreapplication.h>
 #include <QListWidget>
 #include <QWidget>
 #include <QJsonArray>
@@ -26,10 +27,14 @@ public:
     Ui::mainwindow *ui;
     QJsonArray m_configArray;
     ItemInfo currentItem;
+    QString CONFIG_PATH = QCoreApplication::applicationDirPath() + "/src/resource/config.json";
     explicit mainwindow(QWidget *parent = nullptr);
     ~mainwindow() override;
     void appendLog(const QString &log) const;
     void appendLogToUI(const QString &msg);
+    void onProgrammeAddBtnClicked();
+    void onProgrammeRemoveBtnClicked();
+void onProgrammeContentAddBtnClicked();
 
 private:
     void loadListWidgetData();

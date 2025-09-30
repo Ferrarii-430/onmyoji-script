@@ -6,11 +6,17 @@
 
 #include <qstring.h>
 
-QString getTemplatePath(ConfigTypeEnum type) {
+QString getConfigTypeEnumToQStringName(ConfigTypeEnum type) {
     switch (type) {
-    case ConfigTypeEnum::OPENCV: return "识图";
-    default: return "未知";
+        case ConfigTypeEnum::OPENCV: return "OpenCV识图";
+        case ConfigTypeEnum::WAIT: return "等待";
+        default: return "未知";
     }
+}
+
+QString getConfigTypeEnumToQStringName(QString type) {
+    ConfigTypeEnum config = stringToConfigType(type);
+    return getConfigTypeEnumToQStringName(config);
 }
 
 // 字符串转枚举
@@ -25,9 +31,10 @@ ConfigTypeEnum stringToConfigType(const QString& typeStr) {
 }
 
 // 枚举转字符串（可选，方便调试或保存）
-QString configTypeToString(ConfigTypeEnum type) {
+QString configTypeToQString(ConfigTypeEnum type) {
     switch (type) {
-    case ConfigTypeEnum::OPENCV: return "OPENCV";
-    default: return "UNKNOWN";
+        case ConfigTypeEnum::OPENCV: return "OPENCV";
+        case ConfigTypeEnum::WAIT: return "WAIT";
+        default: return "UNKNOWN";
     }
 }

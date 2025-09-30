@@ -4,13 +4,15 @@
     "name": "配置1",
     "steps": [
       {
+        "id": "",
         "taskName": "识图别周年庆图标",
         "type": "OPENCV",
         "score": 0.86,
-        "randomCenter": false,
+        "randomClick": false,
         "imagePath": ""
       },
       {
+        "id": "",
         "taskName": "等待2秒",
         "type": "WAIT",
         "time": 2000
@@ -20,19 +22,11 @@
   {
     "id": "DC42C888-2449-41D2-A894-095606E38D12",
     "name": "配置2",
-    "steps": [
-      {
-
-      }
-    ]
+    "steps": []
   },
   {
     "id": "2B0C8FD1-F8A0-473D-A87C-8E5119563BC0",
     "name": "配置3",
-    "steps": [
-      {
-
-      }
-    ]
+    "steps": []
   }
 ]

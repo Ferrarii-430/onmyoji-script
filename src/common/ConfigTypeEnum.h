@@ -13,8 +13,9 @@ enum class ConfigTypeEnum {
 };
 
 // 声明函数
-QString getTemplatePath(ConfigTypeEnum type);
+QString getConfigTypeEnumToQStringName(ConfigTypeEnum type);
+QString getConfigTypeEnumToQStringName(QString type);
 ConfigTypeEnum stringToConfigType(const QString& typeStr);
-QString configTypeToString(ConfigTypeEnum type);
+QString configTypeToQString(ConfigTypeEnum type);
 
 #endif //CONFIGTYPEENUM_H

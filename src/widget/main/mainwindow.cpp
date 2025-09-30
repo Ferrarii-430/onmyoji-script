@@ -18,6 +18,10 @@
 #include <opencv2/opencv.hpp>
 #include <ConfigTypeEnum.h>
 #include <ExecutionSteps.h>
+#include <QInputDialog>
+#include "src/utils/common.h"
+#include "QMessageBox"
+#include "src/widget/editTask/edittaskdialog.h"
 
 
 mainwindow::mainwindow(QWidget *parent) :
@@ -42,6 +46,18 @@ mainwindow::mainwindow(QWidget *parent) :
     connect(ui->stopTaskButton, &QToolButton::clicked,
             this, &mainwindow::stopTaskButtonClick);
 
+    //绑定添加方案按钮
+    connect(ui->programmeAddBtn, &QToolButton::clicked,
+            this, &mainwindow::onProgrammeAddBtnClicked);
+
+    //绑定删除方案按钮
+    connect(ui->programmeRemoveBtn, &QToolButton::clicked,
+            this, &mainwindow::onProgrammeRemoveBtnClicked);
+
+    //绑定添加方案内容按钮
+    connect(ui->programmeContentAddBtn, &QToolButton::clicked,
+            this, &mainwindow::onProgrammeContentAddBtnClicked);
+
     loadConfig();
 
     loadListWidgetData();
@@ -59,10 +75,9 @@ void mainwindow::loadConfig()
     Logger::log(QString("是否有AVX支持：%1").arg(CV_CPU_AVX));
     Logger::log(QString("是否有AVX2支持：%1").arg(CV_CPU_AVX2));
 
-    QString configPath = QCoreApplication::applicationDirPath() + "/src/resource/config.json";
-    QFile file(configPath);
+    QFile file(CONFIG_PATH);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        Logger::log(QString("无法打开配置文件：" + file.errorString() + "路径:" + configPath));
+        Logger::log(QString("无法打开配置文件：" + file.errorString() + "路径:" + CONFIG_PATH));
         return;
     }
 
@@ -111,7 +126,7 @@ void mainwindow::onItemClicked(QListWidgetItem *item) {
     // 获取显示文本
     QString name = item->text();
     QString id   = item->data(Qt::UserRole).toString();
-    Logger::log(QString( "onItemClicked->选中项 name:" + name + ", id:" + id));
+    // Logger::log(QString( "onItemClicked->选中项 name:" + name + ", id:" + id));
     setCurrentItem(id, name);
 
     QJsonObject obj = QJsonObject(); //默认为空
@@ -148,8 +163,8 @@ void mainwindow::appendLog(const QString &log) const
 void mainwindow::showStepsInTable(const QJsonArray &steps) {
     ui->tableWidget->clear(); // 清空表格
     ui->tableWidget->setRowCount(steps.size());
-    ui->tableWidget->setColumnCount(3); // 新增序号列
-    QStringList headers = {"序号", "任务名称", "类型"};
+    ui->tableWidget->setColumnCount(5); // 新增序号列
+    QStringList headers = {"序号", "任务名称", "类型", "操作",""};
     ui->tableWidget->setHorizontalHeaderLabels(headers);
 
     for (int i = 0; i < steps.size(); ++i) {
@@ -165,6 +180,31 @@ void mainwindow::showStepsInTable(const QJsonArray &steps) {
         // 类型
         QString type = step["type"].toString();
         ui->tableWidget->setItem(i, 2, new QTableWidgetItem(type));
+
+        // 编辑按钮
+        QPushButton *editBtn = new QPushButton("编辑");
+        ui->tableWidget->setCellWidget(i, 3, editBtn);
+        connect(editBtn, &QPushButton::clicked, this, [this, i, step, taskName]() {
+            qDebug() << "点击了编辑: 行=" << i << " taskName=" << taskName;
+            // TODO: 弹窗修改，或进入编辑模式
+            EditTaskDialog dlg(EditMode::Edit,step,this);
+            if (dlg.exec() == QDialog::Accepted)
+            {
+                // 根据 typeCombo 的当前索引或者值读取表单数据
+                QJsonObject newData = dlg.resultData();
+                qDebug() << "编辑后数据:" << newData;
+                // TODO: 保存回 JSON 文件 & 刷新表格
+            }
+        });
+
+        // 删除按钮
+        QPushButton *delBtn = new QPushButton("删除");
+        ui->tableWidget->setCellWidget(i, 4, delBtn);
+        connect(delBtn, &QPushButton::clicked, this, [this, i, step, taskName]() {
+            qDebug() << "点击了删除: 行=" << i << " id=" << step["id"].toString();
+            // TODO: 删除 JSON 并刷新表格
+        });
+
     }
 
     ui->tableWidget->resizeColumnsToContents();
@@ -252,4 +292,77 @@ void mainwindow::appendLogToUI(const QString &msg)
     QTextCursor cursor = ui->plainTextEdit->textCursor();
     cursor.movePosition(QTextCursor::End);
     ui->plainTextEdit->setTextCursor(cursor);
+}
+
+// 按钮点击槽函数
+void mainwindow::onProgrammeAddBtnClicked()
+{
+    bool ok;
+    QString configName = QInputDialog::getText(
+        this,
+        tr("添加方案"),
+        tr("请输入方案名称:"),
+        QLineEdit::Normal,
+        "",
+        &ok
+    );
+
+    if (ok && !configName.isEmpty()) {
+        addConfigToJsonFile(CONFIG_PATH, configName);
+        // 输入了有效内容
+        Logger::log("已添加新的配置: " + configName);
+        loadConfig();
+    } else {
+        // 用户取消或输入为空
+        Logger::log(QString("用户未输入或无效的配置名称"));
+    }
+}
+
+// 按钮点击槽函数
+void mainwindow::onProgrammeRemoveBtnClicked()
+{
+    if (currentItem.id.isEmpty())
+    {
+        Logger::log(QString("未选中配置"));
+        return;
+    }
+    // 弹出确认对话框
+    QMessageBox::StandardButton reply;
+    reply = QMessageBox::question(
+        this,
+        tr("确认删除"),
+        tr("确定要删除配置 “%1” 吗？").arg(currentItem.taskName),
+        QMessageBox::Yes | QMessageBox::No
+    );
+
+    if (reply == QMessageBox::Yes)
+    {
+        if (removeConfigById(CONFIG_PATH, currentItem.id))
+        {
+            Logger::log("已删除配置: " + currentItem.taskName);
+            loadConfig();  // 刷新配置
+            setCurrentItem("", ""); //清空当前选择
+        }
+        else
+        {
+            Logger::log("删除配置失败: " + currentItem.taskName);
+        }
+    }
+    else
+    {
+        Logger::log(QString("已取消删除"));
+    }
+}
+
+void mainwindow::onProgrammeContentAddBtnClicked()
+{
+    QJsonObject empty;
+    EditTaskDialog* dlg = new EditTaskDialog(EditMode::Add,empty,nullptr); // 非模态
+    dlg->show();
+    connect(dlg, &EditTaskDialog::accepted, [dlg]() {
+        QJsonObject data = dlg->resultData();
+        // 保存 JSON
+        dlg->deleteLater(); // 这里直接用 dlg
+        qDebug() << data.toVariantMap();
+    });
 }

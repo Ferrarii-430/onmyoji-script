@@ -29,6 +29,19 @@ add_executable(qtTest main.cpp
         src/common/ConfigTypeEnum.h
         src/common/Logger.cpp
         src/common/Logger.h
+        src/utils/common.cpp
+        src/utils/common.h
+        src/widget/editTask/edittaskdialog.cpp
+        src/widget/editTask/edittaskdialog.h
+        src/widget/editTask/edittaskdialog.ui
+        src/widget/typeOpenCVForm/typeopencvform.cpp
+        src/widget/typeOpenCVForm/typeopencvform.h
+        src/widget/typeOpenCVForm/typeopencvform.ui
+        src/widget/waitForm/waitform.cpp
+        src/widget/waitForm/waitform.h
+        src/widget/waitForm/waitform.ui
+        src/widget/typeOpenCVForm/ScreenCaptureWidget.cpp
+        src/widget/typeOpenCVForm/ScreenCaptureWidget.h
 )
 
 add_definitions(-DPROJECT_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
