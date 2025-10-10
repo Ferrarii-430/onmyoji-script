@@ -7,13 +7,11 @@
 #include "mainwindow.h"
 #include "Logger.h"
 #include <iostream>
-
 #include<windows.h>
 #include "ui_mainwindow.h"
-#include <QVBoxLayout>
 #include <QFile>
 #include <QJsonArray>
-#include <QJsonObject>
+#include <QTimer>
 #include <QDebug>
 #include <opencv2/opencv.hpp>
 #include <ConfigTypeEnum.h>
@@ -58,9 +56,18 @@ mainwindow::mainwindow(QWidget *parent) :
     connect(ui->programmeContentAddBtn, &QToolButton::clicked,
             this, &mainwindow::onProgrammeContentAddBtnClicked);
 
-    loadConfig();
+    connect(ui->listWidget, &QListWidget::itemChanged, this, [this](QListWidgetItem *item) {
+        // 这里可以保存修改到配置文件等
+        updateProgrammeContent(CONFIG_PATH, currentItem.id, item->text());
+        loadListWidgetData();
+    });
 
     loadListWidgetData();
+
+    appendLog("脚本配置加载成功！");
+
+    // 检查OpenCV版本和编译选项
+    Logger::log(QString("OpenCV版本 %1").arg(CV_VERSION));
 }
 
 mainwindow::~mainwindow() {
@@ -70,11 +77,6 @@ mainwindow::~mainwindow() {
 //加载配置文件
 void mainwindow::loadConfig()
 {
-    // 检查OpenCV版本和编译选项
-    Logger::log(QString("OpenCV版本 %1").arg(CV_VERSION));
-    Logger::log(QString("是否有AVX支持：%1").arg(CV_CPU_AVX));
-    Logger::log(QString("是否有AVX2支持：%1").arg(CV_CPU_AVX2));
-
     QFile file(CONFIG_PATH);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         Logger::log(QString("无法打开配置文件：" + file.errorString() + "路径:" + CONFIG_PATH));
@@ -89,12 +91,14 @@ void mainwindow::loadConfig()
 
     // 保存全局数据
     m_configArray = arr;
-
-    appendLog("脚本配置加载成功！");
 }
 
 void mainwindow::loadListWidgetData()
 {
+    loadConfig();
+
+    ui->listWidget->clear();
+
     QJsonArray arr = m_configArray;
     for (int i = 0; i < arr.size(); i++) {
         QJsonObject obj = arr[i].toObject();
@@ -107,6 +111,7 @@ void mainwindow::loadListWidgetData()
 
         // 绑定额外数据（Qt::UserRole 是给用户自定义数据用的）
         item->setData(Qt::UserRole, id);
+        item->setFlags(item->flags() | Qt::ItemIsEditable); // 添加可编辑标志
 
         ui->listWidget->addItem(item);
     }
@@ -117,6 +122,7 @@ void mainwindow::loadListWidgetData()
         QString id = step["id"].toString();
         QString name = step["name"].toString();
         setCurrentItem(id, name);
+        showStepsInTable(arr[0].toObject()["steps"].toArray()); //默认显示第一配置的方案内容
     }
 }
 
@@ -184,25 +190,35 @@ void mainwindow::showStepsInTable(const QJsonArray &steps) {
         // 编辑按钮
         QPushButton *editBtn = new QPushButton("编辑");
         ui->tableWidget->setCellWidget(i, 3, editBtn);
-        connect(editBtn, &QPushButton::clicked, this, [this, i, step, taskName]() {
-            qDebug() << "点击了编辑: 行=" << i << " taskName=" << taskName;
-            // TODO: 弹窗修改，或进入编辑模式
-            EditTaskDialog dlg(EditMode::Edit,step,this);
-            if (dlg.exec() == QDialog::Accepted)
-            {
-                // 根据 typeCombo 的当前索引或者值读取表单数据
-                QJsonObject newData = dlg.resultData();
-                qDebug() << "编辑后数据:" << newData;
-                // TODO: 保存回 JSON 文件 & 刷新表格
-            }
+        connect(editBtn, &QPushButton::clicked, this, [this, step]() {
+            // 弹窗修改，或进入编辑模式
+            EditTaskDialog* dlg = new EditTaskDialog(EditMode::Edit,step,nullptr);
+            dlg->show();
+            connect(dlg, &EditTaskDialog::accepted,[dlg, this]() {
+                QJsonObject data = dlg->resultData();
+                // 保存回 JSON 文件 & 刷新表格
+                saveBase64ImageToFile(data);
+                updateConfigInJsonFile(CONFIG_PATH, currentItem.id, data);
+                QTimer::singleShot(0, dlg, &QObject::deleteLater); // 延迟一拍
+                showCurrentSelectStepsInTable();
+            });
         });
 
         // 删除按钮
         QPushButton *delBtn = new QPushButton("删除");
         ui->tableWidget->setCellWidget(i, 4, delBtn);
-        connect(delBtn, &QPushButton::clicked, this, [this, i, step, taskName]() {
-            qDebug() << "点击了删除: 行=" << i << " id=" << step["id"].toString();
-            // TODO: 删除 JSON 并刷新表格
+        connect(delBtn, &QPushButton::clicked, this, [this, step]() {
+            // 添加确认弹窗
+            QMessageBox::StandardButton reply;
+            reply = QMessageBox::question(this, "确认删除",
+                                        "确定要删除这个步骤吗？",
+                                        QMessageBox::Yes | QMessageBox::No);
+
+            if (reply == QMessageBox::Yes) {
+                // qDebug() << "点击了删除: 行=" << i << " id=" << step["stepsId"].toString();
+                removeConfigById(CONFIG_PATH, currentItem.id, step["stepsId"].toString());
+                showCurrentSelectStepsInTable();
+            }
         });
 
     }
@@ -211,10 +227,37 @@ void mainwindow::showStepsInTable(const QJsonArray &steps) {
     ui->tableWidget->resizeRowsToContents();
 }
 
+void mainwindow::showCurrentSelectStepsInTable()
+{
+    loadConfig();
+    if (currentItem.id.isEmpty())
+    {
+        Logger::log(QString("当前选择方案ID为空"));
+        return;
+    }
+
+
+    bool hasConfigId = false;
+    for (int i = 0; i < m_configArray.size(); ++i)
+    {
+        QJsonObject obj = m_configArray[i].toObject();
+        if (obj["id"].toString() == currentItem.id)
+        {
+            showStepsInTable(obj["steps"].toArray());
+            hasConfigId = true;
+            break;
+        }
+    }
+
+    if (!hasConfigId)
+    {
+        Logger::log("没有ConfigId: " + currentItem.id);
+    }
+}
+
 //开启当前选中的任务
 void mainwindow::startTaskButtonClick()
 {
-    std::cout << currentItem.id.toStdString() << "<-id" << std::endl;
 
     if (currentItem.id.isEmpty())
     {
@@ -245,35 +288,73 @@ void mainwindow::startTaskButtonClick()
     }
     QJsonArray steps = obj["steps"].toArray();
 
-    for (const QJsonValue &val : steps)
-    {
-        QJsonObject step = val.toObject();
-        QString typeStr = step["type"].toString();
-
-        ConfigTypeEnum type = stringToConfigType(typeStr);
-        switch (type)
-        {
-            case ConfigTypeEnum::OPENCV:
-                // TODO: 处理 OPENCV 类型
-                Logger::log(QString("开始进行OpenCV识图"));
-                ExecutionSteps::getInstance().opencvRecognizesAndClick(step["imagePath"].toString().toStdString());
-                break;
-
-            case ConfigTypeEnum::WAIT:
-                // TODO: 处理 WAIT 类型
-                Logger::log(QString("等待" + step["time"].toString() + "毫秒..."));
-                Sleep(step["time"].toInt());
-                break;
-
-            default: appendLog(QString("未知的命令：" + typeStr));
-        }
+    if (m_isRunning) {
+        appendLog("任务已在运行中");
+        return;
     }
+
+    m_isRunning = true;
+    ui->startTaskButton->setEnabled(false);
+    ui->stopTaskButton->setEnabled(true);
+
+    int number = ui->taskCycleNumber->text().toInt();
+    bool infiniteLoop = (number <= 0);
+    appendLog("循环次数");
+    Logger::log(QString("循环次数: %1").arg(infiniteLoop ? "无限" : QString::number(number)));
+
+    do {
+        for (const QJsonValue &val : steps)
+        {
+            QJsonObject step = val.toObject();
+            QString typeStr = step["type"].toString();
+            ConfigTypeEnum type = stringToConfigType(typeStr);
+
+            switch (type) {
+                case ConfigTypeEnum::OPENCV: {
+                        Logger::log(QString("开始进行OpenCV识图"));
+                        QString imagePath = step["imagePath"].toString();
+                        const double score = step["score"].toDouble();
+                        const bool randomClick = step["randomClick"].toBool();
+                        QString savePath = ExecutionSteps::getInstance().opencvRecognizesAndClick(imagePath, score, randomClick);
+                        showOpenCVIdentifyImage(savePath);
+                        break;
+                }
+
+                case ConfigTypeEnum::WAIT: {
+                        Logger::log(QString("等待%1毫秒...").arg(step["time"].toInt()));
+                        int waitTime = step["time"].toInt();
+                        int interval = 100; // 每100ms检查一次
+                        for (int t = 0; t < waitTime && m_isRunning; t += interval) {
+                            Sleep(qMin(interval, waitTime - t));
+                            QCoreApplication::processEvents();
+                        }
+                        break;
+                }
+
+                default: {
+                        appendLog(QString("未知的命令：%1").arg(typeStr));
+                        break;
+                }
+            }
+        }
+
+        if (!infiniteLoop) {
+            number--;
+        }
+
+    } while (m_isRunning && (infiniteLoop || number > 0));
+
+    // 执行结束
+    m_isRunning = false;
+    ui->startTaskButton->setEnabled(true);
+    ui->stopTaskButton->setEnabled(false);
 }
 
 //关闭当前选中的任务
 void mainwindow::stopTaskButtonClick()
 {
-
+    m_isRunning = false;
+    appendLog("正在停止任务...");
 }
 
 //修改当前选择的方案
@@ -340,8 +421,14 @@ void mainwindow::onProgrammeRemoveBtnClicked()
         if (removeConfigById(CONFIG_PATH, currentItem.id))
         {
             Logger::log("已删除配置: " + currentItem.taskName);
-            loadConfig();  // 刷新配置
+            loadListWidgetData();  // 刷新配置
             setCurrentItem("", ""); //清空当前选择
+            if (m_configArray.size() > 0)
+            {
+                const QString id = m_configArray[0].toObject()["id"].toString();
+                const QString name = m_configArray[0].toObject()["name"].toString();
+                setCurrentItem(id, name);
+            }
         }
         else
         {
@@ -359,10 +446,56 @@ void mainwindow::onProgrammeContentAddBtnClicked()
     QJsonObject empty;
     EditTaskDialog* dlg = new EditTaskDialog(EditMode::Add,empty,nullptr); // 非模态
     dlg->show();
-    connect(dlg, &EditTaskDialog::accepted, [dlg]() {
+    connect(dlg, &EditTaskDialog::accepted, [dlg, this]() {
         QJsonObject data = dlg->resultData();
         // 保存 JSON
-        dlg->deleteLater(); // 这里直接用 dlg
-        qDebug() << data.toVariantMap();
+        saveBase64ImageToFile(data);
+        addConfigToJsonFile(CONFIG_PATH,currentItem.id,data);
+        QTimer::singleShot(0, dlg, &QObject::deleteLater);  // 延迟一拍
+        showCurrentSelectStepsInTable();
     });
+}
+
+void mainwindow::showOpenCVIdentifyImage(const QString& savePath) const
+{
+    if (savePath.isEmpty()) {
+        qWarning() << "[WARN] showOpenCVIdentifyImage: 路径为空";
+        ui->openCVIdentifyLabel->clear();
+        ui->openCVIdentifyLabel->setText("无图像");
+        return;
+    }
+
+    // 1️⃣ 用 OpenCV 读取图像
+    cv::Mat img = cv::imread(savePath.toStdString());
+    if (img.empty()) {
+        qWarning() << "[ERROR] 无法加载图片:" << savePath;
+        ui->openCVIdentifyLabel->clear();
+        ui->openCVIdentifyLabel->setText("加载失败");
+        return;
+    }
+
+    // 2️⃣ 转换为 Qt 可识别格式（BGR → RGB）
+    cv::cvtColor(img, img, cv::COLOR_BGR2RGB);
+
+    // 3️⃣ 封装成 QImage（不拷贝数据）
+    QImage qimg(
+        img.data,
+        img.cols,
+        img.rows,
+        static_cast<int>(img.step),
+        QImage::Format_RGB888
+    );
+
+    // 4️⃣ 缩放显示：保持比例完整显示在 QLabel 内
+    QSize labelSize = ui->openCVIdentifyLabel->size();
+    QPixmap pixmap = QPixmap::fromImage(qimg).scaled(
+        labelSize,
+        Qt::KeepAspectRatio,
+        Qt::SmoothTransformation
+    );
+
+    // 5️⃣ 设置显示
+    ui->openCVIdentifyLabel->setPixmap(pixmap);
+    ui->openCVIdentifyLabel->setAlignment(Qt::AlignCenter);
+    ui->openCVIdentifyLabel->setScaledContents(false);  // 不拉伸变形
 }

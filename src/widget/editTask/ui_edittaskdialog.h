@@ -32,19 +32,19 @@ public:
     {
         if (EditTaskDialog->objectName().isEmpty())
             EditTaskDialog->setObjectName("EditTaskDialog");
-        EditTaskDialog->resize(404, 472);
+        EditTaskDialog->resize(479, 496);
         comboBox = new QComboBox(EditTaskDialog);
         comboBox->setObjectName("comboBox");
         comboBox->setGeometry(QRect(140, 40, 191, 21));
         stackedWidget = new QStackedWidget(EditTaskDialog);
         stackedWidget->setObjectName("stackedWidget");
-        stackedWidget->setGeometry(QRect(80, 100, 251, 261));
+        stackedWidget->setGeometry(QRect(80, 100, 301, 311));
         label = new QLabel(EditTaskDialog);
         label->setObjectName("label");
         label->setGeometry(QRect(80, 40, 61, 20));
         buttonBox = new QDialogButtonBox(EditTaskDialog);
         buttonBox->setObjectName("buttonBox");
-        buttonBox->setGeometry(QRect(120, 430, 161, 23));
+        buttonBox->setGeometry(QRect(150, 450, 161, 23));
         buttonBox->setStandardButtons(QDialogButtonBox::StandardButton::Cancel|QDialogButtonBox::StandardButton::Ok);
 
         retranslateUi(EditTaskDialog);

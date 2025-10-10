@@ -38,6 +38,9 @@
      <height>131</height>
     </rect>
    </property>
+   <property name="editTriggers">
+    <set>QAbstractItemView::EditTrigger::DoubleClicked</set>
+   </property>
   </widget>
   <widget class="QLabel" name="label_2">
    <property name="geometry">
@@ -143,7 +146,7 @@
     <string>循环次数</string>
    </property>
   </widget>
-  <widget class="QSpinBox" name="spinBox">
+  <widget class="QSpinBox" name="taskCycleNumber">
    <property name="geometry">
     <rect>
      <x>620</x>
@@ -219,6 +222,19 @@
    </property>
    <property name="text">
     <string>删除方案</string>
+   </property>
+  </widget>
+  <widget class="QLabel" name="openCVIdentifyLabel">
+   <property name="geometry">
+    <rect>
+     <x>470</x>
+     <y>50</y>
+     <width>381</width>
+     <height>201</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string/>
    </property>
   </widget>
  </widget>

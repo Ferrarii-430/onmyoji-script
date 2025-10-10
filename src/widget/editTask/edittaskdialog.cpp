@@ -10,7 +10,6 @@
 #include "../typeOpenCVForm/typeopencvform.h"
 #include "../waitForm/waitform.h"
 #include "ui_EditTaskDialog.h"
-#include "../common/ConfigTypeEnum.h"
 
 EditTaskDialog::EditTaskDialog(EditMode mode, const QJsonObject &stepData, QWidget *parent) :
     QDialog(parent), ui(new Ui::EditTaskDialog) {
@@ -21,8 +20,8 @@ EditTaskDialog::EditTaskDialog(EditMode mode, const QJsonObject &stepData, QWidg
     ui->comboBox->addItem("等待");
 
     // 构造函数里
-    TypeOpenCVForm* typeForm = new TypeOpenCVForm(this);
-    WaitForm* waitForm = new WaitForm(this);
+    typeForm = new TypeOpenCVForm(this);
+    waitForm = new WaitForm(this);
 
     ui->stackedWidget->addWidget(typeForm);  // index 0
     ui->stackedWidget->addWidget(waitForm);  // index 1
@@ -82,7 +81,7 @@ EditTaskDialog::~EditTaskDialog() {
 }
 
 
-void EditTaskDialog::setCurrentIndex()
-{
-
-}
+// void EditTaskDialog::setCurrentIndex()
+// {
+//
+// }

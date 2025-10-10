@@ -10,6 +10,12 @@
     <height>386</height>
    </rect>
   </property>
+  <property name="sizePolicy">
+   <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+    <horstretch>0</horstretch>
+    <verstretch>0</verstretch>
+   </sizepolicy>
+  </property>
   <property name="windowTitle">
    <string>TypeOpenCVForm</string>
   </property>
@@ -34,7 +40,7 @@
      </widget>
     </item>
     <item row="0" column="1">
-     <widget class="QLineEdit" name="lineEdit"/>
+     <widget class="QLineEdit" name="lineTaskNameEdit"/>
     </item>
     <item row="1" column="0">
      <widget class="QLabel" name="label_2">
@@ -42,9 +48,6 @@
        <string>分数阈值</string>
       </property>
      </widget>
-    </item>
-    <item row="1" column="1">
-     <widget class="QSpinBox" name="spinBox"/>
     </item>
     <item row="2" column="0">
      <widget class="QLabel" name="label_3">
@@ -54,7 +57,7 @@
      </widget>
     </item>
     <item row="2" column="1">
-     <widget class="QCheckBox" name="checkBox">
+     <widget class="QCheckBox" name="randomClickCheckBox">
       <property name="text">
        <string/>
       </property>
@@ -76,10 +79,22 @@
     </item>
     <item row="4" column="1">
      <widget class="QLabel" name="labelPreview">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
       <property name="text">
        <string/>
       </property>
+      <property name="scaledContents">
+       <bool>false</bool>
+      </property>
      </widget>
+    </item>
+    <item row="1" column="1">
+     <widget class="QDoubleSpinBox" name="spinScoreBox"/>
     </item>
    </layout>
   </widget>

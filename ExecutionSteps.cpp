@@ -3,25 +3,22 @@
 //
 
 #include "ExecutionSteps.h"
-
 #include <bemapiset.h>
 #include <iostream>
-#include <qwindowdefs_win.h>
 #include <windows.h>
 #include <tlhelp32.h>
 #include <psapi.h>
 #include <string>
 #include <vector>
-#include <iostream>
 #include <thread>
 #include <chrono>
 #include <filesystem>
 #include <dwmapi.h>
 #include <opencv2/opencv.hpp>
 #include <algorithm>
+#include <QDir>
 #include <random>
 #include <src/widget/main/mainwindow.h>
-
 #include "Logger.h"
 
 ExecutionSteps& ExecutionSteps::getInstance() {
@@ -94,7 +91,7 @@ HWND ExecutionSteps::findWindowByPid(DWORD pid) {
     return ctx.res;
 }
 
-void ExecutionSteps::opencvRecognizesAndClick(const std::string& templPath)
+QString ExecutionSteps::opencvRecognizesAndClick(const QString& templPath, const double threshold, const bool randomClick)
 {
     cv::Mat winImg;
     bool ok = false;
@@ -109,31 +106,64 @@ void ExecutionSteps::opencvRecognizesAndClick(const std::string& templPath)
     if (!ok)
     {
         Logger::log(QString("5次重试未能捕获窗口。任务结束"));
-        return;
+        return nullptr;
     }
 
     //加载模板文件
-    cv::Mat templ = cv::imread(templPath, cv::IMREAD_COLOR);
+    cv::Mat templ = cv::imread(templPath.toStdString(), cv::IMREAD_COLOR);
     if (templ.empty()) {
         Logger::log("模板图片加载失败" + templPath);
-        return;
+        return nullptr;
     }
 
     // 在窗口图像中查找模板
+    double score = 0.0;
     cv::Rect matchRect;
-    double score;
     bool found = findTemplateMultiScaleInMatNMS(winImg, templ, matchRect, score,
-                                             0.9, 1.15, 0.04, 0.86); // 根据需要调整
+                                             0.4, 1, 0.05, threshold); // 参数根据需要调整
 
     if (!found) {
-        Logger::log(QString("未找到匹配区域"));
-        return;
+        // Logger::log(QString("未找到匹配区域"));
+        Logger::log(QString("未找到匹配区域! score=%1").arg(score));
+        return nullptr;
     }
 
-    cv::Point clickPt = getRandomPointInRect(matchRect);
-    Logger::log("随机点击点: (" + std::to_string(clickPt.x) + ", " + std::to_string(clickPt.y) + ")");
+    cv::Point clickPt;
+    if (randomClick) {
+        // 随机点击模式：在匹配区域内随机点击
+        clickPt = getRandomPointInRect(matchRect);
+        Logger::log("随机点击点: (" + std::to_string(clickPt.x) + ", " + std::to_string(clickPt.y) + ")");
+    } else {
+        // 中心点击模式：点击匹配区域的中心点
+        clickPt = cv::Point(matchRect.x + matchRect.width / 2,
+                           matchRect.y + matchRect.height / 2);
+        Logger::log("中心点击点: (" + std::to_string(clickPt.x) + ", " + std::to_string(clickPt.y) + ")");
+    }
+
+    // 保存带识别框和点击位置的图片
+    cv::Mat resultImg = winImg.clone();
+
+    // 绘制识别框（绿色）
+    cv::rectangle(resultImg, matchRect, cv::Scalar(0, 255, 0), 2);
+
+    // 绘制点击位置（红色圆点）
+    cv::circle(resultImg, clickPt, 5, cv::Scalar(0, 0, 255), -1);
+
+    // 确保目录存在
+    QString saveDir = QCoreApplication::applicationDirPath() + "/src/resource/thumbnail";
+    QDir dir(saveDir);
+    if (!dir.exists()) {
+        dir.mkpath(".");
+    }
+
+    // 保存图片（覆盖保存）
+    QString savePath = saveDir + "/debug_match_result.jpg";
+    cv::imwrite(savePath.toStdString(), resultImg);
+    // Logger::log("已保存识别结果图片: " + savePath);
 
     clickInWindow(clickPt);
+
+    return savePath;
 }
 
 // 安全捕获窗口到 cv::Mat - 完全避免AVX2问题
@@ -326,48 +356,117 @@ bool ExecutionSteps::captureWindowToMat(HWND hwnd, cv::Mat& outBGR) {
 }
 
 // 多尺度模板匹配，返回最优匹配矩形和置信度
-bool ExecutionSteps::findTemplateMultiScaleInMatNMS(const cv::Mat& haystack, const cv::Mat& needle, cv::Rect& outRect, double& outScore,
-                                    double scaleMin = 0.8, double scaleMax = 1.25, double scaleStep = 0.05, double threshold = 0.85)
-{
+bool ExecutionSteps::findTemplateMultiScaleInMatNMS(const cv::Mat& haystack, const cv::Mat& needle,
+                                                   cv::Rect& outRect, double& outScore,
+                                                   double scaleMin, double scaleMax,
+                                                   double scaleStep, double threshold) {
     outScore = -1;
+
+    // 详细检查输入
     if (haystack.empty() || needle.empty()) {
-        std::cout << "[ERROR] haystack 或 needle 为空" << std::endl;
+        Logger::log(QString("[ERROR] 输入图像为空"));
         return false;
     }
 
-    cv::Mat gHay, gNeedle;
+    if (haystack.cols == 0 || haystack.rows == 0 ||
+        needle.cols == 0 || needle.rows == 0) {
+        Logger::log(QString("[ERROR] 输入图像尺寸为0"));
+        return false;
+    }
+
+    // 强制禁用所有优化
     cv::setUseOptimized(false);
-    cvtColor(haystack, gHay, cv::COLOR_BGR2GRAY);
-    cvtColor(needle, gNeedle, cv::COLOR_BGR2GRAY);
+
+    cv::Mat gHay, gNeedle;
+
+    // 安全的图像转换
+    try {
+        if (haystack.channels() == 3) {
+            cv::cvtColor(haystack, gHay, cv::COLOR_BGR2GRAY);
+        } else {
+            gHay = haystack.clone();
+        }
+
+        if (needle.channels() == 3) {
+            cv::cvtColor(needle, gNeedle, cv::COLOR_BGR2GRAY);
+        } else {
+            gNeedle = needle.clone();
+        }
+    } catch (const cv::Exception& e) {
+        Logger::log(QString("[ERROR] 图像转换失败: %1").arg(e.what()));
+        return false;
+    }
+
+    // 验证转换结果
+    if (gHay.empty() || gNeedle.empty()) {
+        Logger::log(QString("[ERROR] 灰度图像为空"));
+        return false;
+    }
 
     std::vector<cv::Rect> candidateRects;
     std::vector<double> candidateScores;
 
-    for (double s = scaleMin; s <= scaleMax; s += scaleStep) {
-        cv::Mat resizedNeedle;
-        resize(gNeedle, resizedNeedle, cv::Size(), s, s, cv::INTER_LINEAR);
-        if (resizedNeedle.cols < 8 || resizedNeedle.rows < 8) continue;
-        if (resizedNeedle.cols > gHay.cols || resizedNeedle.rows > gHay.rows) continue;
+    // 使用更保守的尺度参数
+    for (double s = scaleMin; s <= scaleMax + scaleStep/2; s += scaleStep) {
+        try {
+            // 计算新尺寸
+            int newWidth = std::max(1, static_cast<int>(gNeedle.cols * s));
+            int newHeight = std::max(1, static_cast<int>(gNeedle.rows * s));
 
-        cv::Mat result;
-        matchTemplate(gHay, resizedNeedle, result, cv::TM_CCOEFF_NORMED);
+            // 严格的尺寸检查
+            if (newWidth < 10 || newHeight < 10) {
+                continue;
+            }
+            if (newWidth > gHay.cols || newHeight > gHay.rows) {
+                continue;
+            }
 
-        double minVal, maxVal;
-        cv::Point minLoc, maxLoc;
-        minMaxLoc(result, &minVal, &maxVal, &minLoc, &maxLoc);
+            cv::Mat resizedNeedle;
 
-        // 打印调试日志
-        Logger::log(QString("[LOG] scale=%1 minVal=%2 maxVal=%3 pos=(%4,%5)")
-            .arg(s)
-            .arg(minVal)
-            .arg(maxVal)
-            .arg(maxLoc.x)
-            .arg(maxLoc.y));
+            // 使用INTER_NEAREST，最安全的插值方法
+            cv::resize(gNeedle, resizedNeedle, cv::Size(newWidth, newHeight), 0, 0, cv::INTER_NEAREST);
 
-        if (maxVal >= threshold) {
-            cv::Rect r(maxLoc.x, maxLoc.y, resizedNeedle.cols, resizedNeedle.rows);
-            candidateRects.push_back(r);
-            candidateScores.push_back(maxVal);
+            if (resizedNeedle.empty()) {
+                continue;
+            }
+
+            cv::Mat result;
+
+            // 使用try-catch包装可能崩溃的操作
+            try {
+                cv::matchTemplate(gHay, resizedNeedle, result, cv::TM_CCOEFF_NORMED);
+            } catch (...) {
+                Logger::log(QString("[WARN] matchTemplate 异常，跳过该尺度"));
+                continue;
+            }
+
+            if (result.empty()) {
+                continue;
+            }
+
+            double minVal, maxVal;
+            cv::Point minLoc, maxLoc;
+
+            try {
+                cv::minMaxLoc(result, &minVal, &maxVal, &minLoc, &maxLoc);
+            } catch (...) {
+                Logger::log(QString("[WARN] minMaxLoc 异常，跳过该尺度"));
+                continue;
+            }
+
+            Logger::log(QString("[LOG] scale=%1 maxVal=%2 pos=(%3,%4) size=%5x%6")
+                .arg(s).arg(maxVal).arg(maxLoc.x).arg(maxLoc.y)
+                .arg(resizedNeedle.cols).arg(resizedNeedle.rows));
+
+            if (maxVal >= threshold) {
+                cv::Rect r(maxLoc.x, maxLoc.y, resizedNeedle.cols, resizedNeedle.rows);
+                candidateRects.push_back(r);
+                candidateScores.push_back(maxVal);
+            }
+
+        } catch (const std::exception& e) {
+            Logger::log(QString("[WARN] 尺度 %1 处理异常: %2").arg(s).arg(e.what()));
+            continue;
         }
     }
 
@@ -376,15 +475,51 @@ bool ExecutionSteps::findTemplateMultiScaleInMatNMS(const cv::Mat& haystack, con
         return false;
     }
 
-    // NMS 合并重叠区域
-    std::vector<cv::Rect> mergedRects = nonMaxSuppression(candidateRects, 0.3f);
+    // 简单的NMS实现
+    std::vector<bool> keep(candidateRects.size(), true);
 
-    // 找到分数最高的矩形
-    auto maxIt = std::max_element(candidateScores.begin(), candidateScores.end());
-    int idx = std::distance(candidateScores.begin(), maxIt);
+    for (size_t i = 0; i < candidateRects.size(); ++i) {
+        if (!keep[i]) continue;
 
-    outRect = candidateRects[idx];
-    outScore = candidateScores[idx];
+        for (size_t j = i + 1; j < candidateRects.size(); ++j) {
+            if (!keep[j]) continue;
+
+            cv::Rect intersection = candidateRects[i] & candidateRects[j];
+            double overlap = intersection.area() / (double)std::min(candidateRects[i].area(), candidateRects[j].area());
+
+            if (overlap > 0.3) {
+                // 保留分数更高的
+                if (candidateScores[j] > candidateScores[i]) {
+                    keep[i] = false;
+                } else {
+                    keep[j] = false;
+                }
+            }
+        }
+    }
+
+    // 收集保留的候选框
+    std::vector<cv::Rect> keptRects;
+    std::vector<double> keptScores;
+
+    for (size_t i = 0; i < candidateRects.size(); ++i) {
+        if (keep[i]) {
+            keptRects.push_back(candidateRects[i]);
+            keptScores.push_back(candidateScores[i]);
+        }
+    }
+
+    if (keptScores.empty()) {
+        Logger::log(QString("[WARN] NMS后无候选框"));
+        return false;
+    }
+
+    // 找到最高分
+    auto maxIt = std::max_element(keptScores.begin(), keptScores.end());
+    int idx = std::distance(keptScores.begin(), maxIt);
+
+    outRect = keptRects[idx];
+    outScore = keptScores[idx];
 
     Logger::log(QString("[RESULT] bestScore=%1 rect=(%2,%3,%4x%5)")
             .arg(outScore)
@@ -460,7 +595,7 @@ void ExecutionSteps::clickInWindow(const cv::Point& ptClient) {
 
     SendInput(2, inputs, sizeof(INPUT));
 
-    Logger::log(QString("已点击窗口 (%1, %2")
+    Logger::log(QString("已点击窗口 (%1, %2)")
         .arg(pt.x)
         .arg(pt.y));
 

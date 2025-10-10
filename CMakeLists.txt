@@ -3,8 +3,10 @@ project(qtTest)
 
 find_package(OpenCV REQUIRED)
 
-file(COPY ${CMAKE_SOURCE_DIR}/src/resource/config.json
-        DESTINATION ${CMAKE_BINARY_DIR}/src/resource)
+#file(COPY ${CMAKE_SOURCE_DIR}/src/resource/config.json
+#        DESTINATION ${CMAKE_BINARY_DIR}/src/resource)
+file(COPY ${CMAKE_SOURCE_DIR}/src/resource/
+        DESTINATION ${CMAKE_BINARY_DIR}/src/resource/)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_AUTOMOC ON)
@@ -89,3 +91,9 @@ if (WIN32 AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
                 "$<TARGET_FILE_DIR:${PROJECT_NAME}>")
     endforeach (QT_LIB)
 endif ()
+
+# 针对MinGW的特殊设置
+if(MINGW)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mno-avx -mno-avx2 -march=core2")
+    set(OpenCV_LIBS opencv_core opencv_imgproc opencv_highgui opencv_imgcodecs)
+endif()

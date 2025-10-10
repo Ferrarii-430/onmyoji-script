@@ -4,6 +4,7 @@
 
 #ifndef EXECUTIONSTEPS_H
 #define EXECUTIONSTEPS_H
+#include <QString>
 #include <string>
 #include <windows.h>
 #include <opencv2/core/mat.hpp>
@@ -18,7 +19,7 @@ public:
     bool checkHWNDHandle();
     DWORD findPidByProcessName(const std::string& procName);
     HWND findWindowByPid(DWORD pid);
-    void opencvRecognizesAndClick(const std::string& templPath);
+    QString opencvRecognizesAndClick(const QString& templPath, double threshold, bool randomClick);
     bool captureWindowToMat(HWND hwnd, cv::Mat& outBGR);
     bool findTemplateMultiScaleInMatNMS(const cv::Mat& haystack, const cv::Mat& needle, cv::Rect& outRect,
                                         double& outScore,

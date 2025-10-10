@@ -5,6 +5,7 @@
 #ifndef TYPEOPENCVFORM_H
 #define TYPEOPENCVFORM_H
 
+#include <QJsonObject>
 #include <QWidget>
 
 
@@ -20,15 +21,18 @@ public:
     ~TypeOpenCVForm() override;
     void loadFromJson(const QJsonObject &obj);
     QJsonObject toJson() const;
-void onCaptureClicked();
+
 
 
 private slots:
     void onCaptureButtonClicked();
+    void updatePreview() const;
 
 private:
     Ui::TypeOpenCVForm *ui;
     QPixmap capturedImage;  // 保存截图
+    QPixmap originalPixmap_;
+    QJsonObject stepDataCopy;
 };
 
 

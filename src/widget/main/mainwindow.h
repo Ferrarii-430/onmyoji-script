@@ -34,16 +34,19 @@ public:
     void appendLogToUI(const QString &msg);
     void onProgrammeAddBtnClicked();
     void onProgrammeRemoveBtnClicked();
-void onProgrammeContentAddBtnClicked();
+    void onProgrammeContentAddBtnClicked();
+    void showOpenCVIdentifyImage(const QString& savePath) const;
 
 private:
     void loadListWidgetData();
     void onItemClicked(QListWidgetItem *item);
     void loadConfig();
     void showStepsInTable(const QJsonArray &steps);
+    void showCurrentSelectStepsInTable();
     void startTaskButtonClick();
     void stopTaskButtonClick();
     void setCurrentItem(const QString &id, const QString &taskName);
+    bool m_isRunning = false;
 };
 
 

@@ -12,10 +12,10 @@
 #include <QtCore/QVariant>
 #include <QtWidgets/QApplication>
 #include <QtWidgets/QCheckBox>
+#include <QtWidgets/QDoubleSpinBox>
 #include <QtWidgets/QFormLayout>
 #include <QtWidgets/QLabel>
 #include <QtWidgets/QLineEdit>
-#include <QtWidgets/QSpinBox>
 #include <QtWidgets/QToolButton>
 #include <QtWidgets/QWidget>
 
@@ -27,20 +27,25 @@ public:
     QWidget *formLayoutWidget;
     QFormLayout *formLayout;
     QLabel *label;
-    QLineEdit *lineEdit;
+    QLineEdit *lineTaskNameEdit;
     QLabel *label_2;
-    QSpinBox *spinBox;
     QLabel *label_3;
-    QCheckBox *checkBox;
+    QCheckBox *randomClickCheckBox;
     QLabel *label_4;
     QToolButton *btnCapture;
     QLabel *labelPreview;
+    QDoubleSpinBox *spinScoreBox;
 
     void setupUi(QWidget *TypeOpenCVForm)
     {
         if (TypeOpenCVForm->objectName().isEmpty())
             TypeOpenCVForm->setObjectName("TypeOpenCVForm");
         TypeOpenCVForm->resize(518, 386);
+        QSizePolicy sizePolicy(QSizePolicy::Policy::Expanding, QSizePolicy::Policy::Expanding);
+        sizePolicy.setHorizontalStretch(0);
+        sizePolicy.setVerticalStretch(0);
+        sizePolicy.setHeightForWidth(TypeOpenCVForm->sizePolicy().hasHeightForWidth());
+        TypeOpenCVForm->setSizePolicy(sizePolicy);
         formLayoutWidget = new QWidget(TypeOpenCVForm);
         formLayoutWidget->setObjectName("formLayoutWidget");
         formLayoutWidget->setGeometry(QRect(0, 10, 511, 371));
@@ -53,30 +58,25 @@ public:
 
         formLayout->setWidget(0, QFormLayout::ItemRole::LabelRole, label);
 
-        lineEdit = new QLineEdit(formLayoutWidget);
-        lineEdit->setObjectName("lineEdit");
+        lineTaskNameEdit = new QLineEdit(formLayoutWidget);
+        lineTaskNameEdit->setObjectName("lineTaskNameEdit");
 
-        formLayout->setWidget(0, QFormLayout::ItemRole::FieldRole, lineEdit);
+        formLayout->setWidget(0, QFormLayout::ItemRole::FieldRole, lineTaskNameEdit);
 
         label_2 = new QLabel(formLayoutWidget);
         label_2->setObjectName("label_2");
 
         formLayout->setWidget(1, QFormLayout::ItemRole::LabelRole, label_2);
 
-        spinBox = new QSpinBox(formLayoutWidget);
-        spinBox->setObjectName("spinBox");
-
-        formLayout->setWidget(1, QFormLayout::ItemRole::FieldRole, spinBox);
-
         label_3 = new QLabel(formLayoutWidget);
         label_3->setObjectName("label_3");
 
         formLayout->setWidget(2, QFormLayout::ItemRole::LabelRole, label_3);
 
-        checkBox = new QCheckBox(formLayoutWidget);
-        checkBox->setObjectName("checkBox");
+        randomClickCheckBox = new QCheckBox(formLayoutWidget);
+        randomClickCheckBox->setObjectName("randomClickCheckBox");
 
-        formLayout->setWidget(2, QFormLayout::ItemRole::FieldRole, checkBox);
+        formLayout->setWidget(2, QFormLayout::ItemRole::FieldRole, randomClickCheckBox);
 
         label_4 = new QLabel(formLayoutWidget);
         label_4->setObjectName("label_4");
@@ -90,8 +90,16 @@ public:
 
         labelPreview = new QLabel(formLayoutWidget);
         labelPreview->setObjectName("labelPreview");
+        sizePolicy.setHeightForWidth(labelPreview->sizePolicy().hasHeightForWidth());
+        labelPreview->setSizePolicy(sizePolicy);
+        labelPreview->setScaledContents(false);
 
         formLayout->setWidget(4, QFormLayout::ItemRole::FieldRole, labelPreview);
+
+        spinScoreBox = new QDoubleSpinBox(formLayoutWidget);
+        spinScoreBox->setObjectName("spinScoreBox");
+
+        formLayout->setWidget(1, QFormLayout::ItemRole::FieldRole, spinScoreBox);
 
 
         retranslateUi(TypeOpenCVForm);
@@ -105,7 +113,7 @@ public:
         label->setText(QCoreApplication::translate("TypeOpenCVForm", "\344\273\273\345\212\241\345\220\215\347\247\260", nullptr));
         label_2->setText(QCoreApplication::translate("TypeOpenCVForm", "\345\210\206\346\225\260\351\230\210\345\200\274", nullptr));
         label_3->setText(QCoreApplication::translate("TypeOpenCVForm", "\346\230\257\345\220\246\351\232\217\346\234\272\347\202\271\345\207\273", nullptr));
-        checkBox->setText(QString());
+        randomClickCheckBox->setText(QString());
         label_4->setText(QCoreApplication::translate("TypeOpenCVForm", "\346\210\252\345\233\276", nullptr));
         btnCapture->setText(QString());
         labelPreview->setText(QString());

@@ -36,12 +36,13 @@ public:
     QToolButton *startTaskButton;
     QToolButton *stopTaskButton;
     QLabel *label_5;
-    QSpinBox *spinBox;
+    QSpinBox *taskCycleNumber;
     QLabel *label_6;
     QLabel *currentTaskName;
     QPushButton *programmeAddBtn;
     QPushButton *programmeContentAddBtn;
     QPushButton *programmeRemoveBtn;
+    QLabel *openCVIdentifyLabel;
 
     void setupUi(QWidget *mainwindow)
     {
@@ -55,6 +56,7 @@ public:
         listWidget = new QListWidget(mainwindow);
         listWidget->setObjectName("listWidget");
         listWidget->setGeometry(QRect(10, 40, 181, 131));
+        listWidget->setEditTriggers(QAbstractItemView::EditTrigger::DoubleClicked);
         label_2 = new QLabel(mainwindow);
         label_2->setObjectName("label_2");
         label_2->setGeometry(QRect(10, 185, 81, 21));
@@ -81,10 +83,10 @@ public:
         label_5 = new QLabel(mainwindow);
         label_5->setObjectName("label_5");
         label_5->setGeometry(QRect(542, 350, 61, 20));
-        spinBox = new QSpinBox(mainwindow);
-        spinBox->setObjectName("spinBox");
-        spinBox->setGeometry(QRect(620, 350, 70, 21));
-        spinBox->setMaximum(999);
+        taskCycleNumber = new QSpinBox(mainwindow);
+        taskCycleNumber->setObjectName("taskCycleNumber");
+        taskCycleNumber->setGeometry(QRect(620, 350, 70, 21));
+        taskCycleNumber->setMaximum(999);
         label_6 = new QLabel(mainwindow);
         label_6->setObjectName("label_6");
         label_6->setGeometry(QRect(520, 310, 81, 20));
@@ -100,6 +102,9 @@ public:
         programmeRemoveBtn = new QPushButton(mainwindow);
         programmeRemoveBtn->setObjectName("programmeRemoveBtn");
         programmeRemoveBtn->setGeometry(QRect(130, 10, 61, 23));
+        openCVIdentifyLabel = new QLabel(mainwindow);
+        openCVIdentifyLabel->setObjectName("openCVIdentifyLabel");
+        openCVIdentifyLabel->setGeometry(QRect(480, 50, 361, 191));
 
         retranslateUi(mainwindow);
 
@@ -121,6 +126,7 @@ public:
         programmeAddBtn->setText(QCoreApplication::translate("mainwindow", "\346\267\273\345\212\240\346\226\271\346\241\210", nullptr));
         programmeContentAddBtn->setText(QCoreApplication::translate("mainwindow", "\346\267\273\345\212\240\346\226\271\346\241\210\345\206\205\345\256\271", nullptr));
         programmeRemoveBtn->setText(QCoreApplication::translate("mainwindow", "\345\210\240\351\231\244\346\226\271\346\241\210", nullptr));
+        openCVIdentifyLabel->setText(QString());
     } // retranslateUi
 
 };

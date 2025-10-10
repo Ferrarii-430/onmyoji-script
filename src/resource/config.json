@@ -4,17 +4,21 @@
     "name": "配置1",
     "steps": [
       {
-        "id": "",
-        "taskName": "识图别周年庆图标",
+        "stepsId": "207B98D2-6276-772E-4AAA-A0C8B84834D1",
+        "taskName": "识图别式神录图标",
         "type": "OPENCV",
-        "score": 0.86,
-        "randomClick": false,
-        "imagePath": ""
+        "score": 0.55,
+        "randomClick": true,
+        "imagePath": "D:/CppProduct/qtTest/cmake-build-gt-cmake-692/src/resource/screenshot/207B98D2-6276-772E-4AAA-A0C8B84834D1.png",
+        "time": null
       },
       {
-        "id": "",
+        "stepsId": "F25F2899-D0F3-731F-5185-32B8AFA70F21",
         "taskName": "等待2秒",
         "type": "WAIT",
+        "score": null,
+        "randomClick": null,
+        "imagePath": null,
         "time": 2000
       }
     ]
