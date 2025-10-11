@@ -11,7 +11,10 @@
 
 #include <QtCore/QVariant>
 #include <QtWidgets/QApplication>
+#include <QtWidgets/QFormLayout>
 #include <QtWidgets/QLabel>
+#include <QtWidgets/QLineEdit>
+#include <QtWidgets/QSpinBox>
 #include <QtWidgets/QWidget>
 
 QT_BEGIN_NAMESPACE
@@ -19,16 +22,47 @@ QT_BEGIN_NAMESPACE
 class Ui_WaitForm
 {
 public:
+    QWidget *formLayoutWidget;
+    QFormLayout *formLayout;
     QLabel *label;
+    QSpinBox *spinBox;
+    QLabel *label_2;
+    QLineEdit *lineTaskNameEdit;
 
     void setupUi(QWidget *WaitForm)
     {
         if (WaitForm->objectName().isEmpty())
             WaitForm->setObjectName("WaitForm");
         WaitForm->resize(400, 300);
-        label = new QLabel(WaitForm);
+        formLayoutWidget = new QWidget(WaitForm);
+        formLayoutWidget->setObjectName("formLayoutWidget");
+        formLayoutWidget->setGeometry(QRect(0, 10, 391, 281));
+        formLayout = new QFormLayout(formLayoutWidget);
+        formLayout->setObjectName("formLayout");
+        formLayout->setHorizontalSpacing(20);
+        formLayout->setContentsMargins(0, 0, 0, 0);
+        label = new QLabel(formLayoutWidget);
         label->setObjectName("label");
-        label->setGeometry(QRect(140, 110, 131, 21));
+
+        formLayout->setWidget(1, QFormLayout::ItemRole::LabelRole, label);
+
+        spinBox = new QSpinBox(formLayoutWidget);
+        spinBox->setObjectName("spinBox");
+        spinBox->setMaximum(60000);
+        spinBox->setSingleStep(100);
+
+        formLayout->setWidget(1, QFormLayout::ItemRole::FieldRole, spinBox);
+
+        label_2 = new QLabel(formLayoutWidget);
+        label_2->setObjectName("label_2");
+
+        formLayout->setWidget(0, QFormLayout::ItemRole::LabelRole, label_2);
+
+        lineTaskNameEdit = new QLineEdit(formLayoutWidget);
+        lineTaskNameEdit->setObjectName("lineTaskNameEdit");
+
+        formLayout->setWidget(0, QFormLayout::ItemRole::FieldRole, lineTaskNameEdit);
+
 
         retranslateUi(WaitForm);
 
@@ -38,7 +72,8 @@ public:
     void retranslateUi(QWidget *WaitForm)
     {
         WaitForm->setWindowTitle(QCoreApplication::translate("WaitForm", "waitForm", nullptr));
-        label->setText(QCoreApplication::translate("WaitForm", "\346\210\221\346\230\257\347\255\211\345\276\205\347\261\273\345\236\213", nullptr));
+        label->setText(QCoreApplication::translate("WaitForm", "\347\255\211\345\276\205\346\227\266\351\227\264\357\274\210\346\257\253\347\247\222\357\274\211", nullptr));
+        label_2->setText(QCoreApplication::translate("WaitForm", "\344\273\273\345\212\241\345\220\215\347\247\260", nullptr));
     } // retranslateUi
 
 };

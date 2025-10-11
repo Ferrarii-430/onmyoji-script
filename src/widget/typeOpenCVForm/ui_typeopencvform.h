@@ -98,6 +98,8 @@ public:
 
         spinScoreBox = new QDoubleSpinBox(formLayoutWidget);
         spinScoreBox->setObjectName("spinScoreBox");
+        spinScoreBox->setMaximum(1.000000000000000);
+        spinScoreBox->setSingleStep(0.010000000000000);
 
         formLayout->setWidget(1, QFormLayout::ItemRole::FieldRole, spinScoreBox);
 

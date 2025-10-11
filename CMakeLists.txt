@@ -32,7 +32,7 @@ find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets)
 # ------------------------------
 # 源码文件
 # ------------------------------
-add_executable(qtTest
+add_executable(qtTest WIN32
         main.cpp
 
         src/widget/main/mainwindow.cpp
@@ -63,6 +63,9 @@ add_executable(qtTest
 
         src/widget/typeOpenCVForm/ScreenCaptureWidget.cpp
         src/widget/typeOpenCVForm/ScreenCaptureWidget.h
+        src/widget/temp/temp.cpp
+        src/widget/temp/temp.h
+        src/widget/temp/temp.ui
 )
 
 # ------------------------------

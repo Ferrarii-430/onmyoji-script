@@ -56,6 +56,7 @@ mainwindow::mainwindow(QWidget *parent) :
     connect(ui->programmeContentAddBtn, &QToolButton::clicked,
             this, &mainwindow::onProgrammeContentAddBtnClicked);
 
+    //监听编辑方案名称
     connect(ui->listWidget, &QListWidget::itemChanged, this, [this](QListWidgetItem *item) {
         // 这里可以保存修改到配置文件等
         updateProgrammeContent(CONFIG_PATH, currentItem.id, item->text());
@@ -287,6 +288,12 @@ void mainwindow::startTaskButtonClick()
         }
     }
     QJsonArray steps = obj["steps"].toArray();
+
+    if (steps.size() == 0)
+    {
+        appendLog("当前方案的内容为空，任务停止");
+        return;
+    }
 
     if (m_isRunning) {
         appendLog("任务已在运行中");

@@ -22,13 +22,28 @@ WaitForm::~WaitForm() {
 
 void WaitForm::loadFromJson(const QJsonObject &obj)
 {
-
+    stepDataCopy = obj;
+    ui->lineTaskNameEdit->setText(obj["taskName"].toString());
+    ui->spinBox->setValue(obj["time"].toInt());
 }
 
 QJsonObject WaitForm::toJson() const {
+    if (!ui) {
+        qWarning() << "ui 是空指针";
+        return {};
+    }
+
     QJsonObject obj;
-    // obj["type"] = "OPENCV";
-    // obj["taskName"] = ui->lineEditTaskName->text();
-    // obj["threshold"] = ui->spinBoxThreshold->value();
+    if (stepDataCopy.isEmpty())
+    {
+        obj["stepsId"] = QUuid::createUuid().toString(QUuid::WithoutBraces);  // UUID;
+    }else
+    {
+        obj["stepsId"] = stepDataCopy["stepsId"]; //复制原始UUID
+    }
+    obj["type"] = "WAIT";
+    obj["taskName"] = ui->lineTaskNameEdit->text();
+    obj["time"] = ui->spinBox->value();
+
     return obj;
 }

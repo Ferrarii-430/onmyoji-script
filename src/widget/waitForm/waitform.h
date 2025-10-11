@@ -5,6 +5,7 @@
 #ifndef WAITFORM_H
 #define WAITFORM_H
 
+#include <QJsonObject>
 #include <QWidget>
 
 
@@ -22,6 +23,7 @@ public:
     QJsonObject toJson() const;
 private:
     Ui::WaitForm *ui;
+    QJsonObject stepDataCopy;
 };
 
 
