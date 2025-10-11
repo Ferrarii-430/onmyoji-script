@@ -95,7 +95,7 @@ QString ExecutionSteps::opencvRecognizesAndClick(const QString& templPath, const
 {
     cv::Mat winImg;
     bool ok = false;
-    for (int i = 0; i < 5; ++i)
+    for (int i = 0; i < 3; ++i)
     {
         ok = captureWindowToMat(hwnd, winImg);
         if (!ok || winImg.empty()) {
@@ -334,23 +334,6 @@ bool ExecutionSteps::captureWindowToMat(HWND hwnd, cv::Mat& outBGR) {
     Logger::log(QString("成功捕获完整窗口: %1x%2")
               .arg(outBGR.cols)
               .arg(outBGR.rows));
-
-    // 11. 调试输出
-    // try {
-    //     std::filesystem::path outDir = std::string(PROJECT_SOURCE_DIR) + "/debug";
-    //     std::filesystem::create_directories(outDir);
-    //     std::filesystem::path outPath = outDir / "debug_capture.png";
-    //
-    //     if (cv::imwrite(outPath.string(), outBGR)) {
-    //         std::cout << "调试截图保存到: " << outPath.string() << std::endl;
-    //
-    //         // 同时保存原始BGRA数据用于对比
-    //         cv::Mat debugBGRA(h, w, CV_8UC4, pixelData.data());
-    //         cv::imwrite((outDir / "debug_bgra.png").string(), debugBGRA);
-    //     }
-    // } catch (const std::exception& e) {
-    //     std::cerr << "保存调试截图失败: " << e.what() << std::endl;
-    // }
 
     return true;
 }

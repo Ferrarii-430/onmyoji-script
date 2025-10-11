@@ -7,7 +7,7 @@
 #include "mainwindow.h"
 #include "Logger.h"
 #include <iostream>
-#include<windows.h>
+#include <windows.h>
 #include "ui_mainwindow.h"
 #include <QFile>
 #include <QJsonArray>

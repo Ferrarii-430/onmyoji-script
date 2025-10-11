@@ -1,53 +1,83 @@
-cmake_minimum_required(VERSION 3.31)
-project(qtTest)
+cmake_minimum_required(VERSION 3.30.5)
+project(qtTest LANGUAGES CXX)
 
-find_package(OpenCV REQUIRED)
-
-#file(COPY ${CMAKE_SOURCE_DIR}/src/resource/config.json
-#        DESTINATION ${CMAKE_BINARY_DIR}/src/resource)
-file(COPY ${CMAKE_SOURCE_DIR}/src/resource/
-        DESTINATION ${CMAKE_BINARY_DIR}/src/resource/)
-
+# ------------------------------
+# 编译设置
+# ------------------------------
 set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-set(CMAKE_PREFIX_PATH "D:/QT/6.9.2/mingw_64")
+# ------------------------------
+# 路径配置
+# ------------------------------
+# Qt 安装目录（MinGW 版本）
+set(CMAKE_PREFIX_PATH
+        "D:/QT/6.9.2/mingw_64"
+        "D:/vcpkg/installed/x64-mingw-static"
+)
+#-DCMAKE_TOOLCHAIN_FILE=D:/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-mingw-dynamic
 
-find_package(Qt6 COMPONENTS
-        Core
-        Gui
-        Widgets
-        REQUIRED)
+# OpenCV
+find_package(OpenCV REQUIRED)
 
-add_executable(qtTest main.cpp
+# ------------------------------
+# Qt 组件
+# ------------------------------
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets)
+
+# ------------------------------
+# 源码文件
+# ------------------------------
+add_executable(qtTest
+        main.cpp
+
         src/widget/main/mainwindow.cpp
         src/widget/main/mainwindow.h
         src/widget/main/mainwindow.ui
+
         ExecutionSteps.cpp
         ExecutionSteps.h
+
         src/common/ConfigTypeEnum.cpp
         src/common/ConfigTypeEnum.h
         src/common/Logger.cpp
         src/common/Logger.h
         src/utils/common.cpp
         src/utils/common.h
+
         src/widget/editTask/edittaskdialog.cpp
         src/widget/editTask/edittaskdialog.h
         src/widget/editTask/edittaskdialog.ui
+
         src/widget/typeOpenCVForm/typeopencvform.cpp
         src/widget/typeOpenCVForm/typeopencvform.h
         src/widget/typeOpenCVForm/typeopencvform.ui
+
         src/widget/waitForm/waitform.cpp
         src/widget/waitForm/waitform.h
         src/widget/waitForm/waitform.ui
+
         src/widget/typeOpenCVForm/ScreenCaptureWidget.cpp
         src/widget/typeOpenCVForm/ScreenCaptureWidget.h
 )
 
+# ------------------------------
+# 宏定义 & 包含目录
+# ------------------------------
 add_definitions(-DPROJECT_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 
+include_directories(
+        ${CMAKE_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/src/common
+)
+
+# ------------------------------
+# 链接库
+# ------------------------------
 target_link_libraries(qtTest
         PRIVATE
         Qt6::Core
@@ -56,44 +86,47 @@ target_link_libraries(qtTest
         ${OpenCV_LIBS}
 )
 
-include_directories(
-        ${CMAKE_SOURCE_DIR}/src/common
-)
-include_directories(
-        ${CMAKE_SOURCE_DIR}
-)
+# ------------------------------
+# 拷贝资源文件
+# ------------------------------
+file(COPY ${CMAKE_SOURCE_DIR}/src/resource/
+        DESTINATION ${CMAKE_BINARY_DIR}/src/resource/)
 
-if (WIN32 AND NOT DEFINED CMAKE_TOOLCHAIN_FILE)
-    set(DEBUG_SUFFIX)
-    if (MSVC AND CMAKE_BUILD_TYPE MATCHES "Debug")
-        set(DEBUG_SUFFIX "d")
-    endif ()
-    set(QT_INSTALL_PATH "${CMAKE_PREFIX_PATH}")
-    if (NOT EXISTS "${QT_INSTALL_PATH}/bin")
-        set(QT_INSTALL_PATH "${QT_INSTALL_PATH}/..")
-        if (NOT EXISTS "${QT_INSTALL_PATH}/bin")
-            set(QT_INSTALL_PATH "${QT_INSTALL_PATH}/..")
-        endif ()
-    endif ()
-    if (EXISTS "${QT_INSTALL_PATH}/plugins/platforms/qwindows${DEBUG_SUFFIX}.dll")
-        add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E make_directory
-                "$<TARGET_FILE_DIR:${PROJECT_NAME}>/plugins/platforms/")
-        add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy
-                "${QT_INSTALL_PATH}/plugins/platforms/qwindows${DEBUG_SUFFIX}.dll"
-                "$<TARGET_FILE_DIR:${PROJECT_NAME}>/plugins/platforms/")
-    endif ()
-    foreach (QT_LIB Core Gui Widgets)
-        add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy
-                "${QT_INSTALL_PATH}/bin/Qt6${QT_LIB}${DEBUG_SUFFIX}.dll"
-                "$<TARGET_FILE_DIR:${PROJECT_NAME}>")
-    endforeach (QT_LIB)
-endif ()
+# ------------------------------
+# Qt 自动复制依赖 (Qt 6.5+)
+# ------------------------------
+qt_finalize_executable(qtTest)
 
-# 针对MinGW的特殊设置
-if(MINGW)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mno-avx -mno-avx2 -march=core2")
-    set(OpenCV_LIBS opencv_core opencv_imgproc opencv_highgui opencv_imgcodecs)
+
+# ------------------------------
+# Qt DLL 拷贝（MinGW 动态库模式）
+# ------------------------------
+if(WIN32 AND MINGW)
+    # Qt 二进制目录
+    set(QT_BIN_DIR "D:/QT/6.9.2/mingw_64/bin")
+    set(QT_PLUGINS_DIR "D:/QT/6.9.2/mingw_64/plugins")
+
+    # Qt 核心 DLL
+    foreach(QT_LIB Core Gui Widgets)
+        add_custom_command(TARGET qtTest POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${QT_BIN_DIR}/Qt6${QT_LIB}.dll"
+                "$<TARGET_FILE_DIR:qtTest>")
+    endforeach()
+
+    # 平台插件 qwindows.dll
+    add_custom_command(TARGET qtTest POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory
+            "$<TARGET_FILE_DIR:qtTest>/plugins/platforms")
+    add_custom_command(TARGET qtTest POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${QT_PLUGINS_DIR}/platforms/qwindows.dll"
+            "$<TARGET_FILE_DIR:qtTest>/plugins/platforms/")
 endif()
+
+# ------------------------------
+# 可选: 打印调试信息
+# ------------------------------
+message(STATUS "Qt prefix path: ${CMAKE_PREFIX_PATH}")
+message(STATUS "OpenCV include dirs: ${OpenCV_INCLUDE_DIRS}")
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")

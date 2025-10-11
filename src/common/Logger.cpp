@@ -5,7 +5,6 @@
 #include "Logger.h"
 #include "src/widget/main/mainwindow.h"
 #include <iostream>
-#include <QTextCursor>
 
 mainwindow* Logger::m_mainWindow = nullptr;
 

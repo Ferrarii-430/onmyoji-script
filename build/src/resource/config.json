@@ -1,0 +1,36 @@
+[
+  {
+    "id": "CC372B66-AFEC-4CBE-9E19-671CD02CFDC3",
+    "name": "配置1",
+    "steps": [
+      {
+        "stepsId": "207B98D2-6276-772E-4AAA-A0C8B84834D1",
+        "taskName": "识图别式神录图标",
+        "type": "OPENCV",
+        "score": 0.55,
+        "randomClick": true,
+        "imagePath": "D:/CppProduct/qtTest/cmake-build-gt-cmake-692/src/resource/screenshot/207B98D2-6276-772E-4AAA-A0C8B84834D1.png",
+        "time": null
+      },
+      {
+        "stepsId": "F25F2899-D0F3-731F-5185-32B8AFA70F21",
+        "taskName": "等待2秒",
+        "type": "WAIT",
+        "score": null,
+        "randomClick": null,
+        "imagePath": null,
+        "time": 2000
+      }
+    ]
+  },
+  {
+    "id": "DC42C888-2449-41D2-A894-095606E38D12",
+    "name": "配置2",
+    "steps": []
+  },
+  {
+    "id": "2B0C8FD1-F8A0-473D-A87C-8E5119563BC0",
+    "name": "配置3",
+    "steps": []
+  }
+]

@@ -27,14 +27,14 @@ int main(int argc, char* argv[])
     // std::cout << cv::getBuildInformation() << std::endl;
 
     // 运行时检查 CPU 功能（OpenCV 提供的检查）
-    std::cout << "check CPU AVX: " << cv::checkHardwareSupport(CV_CPU_AVX) << std::endl;
-    std::cout << "check CPU AVX2: " << cv::checkHardwareSupport(CV_CPU_AVX2) << std::endl;
+    // std::cout << "check CPU AVX: " << cv::checkHardwareSupport(CV_CPU_AVX) << std::endl;
+    // std::cout << "check CPU AVX2: " << cv::checkHardwareSupport(CV_CPU_AVX2) << std::endl;
 
     // 确保没有人为禁用优化
     // std::cout << "UseOptimized: " << cv::useOptimized() << std::endl;
 
     // 禁用OpenCV的优化（包括SIMD指令）
-    // cv::setUseOptimized(false);
+    cv::setUseOptimized(false);
 
     // 设置OpenCV日志级别（可选）
     cv::utils::logging::setLogLevel(cv::utils::logging::LOG_LEVEL_ERROR);
