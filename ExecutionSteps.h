@@ -19,6 +19,11 @@ public:
     bool checkHWNDHandle();
     DWORD findPidByProcessName(const std::string& procName);
     HWND findWindowByPid(DWORD pid);
+    QString getTargetProcessId();
+    bool getOnmyojiCaptureByPrintWindow(cv::Mat& winImg);
+    bool getOnmyojiCaptureByDllInjection(cv::Mat& winImg);
+    bool dllSetLogPath();
+    bool dllStopHook();
     QString opencvRecognizesAndClick(const QString& templPath, double threshold, bool randomClick);
     bool captureWindowToMat(HWND hwnd, cv::Mat& outBGR);
     bool findTemplateMultiScaleInMatNMS(const cv::Mat& haystack, const cv::Mat& needle, cv::Rect& outRect,
@@ -28,6 +33,8 @@ public:
     float rectIoU(const cv::Rect& a, const cv::Rect& b);
     cv::Point getRandomPointInRect(const cv::Rect& r);
     void clickInWindow(const cv::Point& ptClient);
+    bool deleteCaptureFile();
+    void clickInWindow2(const cv::Point& clickPoint);
 
 private:
     // 构造函数私有化，防止外部创建

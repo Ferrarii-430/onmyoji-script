@@ -19,8 +19,11 @@
 #include <QInputDialog>
 #include "src/utils/common.h"
 #include "QMessageBox"
+#include "SettingManager.h"
 #include "src/widget/editTask/edittaskdialog.h"
+#include "src/widget/setting/settingdialog.h"
 
+//TODO 🐶💩代码 有空我一定重构
 
 mainwindow::mainwindow(QWidget *parent) :
     QWidget(parent), ui(new Ui::mainwindow) {
@@ -28,9 +31,6 @@ mainwindow::mainwindow(QWidget *parent) :
 
     // 设置全局 Logger 的 mainwindow 指针
     Logger::setMainWindow(this);
-
-    // 测试
-    // Logger::log(QString("程序启动"));
 
     // 绑定选中信号
     connect(ui->listWidget, &QListWidget::itemClicked,
@@ -56,6 +56,18 @@ mainwindow::mainwindow(QWidget *parent) :
     connect(ui->programmeContentAddBtn, &QToolButton::clicked,
             this, &mainwindow::onProgrammeContentAddBtnClicked);
 
+    //绑定打开设置按钮
+    connect(ui->settingButton, &QToolButton::clicked,
+            this, &mainwindow::onSettingBtnClicked);
+
+    //绑定方案内容上移按钮
+    connect(ui->programmeContentUpButton, &QToolButton::clicked,
+            this, &mainwindow::onProgrammeUpBtnClicked);
+
+    //绑定方案内容下移按钮
+    connect(ui->programmeContentDownButton, &QToolButton::clicked,
+            this, &mainwindow::onProgrammeDownBtnClicked);
+
     //监听编辑方案名称
     connect(ui->listWidget, &QListWidget::itemChanged, this, [this](QListWidgetItem *item) {
         // 这里可以保存修改到配置文件等
@@ -63,9 +75,16 @@ mainwindow::mainwindow(QWidget *parent) :
         loadListWidgetData();
     });
 
+    //读取setting的配置
+    if (SETTING_CONFIG.loadConfig())
+    {
+        Logger::log(QString("Setting配置加载成功！"));
+    }
+
+    //读取方案的配置
     loadListWidgetData();
 
-    appendLog("脚本配置加载成功！");
+    Logger::log(QString("Config配置加载成功！"));
 
     // 检查OpenCV版本和编译选项
     Logger::log(QString("OpenCV版本 %1").arg(CV_VERSION));
@@ -150,20 +169,6 @@ void mainwindow::onItemClicked(QListWidgetItem *item) {
 
     QJsonArray steps = obj["steps"].toArray();
     showStepsInTable(steps);
-}
-
-//添加日志显示
-void mainwindow::appendLog(const QString &log) const
-{
-    if (!ui->plainTextEdit) return;
-
-    // 在末尾添加文本，并换行
-    ui->plainTextEdit->appendPlainText(log);
-
-    // 自动滚动到底部
-    QTextCursor cursor = ui->plainTextEdit->textCursor();
-    cursor.movePosition(QTextCursor::End);
-    ui->plainTextEdit->setTextCursor(cursor);
 }
 
 //加载数据到任务表格
@@ -291,14 +296,16 @@ void mainwindow::startTaskButtonClick()
 
     if (steps.size() == 0)
     {
-        appendLog("当前方案的内容为空，任务停止");
+        Logger::log(QString("当前方案的内容为空，任务停止"));
         return;
     }
 
     if (m_isRunning) {
-        appendLog("任务已在运行中");
+        Logger::log(QString("任务已在运行中"));
         return;
     }
+
+    ExecutionSteps::getInstance().dllSetLogPath();
 
     m_isRunning = true;
     ui->startTaskButton->setEnabled(false);
@@ -306,7 +313,6 @@ void mainwindow::startTaskButtonClick()
 
     int number = ui->taskCycleNumber->text().toInt();
     bool infiniteLoop = (number <= 0);
-    appendLog("循环次数");
     Logger::log(QString("循环次数: %1").arg(infiniteLoop ? "无限" : QString::number(number)));
 
     do {
@@ -322,7 +328,28 @@ void mainwindow::startTaskButtonClick()
                         QString imagePath = step["imagePath"].toString();
                         const double score = step["score"].toDouble();
                         const bool randomClick = step["randomClick"].toBool();
-                        QString savePath = ExecutionSteps::getInstance().opencvRecognizesAndClick(imagePath, score, randomClick);
+                        int retryCount = 0;
+
+                        QString savePath;
+                        while (retryCount < 3) {
+                            savePath = ExecutionSteps::getInstance().opencvRecognizesAndClick(imagePath, score, randomClick);
+                            if (!savePath.isNull()) {
+                                break; // 成功
+                            }
+
+                            retryCount++;
+                            if (retryCount < 3) {
+                                Logger::log(QString("截图失败，第%1次重试").arg(retryCount));
+                                Sleep(1000); // 等待1秒后重试
+                            }
+                        }
+
+
+                        if (savePath.isEmpty())
+                        {
+                            Logger::log(QString("识别失败，跳过当次循环！"));
+                            continue;
+                        }
                         showOpenCVIdentifyImage(savePath);
                         break;
                 }
@@ -339,7 +366,7 @@ void mainwindow::startTaskButtonClick()
                 }
 
                 default: {
-                        appendLog(QString("未知的命令：%1").arg(typeStr));
+                        Logger::log(QString("未知的命令：%1").arg(typeStr));
                         break;
                 }
             }
@@ -349,19 +376,29 @@ void mainwindow::startTaskButtonClick()
             number--;
         }
 
+        //删除掉截图
+        // ExecutionSteps::getInstance().deleteCaptureFile();
+        //每次任务结束都固定休眠1秒，防止无限循环一直执行
+        // Sleep(1000);
+
     } while (m_isRunning && (infiniteLoop || number > 0));
 
     // 执行结束
     m_isRunning = false;
     ui->startTaskButton->setEnabled(true);
     ui->stopTaskButton->setEnabled(false);
+
+    Logger::log(QString("任务循环结束"));
+
+    //卸载dll异常 暂不使用
+    // ExecutionSteps::getInstance().dllStopHook();
 }
 
 //关闭当前选中的任务
 void mainwindow::stopTaskButtonClick()
 {
     m_isRunning = false;
-    appendLog("正在停止任务...");
+    Logger::log(QString("正在停止任务..."));
 }
 
 //修改当前选择的方案
@@ -448,6 +485,16 @@ void mainwindow::onProgrammeRemoveBtnClicked()
     }
 }
 
+void mainwindow::onSettingBtnClicked()
+{
+    SettingDialog dialog(this);
+    if (dialog.exec() == QDialog::Accepted) {
+        // 设置已保存和应用
+        Logger::log(QString("Setting配置已修改"));
+    }
+}
+
+
 void mainwindow::onProgrammeContentAddBtnClicked()
 {
     QJsonObject empty;
@@ -461,6 +508,30 @@ void mainwindow::onProgrammeContentAddBtnClicked()
         QTimer::singleShot(0, dlg, &QObject::deleteLater);  // 延迟一拍
         showCurrentSelectStepsInTable();
     });
+}
+
+void mainwindow::onProgrammeUpBtnClicked()
+{
+    int currentRow = ui->tableWidget->currentRow();
+    if (currentRow >= 0) {
+        moveProgramme(CONFIG_PATH, currentItem.id, currentRow, true);
+        showCurrentSelectStepsInTable();
+        ui->tableWidget->selectRow(currentRow-1);
+    } else {
+        Logger::log(QString("没有选择方案内容的任何行"));
+    }
+}
+
+void mainwindow::onProgrammeDownBtnClicked()
+{
+    int currentRow = ui->tableWidget->currentRow();
+    if (currentRow >= 0) {
+        moveProgramme(CONFIG_PATH, currentItem.id, currentRow, false);
+        showCurrentSelectStepsInTable();
+        ui->tableWidget->selectRow(currentRow+1);
+    } else {
+        Logger::log(QString("没有选择方案内容的任何行"));
+    }
 }
 
 void mainwindow::showOpenCVIdentifyImage(const QString& savePath) const

@@ -23,29 +23,29 @@ QT_BEGIN_NAMESPACE
 class Ui_EditTaskDialog
 {
 public:
+    QDialogButtonBox *buttonBox;
+    QLabel *label;
     QComboBox *comboBox;
     QStackedWidget *stackedWidget;
-    QLabel *label;
-    QDialogButtonBox *buttonBox;
 
     void setupUi(QDialog *EditTaskDialog)
     {
         if (EditTaskDialog->objectName().isEmpty())
             EditTaskDialog->setObjectName("EditTaskDialog");
         EditTaskDialog->resize(479, 496);
-        comboBox = new QComboBox(EditTaskDialog);
-        comboBox->setObjectName("comboBox");
-        comboBox->setGeometry(QRect(140, 40, 191, 21));
-        stackedWidget = new QStackedWidget(EditTaskDialog);
-        stackedWidget->setObjectName("stackedWidget");
-        stackedWidget->setGeometry(QRect(80, 100, 301, 311));
-        label = new QLabel(EditTaskDialog);
-        label->setObjectName("label");
-        label->setGeometry(QRect(80, 40, 61, 20));
         buttonBox = new QDialogButtonBox(EditTaskDialog);
         buttonBox->setObjectName("buttonBox");
         buttonBox->setGeometry(QRect(150, 450, 161, 23));
         buttonBox->setStandardButtons(QDialogButtonBox::StandardButton::Cancel|QDialogButtonBox::StandardButton::Ok);
+        label = new QLabel(EditTaskDialog);
+        label->setObjectName("label");
+        label->setGeometry(QRect(80, 30, 48, 16));
+        comboBox = new QComboBox(EditTaskDialog);
+        comboBox->setObjectName("comboBox");
+        comboBox->setGeometry(QRect(150, 30, 211, 23));
+        stackedWidget = new QStackedWidget(EditTaskDialog);
+        stackedWidget->setObjectName("stackedWidget");
+        stackedWidget->setGeometry(QRect(80, 80, 291, 311));
 
         retranslateUi(EditTaskDialog);
 

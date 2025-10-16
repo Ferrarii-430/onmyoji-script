@@ -18,4 +18,5 @@ QJsonValue safeValue(const QJsonObject &obj, const QString &key);
 bool removeConfigById(const QString &filePath, const QString &configId, const QString &stepsId);
 void updateConfigInJsonFile(const QString &filePath, const QString &configId, const QJsonObject& json);
 void updateProgrammeContent(const QString &filePath, const QString &configId, const QString &name);
+bool moveProgramme(const QString &filePath, const QString &configId, int stepsIndex, bool status);
 #endif //COMMON_H

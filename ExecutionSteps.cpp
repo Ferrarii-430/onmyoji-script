@@ -5,6 +5,7 @@
 #include "ExecutionSteps.h"
 #include <bemapiset.h>
 #include <iostream>
+#include <QProcess>
 #include <windows.h>
 #include <tlhelp32.h>
 #include <psapi.h>
@@ -20,6 +21,9 @@
 #include <random>
 #include <src/widget/main/mainwindow.h>
 #include "Logger.h"
+#include "SettingManager.h"
+#include "ConfigManager.h"
+#include "src/utils/MouseSimulator.h"
 
 ExecutionSteps& ExecutionSteps::getInstance() {
     static ExecutionSteps instance; // C++11 保证线程安全
@@ -29,13 +33,13 @@ ExecutionSteps& ExecutionSteps::getInstance() {
 bool ExecutionSteps::checkHWNDHandle() {
     DWORD pid = findPidByProcessName(target);
     if (pid == 0) {
-        Logger::log(QString("找不到进程： %1").arg(target));
+        Logger::log(QString("找不到桌面版游戏进程： %1").arg(target));
         return false;
     }
     hwnd = findWindowByPid(pid);
 
     if (!hwnd) {
-        Logger::log(QString("窗口未找到"));
+        Logger::log(QString("阴阳师游戏窗口未找到"));
         return false;
     }
     return true;
@@ -91,11 +95,37 @@ HWND ExecutionSteps::findWindowByPid(DWORD pid) {
     return ctx.res;
 }
 
-QString ExecutionSteps::opencvRecognizesAndClick(const QString& templPath, const double threshold, const bool randomClick)
+QString ExecutionSteps::getTargetProcessId()
 {
-    cv::Mat winImg;
+    // 如果 hwnd 为空，返回空字符串
+    if (hwnd == nullptr) {
+        qWarning() << "窗口句柄为空，无法获取进程ID";
+        return QString();
+    }
+
+    // 检查窗口是否有效
+    if (!IsWindow(hwnd)) {
+        qWarning() << "窗口句柄无效";
+        hwnd = nullptr; // 重置为nullptr
+        return QString();
+    }
+
+    DWORD processId = 0;
+    DWORD threadId = GetWindowThreadProcessId(hwnd, &processId);
+
+    if (processId == 0) {
+        qWarning() << "无法获取窗口进程ID，错误代码:" << GetLastError();
+        return QString();
+    }
+
+    return QString::number(processId);
+}
+
+//使用PrintWindo截图
+bool ExecutionSteps::getOnmyojiCaptureByPrintWindow(cv::Mat& winImg)
+{
     bool ok = false;
-    for (int i = 0; i < 3; ++i)
+    for (int i = 0; i < 5; ++i)
     {
         ok = captureWindowToMat(hwnd, winImg);
         if (!ok || winImg.empty()) {
@@ -106,24 +136,335 @@ QString ExecutionSteps::opencvRecognizesAndClick(const QString& templPath, const
     if (!ok)
     {
         Logger::log(QString("5次重试未能捕获窗口。任务结束"));
+    }
+    return ok;
+}
+
+
+
+//使用DX11截图
+bool ExecutionSteps::getOnmyojiCaptureByDllInjection(cv::Mat& winImg)
+{
+    bool ok = false;
+
+    // 定义路径
+    QString DX11_CAPTURE_PATH = ConfigManager::instance().dx11CapturePath();
+    QString DX11_LOG_PATH = ConfigManager::instance().dx11LogPath();
+    QString DX11_HOOK_DLL_PATH = ConfigManager::instance().dx11HookDllPath();
+    QString DX11_HOOK_DLL_NAME = ConfigManager::instance().dx11HookDllName();
+    QString remoteCaptureExe = ConfigManager::instance().remoteCaptureExePath();
+
+    // 确保目录存在
+    QDir logDir = QFileInfo(DX11_LOG_PATH).absoluteDir();
+    if (!logDir.exists()) {
+        logDir.mkpath(".");
+    }
+
+    QDir captureDir = QFileInfo(DX11_CAPTURE_PATH).absoluteDir();
+    if (!captureDir.exists()) {
+        captureDir.mkpath(".");
+    }
+
+    // 获取目标进程ID（这里需要您提供获取进程ID的方法）
+    // 假设您有一个获取目标进程ID的函数或变量
+    QString targetPid = getTargetProcessId(); // 您需要实现这个函数
+
+    if (targetPid.isEmpty()) {
+        qWarning() << "无法获取目标进程ID";
+        return false;
+    }
+
+    // 检查 remote_capture_call.exe 是否存在
+    if (!QFile::exists(remoteCaptureExe)) {
+        qWarning() << "remote_capture_call.exe 不存在:" << remoteCaptureExe;
+        return false;
+    }
+
+    // 检查 DLL 文件是否存在
+    if (!QFile::exists(DX11_HOOK_DLL_PATH)) {
+        qWarning() << "DLL 文件不存在:" << DX11_HOOK_DLL_PATH;
+        return false;
+    }
+
+    // 执行截图命令
+    QProcess process;
+    QStringList arguments;
+    arguments << "-capture"
+              << targetPid
+              << DX11_HOOK_DLL_PATH
+              << DX11_HOOK_DLL_NAME
+              << DX11_CAPTURE_PATH;
+
+    qDebug() << "执行截图命令:" << remoteCaptureExe << arguments;
+
+    process.start(remoteCaptureExe, arguments);
+
+    // 等待命令完成（设置超时时间，比如10秒）
+    if (!process.waitForFinished(10000)) {
+        qWarning() << "截图命令执行超时";
+        process.kill();
+        return false;
+    }
+
+    // 检查命令执行结果
+    int exitCode = process.exitCode();
+    QByteArray output = process.readAllStandardOutput();
+    QByteArray errorOutput = process.readAllStandardError();
+
+    if (exitCode != 0) {
+        qWarning() << "截图命令执行失败，退出码:" << exitCode;
+        qWarning() << "错误输出:" << errorOutput;
+        return false;
+    }
+
+    qDebug() << "截图命令输出:" << output;
+
+    // 检查截图文件是否存在
+    if (!QFile::exists(DX11_CAPTURE_PATH)) {
+        qWarning() << "截图文件未生成:" << DX11_CAPTURE_PATH;
+        return false;
+    }
+
+    // 使用 OpenCV 读取截图
+    winImg = cv::imread(DX11_CAPTURE_PATH.toStdString());
+
+    if (winImg.empty()) {
+        qWarning() << "无法读取截图文件:" << DX11_CAPTURE_PATH;
+        return false;
+    }
+
+    qDebug() << "截图成功，图像尺寸:" << winImg.cols << "x" << winImg.rows
+             << "通道数:" << winImg.channels();
+
+    ok = true;
+    return ok;
+}
+
+//使用DX11截图
+bool ExecutionSteps::dllSetLogPath()
+{
+    bool ok = false;
+
+    // 定义路径
+    QString DX11_CAPTURE_PATH = ConfigManager::instance().dx11CapturePath();
+    QString DX11_LOG_PATH = ConfigManager::instance().dx11LogPath();
+    QString DX11_HOOK_DLL_PATH = ConfigManager::instance().dx11HookDllPath();
+    QString DX11_HOOK_DLL_NAME = ConfigManager::instance().dx11HookDllName();
+    QString remoteCaptureExe = ConfigManager::instance().remoteCaptureExePath();
+
+    // 确保目录存在
+    QDir logDir = QFileInfo(DX11_LOG_PATH).absoluteDir();
+    if (!logDir.exists()) {
+        logDir.mkpath(".");
+    }
+
+    // 获取目标进程ID（这里需要您提供获取进程ID的方法）
+    // 假设您有一个获取目标进程ID的函数或变量
+    QString targetPid = getTargetProcessId();
+
+    if (targetPid.isEmpty()) {
+        qWarning() << "无法获取目标进程ID";
+        return false;
+    }
+
+    // 检查 remote_capture_call.exe 是否存在
+    if (!QFile::exists(remoteCaptureExe)) {
+        qWarning() << "remote_capture_call.exe 不存在:" << remoteCaptureExe;
+        return false;
+    }
+
+    // 检查 DLL 文件是否存在
+    if (!QFile::exists(DX11_HOOK_DLL_PATH)) {
+        qWarning() << "DLL 文件不存在:" << DX11_HOOK_DLL_PATH;
+        return false;
+    }
+
+    // 执行截图命令
+    QProcess process;
+    QStringList arguments;
+    arguments << "-log"
+              << targetPid
+              << DX11_HOOK_DLL_PATH
+              << DX11_HOOK_DLL_NAME
+              << DX11_LOG_PATH;
+
+    qDebug() << "执行修改log地址命令:" << remoteCaptureExe << arguments;
+
+    process.start(remoteCaptureExe, arguments);
+
+    // 等待命令完成（设置超时时间，比如10秒）
+    if (!process.waitForFinished(5000)) {
+        qWarning() << "修改log地址命令执行超时";
+        process.kill();
+        return false;
+    }
+
+    // 检查命令执行结果
+    int exitCode = process.exitCode();
+    QByteArray output = process.readAllStandardOutput();
+    QByteArray errorOutput = process.readAllStandardError();
+
+    if (exitCode != 0) {
+        qWarning() << "修改log地址命令执行失败，退出码:" << exitCode;
+        qWarning() << "错误输出:" << errorOutput;
+        return false;
+    }
+
+    qDebug() << "修改log地址命令输出:" << output;
+
+    ok = true;
+    return ok;
+}
+
+//使用DX11截图
+bool ExecutionSteps::dllStopHook()
+{
+bool ok = false;
+
+    // 定义路径
+    QString DX11_CAPTURE_PATH = ConfigManager::instance().dx11CapturePath();
+    QString DX11_LOG_PATH = ConfigManager::instance().dx11LogPath();
+    QString DX11_HOOK_DLL_PATH = ConfigManager::instance().dx11HookDllPath();
+    QString DX11_HOOK_DLL_NAME = ConfigManager::instance().dx11HookDllName();
+    QString remoteCaptureExe = ConfigManager::instance().remoteCaptureExePath();
+
+    // 获取目标进程ID（这里需要您提供获取进程ID的方法）
+    // 假设您有一个获取目标进程ID的函数或变量
+    QString targetPid = getTargetProcessId(); // 您需要实现这个函数
+
+    if (targetPid.isEmpty()) {
+        qWarning() << "无法获取目标进程ID";
+        return false;
+    }
+
+    // 检查 remote_capture_call.exe 是否存在
+    if (!QFile::exists(remoteCaptureExe)) {
+        qWarning() << "remote_capture_call.exe 不存在:" << remoteCaptureExe;
+        return false;
+    }
+
+    // 检查 DLL 文件是否存在
+    if (!QFile::exists(DX11_HOOK_DLL_PATH)) {
+        qWarning() << "DLL 文件不存在:" << DX11_HOOK_DLL_PATH;
+        return false;
+    }
+
+    // 执行截图命令
+    QProcess process;
+    QStringList arguments;
+    arguments << "-stop"
+              << targetPid
+              << DX11_HOOK_DLL_PATH
+              << DX11_HOOK_DLL_NAME;
+
+    qDebug() << "执行停止dx11_hook命令:" << remoteCaptureExe << arguments;
+
+    process.start(remoteCaptureExe, arguments);
+
+    // 等待命令完成（设置超时时间，比如10秒）
+    if (!process.waitForFinished(10000)) {
+        qWarning() << "停止dx11_hook命令执行超时";
+        process.kill();
+        return false;
+    }
+
+    // 检查命令执行结果
+    int exitCode = process.exitCode();
+    QByteArray output = process.readAllStandardOutput();
+    QByteArray errorOutput = process.readAllStandardError();
+
+    if (exitCode != 0) {
+        qWarning() << "停止dx11_hook命令执行失败，退出码:" << exitCode;
+        qWarning() << "错误输出:" << errorOutput;
+        return false;
+    }
+
+    qDebug() << "停止dx11_hook命令输出:" << output;
+
+    ok = true;
+    return ok;
+}
+
+// 提升进程权限
+bool EnableDebugPrivilege() {
+    HANDLE hToken;
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hToken)) {
+        return false;
+    }
+
+    TOKEN_PRIVILEGES tp;
+    LUID luid;
+
+    if (!LookupPrivilegeValue(NULL, SE_DEBUG_NAME, &luid)) {
+        CloseHandle(hToken);
+        return false;
+    }
+
+    tp.PrivilegeCount = 1;
+    tp.Privileges[0].Luid = luid;
+    tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+
+    if (!AdjustTokenPrivileges(hToken, FALSE, &tp, sizeof(tp), NULL, NULL)) {
+        CloseHandle(hToken);
+        return false;
+    }
+
+    CloseHandle(hToken);
+    return GetLastError() == ERROR_SUCCESS;
+}
+
+QString ExecutionSteps::opencvRecognizesAndClick(const QString& templPath, const double threshold, const bool randomClick)
+{
+    cv::Mat winImg;
+    bool hasWinImg = false;
+
+    // 首先尝试提升权限
+    if (!EnableDebugPrivilege()) {
+        Logger::log(QString("提升调试权限失败!"));
+    }
+
+    QString screenshotMode = SETTING_CONFIG.getScreenshotMode();
+    // 使用 if-else 替代 switch
+    if (screenshotMode == "PrintWindow") {
+        hasWinImg = getOnmyojiCaptureByDllInjection(winImg);
+    } else if (screenshotMode == "DirectX截图") {
+        hasWinImg = getOnmyojiCaptureByDllInjection(winImg);
+    } else {
+        Logger::log(QString("无法识别鼠标控制模式，默认使用DirectX截图"));
+        // 默认使用dll注入方式
+        hasWinImg = getOnmyojiCaptureByDllInjection(winImg);
+    }
+
+    if (!hasWinImg)
+    {
+        Logger::log(QString("游戏画面获取失败，请查看日志！"));
         return nullptr;
     }
 
     //加载模板文件
-    cv::Mat templ = cv::imread(templPath.toStdString(), cv::IMREAD_COLOR);
+    cv::Mat templ = cv::imread(templPath.toStdString()); //cv::IMREAD_COLOR
     if (templ.empty()) {
-        Logger::log("模板图片加载失败" + templPath);
+        Logger::log("模板图片加载失败: " + templPath);
         return nullptr;
+    }else {
+        Logger::log("已加载模板图片: " + templPath);
     }
+
+    // 保存原始的图片
+    cv::Mat captureImg = winImg.clone();
+    // 确保目录存在
+    QString saveDir = QCoreApplication::applicationDirPath() + "/src/resource/thumbnail";
+    // 保存图片（覆盖保存）
+    QString saveCapturePath = saveDir + "/debug_capture_result.png";
+    cv::imwrite(saveCapturePath.toStdString(), captureImg);
 
     // 在窗口图像中查找模板
     double score = 0.0;
     cv::Rect matchRect;
     bool found = findTemplateMultiScaleInMatNMS(winImg, templ, matchRect, score,
-                                             0.4, 1, 0.05, threshold); // 参数根据需要调整
+                                             1, 1, 0.1, threshold); // 参数根据需要调整
 
     if (!found) {
-        // Logger::log(QString("未找到匹配区域"));
         Logger::log(QString("未找到匹配区域! score=%1").arg(score));
         return nullptr;
     }
@@ -149,19 +490,17 @@ QString ExecutionSteps::opencvRecognizesAndClick(const QString& templPath, const
     // 绘制点击位置（红色圆点）
     cv::circle(resultImg, clickPt, 5, cv::Scalar(0, 0, 255), -1);
 
-    // 确保目录存在
-    QString saveDir = QCoreApplication::applicationDirPath() + "/src/resource/thumbnail";
     QDir dir(saveDir);
     if (!dir.exists()) {
         dir.mkpath(".");
     }
 
     // 保存图片（覆盖保存）
-    QString savePath = saveDir + "/debug_match_result.jpg";
+    QString savePath = saveDir + "/debug_match_result.png";
     cv::imwrite(savePath.toStdString(), resultImg);
     // Logger::log("已保存识别结果图片: " + savePath);
 
-    clickInWindow(clickPt);
+    clickInWindow2(clickPt);
 
     return savePath;
 }
@@ -248,19 +587,41 @@ bool ExecutionSteps::captureWindowToMat(HWND hwnd, cv::Mat& outBGR) {
     // 5. 捕获窗口内容 - 使用多种方法尝试
     BOOL captureOk = FALSE;
 
+    HMODULE user32 = GetModuleHandleA("user32.dll");
+
+    if (!user32) {
+        Logger::log(QString("无法获取user32.dll模块句柄"));
+        return FALSE;
+    }
+
     // 方法1: PrintWindow with full content
     BOOL (WINAPI *PrintWindow)(HWND, HDC, UINT) = nullptr;
-    HMODULE user32 = GetModuleHandleA("user32.dll");
-    if (user32) {
-        PrintWindow = (BOOL (WINAPI*)(HWND, HDC, UINT))GetProcAddress(user32, "PrintWindow");
-        if (PrintWindow) {
-            // 尝试不同的标志
+    PrintWindow = (BOOL (WINAPI*)(HWND, HDC, UINT))GetProcAddress(user32, "PrintWindow");
+
+    if (!PrintWindow) {
+        DWORD error = GetLastError();
+        Logger::log(QString("获取PrintWindow函数失败，错误代码: %1").arg(error));
+        return FALSE;
+    }
+
+    // 按兼容性顺序尝试不同的标志
+    // 先尝试最兼容的默认方式
+    captureOk = PrintWindow(hwnd, hMemDC, 0x0); // 默认方式
+    if (!captureOk) {
+        DWORD error = GetLastError();
+        Logger::log(QString("PrintWindow默认方式失败，错误代码: %1").arg(error));
+
+        // 再尝试PW_CLIENTONLY
+        captureOk = PrintWindow(hwnd, hMemDC, 0x1); // PW_CLIENTONLY
+        if (!captureOk) {
+            error = GetLastError();
+            Logger::log(QString("PrintWindow PW_CLIENTONLY失败，错误代码: %1").arg(error));
+
+            // 最后尝试PW_RENDERFULLCONTENT（Windows 8.1+）
             captureOk = PrintWindow(hwnd, hMemDC, 0x2); // PW_RENDERFULLCONTENT
             if (!captureOk) {
-                captureOk = PrintWindow(hwnd, hMemDC, 0x1); // PW_CLIENTONLY
-            }
-            if (!captureOk) {
-                captureOk = PrintWindow(hwnd, hMemDC, 0x0); // 默认
+                error = GetLastError();
+                Logger::log(QString("PrintWindow PW_RENDERFULLCONTENT失败，错误代码: %1").arg(error));
             }
         }
     }
@@ -581,5 +942,46 @@ void ExecutionSteps::clickInWindow(const cv::Point& ptClient) {
     Logger::log(QString("已点击窗口 (%1, %2)")
         .arg(pt.x)
         .arg(pt.y));
+}
 
+bool ExecutionSteps::deleteCaptureFile()
+{
+    QString DX11_CAPTURE_PATH = ConfigManager::instance().dx11CapturePath();
+
+    QFile file(DX11_CAPTURE_PATH);
+    if (file.exists()) {
+        if (file.remove()) {
+            // qDebug() << "成功删除截图文件:" << DX11_CAPTURE_PATH;
+            return true;
+        } else {
+            qWarning() << "删除截图文件失败:" << DX11_CAPTURE_PATH << "错误:" << file.errorString();
+            return false;
+        }
+    } else {
+        // qDebug() << "截图文件不存在，无需删除:" << DX11_CAPTURE_PATH;
+        return true; // 文件不存在也算成功
+    }
+}
+
+void ExecutionSteps::clickInWindow2(const cv::Point& clickPoint) {
+    // 创建 MouseSimulator 实例
+    MouseSimulator simulator;
+
+    // 配置模拟器以增强隐蔽性和后台兼容性
+    simulator.SetHumanLikeMode(true);       // 启用人类行为模式
+    simulator.SetRandomDelayRange(20, 100); // 设置短随机延迟以减少检测风险
+    simulator.SetJitterLevel(3);            // 设置轻微抖动以模拟人类操作
+
+    // 使用静默点击方法：StealthClick 使用混合模式（硬件+消息），确保后台执行
+    bool success = simulator.StealthClick(clickPoint.x, clickPoint.y, true);
+
+    if (success) {
+        Logger::log("静默点击成功 at (" + std::to_string(clickPoint.x) + ", " + std::to_string(clickPoint.y) + ")");
+    } else {
+        Logger::log("静默点击失败 at (" + std::to_string(clickPoint.x) + ", " + std::to_string(clickPoint.y) + ")");
+        // 可选： fallback 到硬件点击
+        if (!simulator.HardwareClick(clickPoint.x, clickPoint.y)) {
+            Logger::log(QString("备用硬件点击也失败"));
+        }
+    }
 }

@@ -12,6 +12,8 @@
 #include <QString>
 #include "Logger.h"
 
+
+
 QString getPathByRecognitionImg(const std::string &configId, const std::string &fileName)
 {
     // 基础路径
@@ -372,6 +374,8 @@ bool removeConfigById(const QString &filePath, const QString &configId, const QS
     // 遍历删除
     bool hasConfigId = false;
     bool hasStepsId = false;
+    QString imagePathToDelete; // 存储要删除的图片路径
+
     for (int i = 0; i < rootArray.size(); ++i) {
         QJsonObject rootArrayObj = rootArray[i].toObject();
         if (rootArrayObj["id"].toString() == configId) {
@@ -381,12 +385,32 @@ bool removeConfigById(const QString &filePath, const QString &configId, const QS
             for (int j = 0; j < stepsArray.size(); ++j) {
                 QJsonObject stepsObj = stepsArray[j].toObject();
                 if (stepsObj["stepsId"].toString() == stepsId) {
+                    // 找到对应的stepsId，获取 imagePath
+                    if (stepsObj.contains("imagePath") && !stepsObj["imagePath"].isNull()) {
+                        imagePathToDelete = stepsObj["imagePath"].toString();
+
+                        // 删除图片文件
+                        if (!imagePathToDelete.isEmpty()) {
+                            QFile imageFile(imagePathToDelete);
+                            if (imageFile.exists()) {
+                                if (imageFile.remove()) {
+                                    Logger::log("已删除图片文件: " + imagePathToDelete);
+                                } else {
+                                    Logger::log("删除图片文件失败: " + imagePathToDelete);
+                                }
+                            } else {
+                                Logger::log("图片文件不存在: " + imagePathToDelete);
+                            }
+                        }
+                    }
+
+                    // 从 stepsArray 中删除该步骤
                     stepsArray.removeAt(j);
 
-                    //写回到 obj
+                    // 写回到 obj
                     rootArrayObj["steps"] = stepsArray;
 
-                    //写回到 rootArray
+                    // 写回到 rootArray
                     rootArray[i] = rootArrayObj;
 
                     hasStepsId = true;
@@ -395,7 +419,7 @@ bool removeConfigById(const QString &filePath, const QString &configId, const QS
             }
         }
 
-        if (hasConfigId)
+        if (hasConfigId && hasStepsId)
         {
             break;
         }
@@ -406,12 +430,10 @@ bool removeConfigById(const QString &filePath, const QString &configId, const QS
         return false;
     }
 
-
     if (!hasStepsId) {
         Logger::log("未找到指定 StepsId: " + stepsId);
         return false;
     }
-
 
     // 写回文件
     if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
@@ -482,5 +504,110 @@ void updateProgrammeContent(const QString &filePath, const QString &configId, co
         }
     } else {
         Logger::log("未找到 configId: " + configId);
+    }
+}
+
+bool moveProgramme(const QString &filePath, const QString &configId, const int stepsIndex, const bool status)
+{
+    QFile file(filePath);
+    if (!file.exists()) {
+        Logger::log("JSON 文件不存在: " + filePath);
+        return false;
+    }
+
+    QJsonArray rootArray;
+
+    // 读取 JSON
+    if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QByteArray data = file.readAll();
+        file.close();
+
+        QJsonParseError err;
+        QJsonDocument doc = QJsonDocument::fromJson(data, &err);
+        if (err.error == QJsonParseError::NoError && doc.isArray()) {
+            rootArray = doc.array();
+        } else {
+            Logger::log(QString("解析 JSON 出错，文件不是数组"));
+            return false;
+        }
+    }
+
+    // 遍历数据后移动
+    bool hasConfigId = false;
+    bool hasStepsId = false;
+    for (int i = 0; i < rootArray.size(); ++i) {
+        QJsonObject rootArrayObj = rootArray[i].toObject();
+        if (rootArrayObj["id"].toString() == configId) {
+            hasConfigId = true;
+            QJsonArray stepsArray = rootArrayObj["steps"].toArray();
+
+            // 检查 stepsIndex 是否有效
+            if (stepsIndex < 0 || stepsIndex >= stepsArray.size()) {
+                Logger::log("stepsIndex 超出范围: " + QString::number(stepsIndex));
+                return false;
+            }
+
+            hasStepsId = true;
+
+            // 在这里上移或者下移stepsIndex对应的下标数据
+            if (status) {
+                // status为true表示上移
+                if (stepsIndex > 0) {
+                    // 交换当前元素和前一个元素
+                    QJsonValue currentStep = stepsArray[stepsIndex];
+                    QJsonValue prevStep = stepsArray[stepsIndex - 1];
+
+                    stepsArray[stepsIndex] = prevStep;
+                    stepsArray[stepsIndex - 1] = currentStep;
+
+                    Logger::log(QString("步骤【 %1 】上移成功").arg(currentStep["taskName"].toString()));
+                } else {
+                    Logger::log(QString("已经是第一个步骤，无法上移"));
+                    return false;
+                }
+            } else {
+                // status为false表示下移
+                if (stepsIndex < stepsArray.size() - 1) {
+                    // 交换当前元素和后一个元素
+                    QJsonValue currentStep = stepsArray[stepsIndex];
+                    QJsonValue nextStep = stepsArray[stepsIndex + 1];
+
+                    stepsArray[stepsIndex] = nextStep;
+                    stepsArray[stepsIndex + 1] = currentStep;
+
+                    Logger::log(QString("步骤【 %1 】下移成功").arg(currentStep["taskName"].toString()));
+                } else {
+                    Logger::log(QString("已经是最后一个步骤，无法下移"));
+                    return false;
+                }
+            }
+
+            // 更新 steps 数组
+            rootArrayObj["steps"] = stepsArray;
+            rootArray[i] = rootArrayObj;
+            break;
+        }
+    }
+
+    if (!hasConfigId) {
+        Logger::log("未找到指定 ConfigId: " + configId);
+        return false;
+    }
+
+    if (!hasStepsId) {
+        Logger::log("未找到指定 stepsIndex 的下标数据: " + QString::number(stepsIndex));
+        return false;
+    }
+
+    // 写回文件
+    if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QJsonDocument newDoc(rootArray);
+        file.write(newDoc.toJson(QJsonDocument::Indented));
+        file.close();
+        // Logger::log(QString("步骤移动成功并保存到文件"));
+        return true;
+    } else {
+        Logger::log("写入 JSON 文件失败: " + filePath);
+        return false;
     }
 }

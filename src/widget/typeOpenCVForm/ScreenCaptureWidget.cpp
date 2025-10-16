@@ -2,19 +2,20 @@
 #include <QPainter>
 #include <QMouseEvent>
 #include <QApplication>
-#include <QDebug>
 
 ScreenCaptureWidget::ScreenCaptureWidget(QWidget *parent)
     : QWidget(nullptr), selecting(false)
 {
-    // 全屏显示
     setWindowFlags(Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint);
     setAttribute(Qt::WA_TranslucentBackground);
     setCursor(Qt::CrossCursor);
 
     screen = QGuiApplication::primaryScreen();
-    if (screen)
-        fullPixmap = screen->grabWindow(0); // 截全屏
+    if (screen) {
+        fullPixmap = screen->grabWindow(0);
+        fullPixmap.setDevicePixelRatio(screen->devicePixelRatio());
+    }
+
     setGeometry(screen->geometry());
     show();
 }
@@ -52,10 +53,27 @@ void ScreenCaptureWidget::mouseReleaseEvent(QMouseEvent *event)
     if (!selecting) return;
 
     selecting = false;
-    QRect selectedRect(startPoint, event->pos());
-    selectedRect = selectedRect.normalized();
-    captured = fullPixmap.copy(selectedRect);
 
-    emit captureFinished(captured); // 发信号给外部
+    // 获取设备像素比
+    qreal devicePixelRatio = screen->devicePixelRatio();
+
+    // 坐标转换：逻辑坐标 → 物理坐标
+    QPoint physicalStart = startPoint * devicePixelRatio;
+    QPoint physicalEnd = event->pos() * devicePixelRatio;
+
+    QRect selectedRect(physicalStart, physicalEnd);
+    selectedRect = selectedRect.normalized();
+
+    // 边界检查
+    QRect availableRect(0, 0, fullPixmap.width(), fullPixmap.height());
+    selectedRect = selectedRect.intersected(availableRect);
+
+    if (selectedRect.isValid() && !selectedRect.isEmpty()) {
+        captured = fullPixmap.copy(selectedRect);
+        captured.setDevicePixelRatio(1.0); // 重置DPI
+
+        emit captureFinished(captured);
+    }
+
     close();
 }

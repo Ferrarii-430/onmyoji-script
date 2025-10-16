@@ -1,0 +1,24 @@
+﻿1623697687: Log path set to: D
+1623697734: Present hooked
+1623697734: Initializing hook...
+1623697734: Hook initialized successfully - device=000001e9c619eed0, context=000001e9c616dba8
+1623748062: CaptureFrame called, path=D
+1623748109: Backbuffer format = 28, manually swapped BGR->RGB
+1623748109: Saved PNG: D (wxh=1136 x 640)
+1623748109: CaptureFrame result=1
+1623779046: StopHookAndCleanup called - starting cleanup process
+1623779046: Disabling MinHook hooks
+1623779093: MinHook hooks disabled successfully
+1623779187: Cleaning up D3D resources
+1623779187: g_swap reset to null
+1623779187: Context state cleared and flushed
+1623779187: g_context released
+1623779187: g_device released
+1623779187: Uninitializing MinHook
+1623779187: MinHook uninitialized successfully
+1623779187: Cleaning up log system
+1623779187: StopHookAndCleanup completed successfully
+1623779187: Critical section deleted
+1623779203: Preparing to unload DLL
+1623779250: Calling FreeLibraryAndExitThread
+1623857500: Cleanup already in progress, skipping duplicate call

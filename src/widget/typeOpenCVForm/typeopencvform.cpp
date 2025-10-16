@@ -8,6 +8,7 @@
 #include <QJsonObject>
 #include <QPushButton>
 #include <QBuffer>
+#include <QPainter>
 #include <qscreen.h>
 #include <QTimer>
 #include "ui_TypeOpenCVForm.h"
@@ -87,16 +88,29 @@ void TypeOpenCVForm::onCaptureButtonClicked() {
     });
 }
 
-// 重新缩放预览（保持比例）
 void TypeOpenCVForm::updatePreview() const
 {
-    if (!originalPixmap_.isNull()) {
-        QSize labelSize = ui->labelPreview->size();
-        QPixmap scaled = originalPixmap_.scaled(
-            labelSize,
-            Qt::KeepAspectRatio,
-            Qt::SmoothTransformation
-        );
-        ui->labelPreview->setPixmap(scaled);
-    }
+    if (originalPixmap_.isNull()) return;
+
+    QLabel* label = ui->labelPreview;
+    QSize labelSize = label->size();
+
+    // 计算按比例缩放后的图片
+    QPixmap scaled = originalPixmap_.scaled(
+        labelSize,
+        Qt::KeepAspectRatio,
+        Qt::SmoothTransformation
+    );
+
+    // 创建与label一样大的pixmap背景，并居中绘制scaled图
+    QPixmap finalPixmap(labelSize);
+    finalPixmap.fill(Qt::transparent);  // 背景透明或你可以用 Qt::black
+
+    QPainter painter(&finalPixmap);
+    QPoint center((labelSize.width() - scaled.width()) / 2,
+                  (labelSize.height() - scaled.height()) / 2);
+    painter.drawPixmap(center, scaled);
+    painter.end();
+
+    label->setPixmap(finalPixmap);
 }

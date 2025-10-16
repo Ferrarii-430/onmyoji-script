@@ -31,16 +31,16 @@ public:
     QLabel *label_2;
     QLabel *label_3;
     QCheckBox *randomClickCheckBox;
+    QDoubleSpinBox *spinScoreBox;
     QLabel *label_4;
     QToolButton *btnCapture;
     QLabel *labelPreview;
-    QDoubleSpinBox *spinScoreBox;
 
     void setupUi(QWidget *TypeOpenCVForm)
     {
         if (TypeOpenCVForm->objectName().isEmpty())
             TypeOpenCVForm->setObjectName("TypeOpenCVForm");
-        TypeOpenCVForm->resize(518, 386);
+        TypeOpenCVForm->resize(291, 311);
         QSizePolicy sizePolicy(QSizePolicy::Policy::Expanding, QSizePolicy::Policy::Expanding);
         sizePolicy.setHorizontalStretch(0);
         sizePolicy.setVerticalStretch(0);
@@ -48,7 +48,7 @@ public:
         TypeOpenCVForm->setSizePolicy(sizePolicy);
         formLayoutWidget = new QWidget(TypeOpenCVForm);
         formLayoutWidget->setObjectName("formLayoutWidget");
-        formLayoutWidget->setGeometry(QRect(0, 10, 511, 371));
+        formLayoutWidget->setGeometry(QRect(0, 0, 291, 311));
         formLayout = new QFormLayout(formLayoutWidget);
         formLayout->setObjectName("formLayout");
         formLayout->setVerticalSpacing(20);
@@ -78,6 +78,13 @@ public:
 
         formLayout->setWidget(2, QFormLayout::ItemRole::FieldRole, randomClickCheckBox);
 
+        spinScoreBox = new QDoubleSpinBox(formLayoutWidget);
+        spinScoreBox->setObjectName("spinScoreBox");
+        spinScoreBox->setMaximum(1.000000000000000);
+        spinScoreBox->setSingleStep(0.010000000000000);
+
+        formLayout->setWidget(1, QFormLayout::ItemRole::FieldRole, spinScoreBox);
+
         label_4 = new QLabel(formLayoutWidget);
         label_4->setObjectName("label_4");
 
@@ -94,14 +101,7 @@ public:
         labelPreview->setSizePolicy(sizePolicy);
         labelPreview->setScaledContents(false);
 
-        formLayout->setWidget(4, QFormLayout::ItemRole::FieldRole, labelPreview);
-
-        spinScoreBox = new QDoubleSpinBox(formLayoutWidget);
-        spinScoreBox->setObjectName("spinScoreBox");
-        spinScoreBox->setMaximum(1.000000000000000);
-        spinScoreBox->setSingleStep(0.010000000000000);
-
-        formLayout->setWidget(1, QFormLayout::ItemRole::FieldRole, spinScoreBox);
+        formLayout->setWidget(4, QFormLayout::ItemRole::SpanningRole, labelPreview);
 
 
         retranslateUi(TypeOpenCVForm);

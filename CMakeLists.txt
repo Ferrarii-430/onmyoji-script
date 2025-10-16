@@ -34,38 +34,39 @@ find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets)
 # ------------------------------
 add_executable(qtTest WIN32
         main.cpp
-
         src/widget/main/mainwindow.cpp
         src/widget/main/mainwindow.h
         src/widget/main/mainwindow.ui
-
         ExecutionSteps.cpp
         ExecutionSteps.h
-
         src/common/ConfigTypeEnum.cpp
         src/common/ConfigTypeEnum.h
         src/common/Logger.cpp
         src/common/Logger.h
         src/utils/common.cpp
         src/utils/common.h
-
         src/widget/editTask/edittaskdialog.cpp
         src/widget/editTask/edittaskdialog.h
         src/widget/editTask/edittaskdialog.ui
-
         src/widget/typeOpenCVForm/typeopencvform.cpp
         src/widget/typeOpenCVForm/typeopencvform.h
         src/widget/typeOpenCVForm/typeopencvform.ui
-
         src/widget/waitForm/waitform.cpp
         src/widget/waitForm/waitform.h
         src/widget/waitForm/waitform.ui
-
         src/widget/typeOpenCVForm/ScreenCaptureWidget.cpp
         src/widget/typeOpenCVForm/ScreenCaptureWidget.h
         src/widget/temp/temp.cpp
         src/widget/temp/temp.h
         src/widget/temp/temp.ui
+        src/utils/MouseSimulator.cpp
+        src/utils/MouseSimulator.h
+        src/common/SettingManager.cpp
+        src/common/SettingManager.h
+        src/widget/setting/settingdialog.cpp
+        src/widget/setting/settingdialog.h
+        src/widget/setting/settingdialog.ui
+        src/common/ConfigManager.h
 )
 
 # ------------------------------
@@ -92,6 +93,9 @@ target_link_libraries(qtTest
 # ------------------------------
 # 拷贝资源文件
 # ------------------------------
+file(COPY ${CMAKE_SOURCE_DIR}/src/injection/
+        DESTINATION ${CMAKE_BINARY_DIR}/)
+
 file(COPY ${CMAKE_SOURCE_DIR}/src/resource/
         DESTINATION ${CMAKE_BINARY_DIR}/src/resource/)
 

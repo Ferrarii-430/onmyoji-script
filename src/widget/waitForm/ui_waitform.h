@@ -33,10 +33,10 @@ public:
     {
         if (WaitForm->objectName().isEmpty())
             WaitForm->setObjectName("WaitForm");
-        WaitForm->resize(400, 300);
+        WaitForm->resize(291, 311);
         formLayoutWidget = new QWidget(WaitForm);
         formLayoutWidget->setObjectName("formLayoutWidget");
-        formLayoutWidget->setGeometry(QRect(0, 10, 391, 281));
+        formLayoutWidget->setGeometry(QRect(0, 0, 291, 311));
         formLayout = new QFormLayout(formLayoutWidget);
         formLayout->setObjectName("formLayout");
         formLayout->setHorizontalSpacing(20);

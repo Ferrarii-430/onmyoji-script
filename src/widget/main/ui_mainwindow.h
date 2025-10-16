@@ -11,6 +11,7 @@
 
 #include <QtCore/QVariant>
 #include <QtWidgets/QApplication>
+#include <QtWidgets/QHBoxLayout>
 #include <QtWidgets/QHeaderView>
 #include <QtWidgets/QLabel>
 #include <QtWidgets/QListWidget>
@@ -28,7 +29,6 @@ class Ui_mainwindow
 public:
     QLabel *label;
     QListWidget *listWidget;
-    QLabel *label_2;
     QTableWidget *tableWidget;
     QLabel *label_3;
     QPlainTextEdit *plainTextEdit;
@@ -40,9 +40,15 @@ public:
     QLabel *label_6;
     QLabel *currentTaskName;
     QPushButton *programmeAddBtn;
-    QPushButton *programmeContentAddBtn;
     QPushButton *programmeRemoveBtn;
     QLabel *openCVIdentifyLabel;
+    QWidget *horizontalLayoutWidget;
+    QHBoxLayout *horizontalLayout;
+    QLabel *label_2;
+    QToolButton *programmeContentUpButton;
+    QToolButton *programmeContentDownButton;
+    QPushButton *programmeContentAddBtn;
+    QToolButton *settingButton;
 
     void setupUi(QWidget *mainwindow)
     {
@@ -57,9 +63,6 @@ public:
         listWidget->setObjectName("listWidget");
         listWidget->setGeometry(QRect(10, 40, 181, 131));
         listWidget->setEditTriggers(QAbstractItemView::EditTrigger::DoubleClicked);
-        label_2 = new QLabel(mainwindow);
-        label_2->setObjectName("label_2");
-        label_2->setGeometry(QRect(10, 185, 81, 21));
         tableWidget = new QTableWidget(mainwindow);
         tableWidget->setObjectName("tableWidget");
         tableWidget->setGeometry(QRect(10, 210, 451, 251));
@@ -96,15 +99,41 @@ public:
         programmeAddBtn = new QPushButton(mainwindow);
         programmeAddBtn->setObjectName("programmeAddBtn");
         programmeAddBtn->setGeometry(QRect(70, 10, 61, 23));
-        programmeContentAddBtn = new QPushButton(mainwindow);
-        programmeContentAddBtn->setObjectName("programmeContentAddBtn");
-        programmeContentAddBtn->setGeometry(QRect(360, 180, 101, 23));
         programmeRemoveBtn = new QPushButton(mainwindow);
         programmeRemoveBtn->setObjectName("programmeRemoveBtn");
         programmeRemoveBtn->setGeometry(QRect(130, 10, 61, 23));
         openCVIdentifyLabel = new QLabel(mainwindow);
         openCVIdentifyLabel->setObjectName("openCVIdentifyLabel");
-        openCVIdentifyLabel->setGeometry(QRect(480, 50, 361, 191));
+        openCVIdentifyLabel->setGeometry(QRect(470, 40, 371, 191));
+        horizontalLayoutWidget = new QWidget(mainwindow);
+        horizontalLayoutWidget->setObjectName("horizontalLayoutWidget");
+        horizontalLayoutWidget->setGeometry(QRect(10, 170, 451, 41));
+        horizontalLayout = new QHBoxLayout(horizontalLayoutWidget);
+        horizontalLayout->setObjectName("horizontalLayout");
+        horizontalLayout->setContentsMargins(0, 0, 0, 0);
+        label_2 = new QLabel(horizontalLayoutWidget);
+        label_2->setObjectName("label_2");
+
+        horizontalLayout->addWidget(label_2);
+
+        programmeContentUpButton = new QToolButton(horizontalLayoutWidget);
+        programmeContentUpButton->setObjectName("programmeContentUpButton");
+
+        horizontalLayout->addWidget(programmeContentUpButton);
+
+        programmeContentDownButton = new QToolButton(horizontalLayoutWidget);
+        programmeContentDownButton->setObjectName("programmeContentDownButton");
+
+        horizontalLayout->addWidget(programmeContentDownButton);
+
+        programmeContentAddBtn = new QPushButton(horizontalLayoutWidget);
+        programmeContentAddBtn->setObjectName("programmeContentAddBtn");
+
+        horizontalLayout->addWidget(programmeContentAddBtn);
+
+        settingButton = new QToolButton(mainwindow);
+        settingButton->setObjectName("settingButton");
+        settingButton->setGeometry(QRect(440, 10, 24, 21));
 
         retranslateUi(mainwindow);
 
@@ -115,7 +144,6 @@ public:
     {
         mainwindow->setWindowTitle(QCoreApplication::translate("mainwindow", "mainwindow", nullptr));
         label->setText(QCoreApplication::translate("mainwindow", "\346\226\271\346\241\210", nullptr));
-        label_2->setText(QCoreApplication::translate("mainwindow", "\346\226\271\346\241\210\345\206\205\345\256\271", nullptr));
         label_3->setText(QCoreApplication::translate("mainwindow", "\346\227\245\345\277\227\350\276\223\345\207\272", nullptr));
         label_4->setText(QCoreApplication::translate("mainwindow", "OpenCV\350\257\206\345\210\253\347\274\251\347\225\245\345\233\276", nullptr));
         startTaskButton->setText(QCoreApplication::translate("mainwindow", "\345\220\257\345\212\250", nullptr));
@@ -124,9 +152,13 @@ public:
         label_6->setText(QCoreApplication::translate("mainwindow", "\345\275\223\345\211\215\344\273\273\345\212\241\346\226\271\346\241\210", nullptr));
         currentTaskName->setText(QCoreApplication::translate("mainwindow", "TextLabel", nullptr));
         programmeAddBtn->setText(QCoreApplication::translate("mainwindow", "\346\267\273\345\212\240\346\226\271\346\241\210", nullptr));
-        programmeContentAddBtn->setText(QCoreApplication::translate("mainwindow", "\346\267\273\345\212\240\346\226\271\346\241\210\345\206\205\345\256\271", nullptr));
         programmeRemoveBtn->setText(QCoreApplication::translate("mainwindow", "\345\210\240\351\231\244\346\226\271\346\241\210", nullptr));
         openCVIdentifyLabel->setText(QString());
+        label_2->setText(QCoreApplication::translate("mainwindow", "\345\275\223\345\211\215\346\226\271\346\241\210\345\206\205\345\256\271                                                ", nullptr));
+        programmeContentUpButton->setText(QCoreApplication::translate("mainwindow", "\342\206\221", nullptr));
+        programmeContentDownButton->setText(QCoreApplication::translate("mainwindow", "\342\206\223", nullptr));
+        programmeContentAddBtn->setText(QCoreApplication::translate("mainwindow", "\346\267\273\345\212\240\346\226\271\346\241\210\345\206\205\345\256\271", nullptr));
+        settingButton->setText(QCoreApplication::translate("mainwindow", "\342\232\231\357\270\217", nullptr));
     } // retranslateUi
 
 };

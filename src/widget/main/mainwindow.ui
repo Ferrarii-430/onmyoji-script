@@ -42,19 +42,6 @@
     <set>QAbstractItemView::EditTrigger::DoubleClicked</set>
    </property>
   </widget>
-  <widget class="QLabel" name="label_2">
-   <property name="geometry">
-    <rect>
-     <x>10</x>
-     <y>185</y>
-     <width>81</width>
-     <height>21</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>方案内容</string>
-   </property>
-  </widget>
   <widget class="QTableWidget" name="tableWidget">
    <property name="geometry">
     <rect>
@@ -198,19 +185,6 @@
     <string>添加方案</string>
    </property>
   </widget>
-  <widget class="QPushButton" name="programmeContentAddBtn">
-   <property name="geometry">
-    <rect>
-     <x>360</x>
-     <y>180</y>
-     <width>101</width>
-     <height>23</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>添加方案内容</string>
-   </property>
-  </widget>
   <widget class="QPushButton" name="programmeRemoveBtn">
    <property name="geometry">
     <rect>
@@ -228,13 +202,66 @@
    <property name="geometry">
     <rect>
      <x>470</x>
-     <y>50</y>
-     <width>381</width>
-     <height>201</height>
+     <y>40</y>
+     <width>371</width>
+     <height>191</height>
     </rect>
    </property>
    <property name="text">
     <string/>
+   </property>
+  </widget>
+  <widget class="QWidget" name="horizontalLayoutWidget">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>170</y>
+     <width>451</width>
+     <height>41</height>
+    </rect>
+   </property>
+   <layout class="QHBoxLayout" name="horizontalLayout">
+    <item>
+     <widget class="QLabel" name="label_2">
+      <property name="text">
+       <string>当前方案内容                                                </string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QToolButton" name="programmeContentUpButton">
+      <property name="text">
+       <string>↑</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QToolButton" name="programmeContentDownButton">
+      <property name="text">
+       <string>↓</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QPushButton" name="programmeContentAddBtn">
+      <property name="text">
+       <string>添加方案内容</string>
+      </property>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QToolButton" name="settingButton">
+   <property name="geometry">
+    <rect>
+     <x>440</x>
+     <y>10</y>
+     <width>24</width>
+     <height>21</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>⚙️</string>
    </property>
   </widget>
  </widget>
