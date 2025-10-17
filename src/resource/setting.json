@@ -1,4 +1,5 @@
 {
+  "mouseClickMode": "PostMessage",
   "mouseControlMode": "BEZIER",
   "mouseSpeed": 7,
   "screenshotMode": "DirectX截图"

@@ -28,6 +28,7 @@ SettingDialog::SettingDialog(QWidget *parent) :
     m_originalMouseMode = SETTING_CONFIG.getMouseControlMode();
     m_originalMouseSpeed = SETTING_CONFIG.getMouseSpeed();
     m_originalScreenshotMode = SETTING_CONFIG.getScreenshotMode();
+    m_originalScreenshotMode = SETTING_CONFIG.getMouseClickMode();
 }
 
 SettingDialog::~SettingDialog() {
@@ -44,10 +45,14 @@ void SettingDialog::initSetting() const
     ui->screenshotMode->addItem("PrintWindow", "PrintWindow");
     ui->screenshotMode->addItem("DirectX截图", "DirectX截图");
 
+    ui->mouseClickMode->addItem("PostMessage", "PostMessage");
+    ui->mouseClickMode->addItem("InputMouse", "InputMouse");
+
     //初始化值
     ui->mouseControlMode->setCurrentText(SETTING_CONFIG.getMouseControlMode());
     ui->mouseSpeed->setValue(SETTING_CONFIG.getMouseSpeed());
     ui->screenshotMode->setCurrentText(SETTING_CONFIG.getScreenshotMode());
+    ui->mouseClickMode->setCurrentText(SETTING_CONFIG.getMouseClickMode());
 
     // 根据配置值设置当前选项
     QString currentMouseMode = SETTING_CONFIG.getMouseControlMode();
@@ -72,6 +77,17 @@ void SettingDialog::initSetting() const
         // 如果配置值不在选项中，使用默认值
         ui->screenshotMode->setCurrentIndex(0); // 默认PrintWindow
         qWarning() << "未找到匹配的截图模式:" << currentScreenshotMode << "，使用默认值";
+    }
+
+    // 设置鼠标点击模式
+    QString currentMouseClickMode = SETTING_CONFIG.getMouseClickMode();
+    int mouseClickModeIndex = ui->mouseClickMode->findData(currentMouseClickMode);
+    if (mouseClickModeIndex >= 0) {
+        ui->mouseClickMode->setCurrentIndex(mouseClickModeIndex);
+    } else {
+        // 如果配置值不在选项中，使用默认值
+        ui->mouseClickMode->setCurrentIndex(0); // 默认PostMessage
+        qWarning() << "未找到匹配的鼠标点击模式:" << currentMouseClickMode << "，使用默认值";
     }
 }
 

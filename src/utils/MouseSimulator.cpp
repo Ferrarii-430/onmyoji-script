@@ -66,6 +66,7 @@ bool MouseSimulator::ExecuteTrajectoryWithClick(POINT start, POINT end,
     }
 
     // 在终点执行点击
+    // return true;
     return Click();
 }
 

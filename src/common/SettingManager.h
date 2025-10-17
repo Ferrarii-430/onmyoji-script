@@ -27,6 +27,7 @@ public:
     QString getMouseControlMode() const { return m_mouseControlMode; }
     int getMouseSpeed() const { return m_mouseSpeed; }
     QString getScreenshotMode() const { return m_screenshotMode; }
+    QString getMouseClickMode() const { return m_mouseClickMode; }
 
     // 获取原始JSON对象（用于扩展）
     QJsonObject getRawConfig() const { return m_config; }
@@ -51,6 +52,7 @@ private:
     QString m_mouseControlMode = "BEZIER";  // 默认值
     int m_mouseSpeed = 7;                   // 默认值
     QString m_screenshotMode = "DLL注入";   // 默认值
+    QString m_mouseClickMode = "PostMessage";   // 默认值
 };
 
 // 全局访问宏

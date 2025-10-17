@@ -83,7 +83,7 @@
     <item row="3" column="1">
      <widget class="QToolButton" name="btnCapture">
       <property name="text">
-       <string/>
+       <string>点击开始截图</string>
       </property>
      </widget>
     </item>

@@ -55,39 +55,49 @@
     <property name="verticalSpacing">
      <number>10</number>
     </property>
-    <item row="0" column="0">
+    <item row="1" column="0">
      <widget class="QLabel" name="label">
       <property name="text">
        <string>鼠标控制模式</string>
       </property>
      </widget>
     </item>
-    <item row="0" column="1">
+    <item row="1" column="1">
      <widget class="QComboBox" name="mouseControlMode"/>
     </item>
-    <item row="2" column="0">
+    <item row="3" column="0">
      <widget class="QLabel" name="label_2">
       <property name="text">
        <string>获取截图方式</string>
       </property>
      </widget>
     </item>
-    <item row="2" column="1">
+    <item row="3" column="1">
      <widget class="QComboBox" name="screenshotMode"/>
     </item>
-    <item row="1" column="0">
+    <item row="2" column="0">
      <widget class="QLabel" name="label_3">
       <property name="text">
        <string>鼠标速度</string>
       </property>
      </widget>
     </item>
-    <item row="1" column="1">
+    <item row="2" column="1">
      <widget class="QSpinBox" name="mouseSpeed">
       <property name="maximum">
        <number>10</number>
       </property>
      </widget>
+    </item>
+    <item row="0" column="0">
+     <widget class="QLabel" name="label_4">
+      <property name="text">
+       <string>鼠标点击模式</string>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="1">
+     <widget class="QComboBox" name="mouseClickMode"/>
     </item>
    </layout>
   </widget>

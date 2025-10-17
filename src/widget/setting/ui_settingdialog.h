@@ -37,6 +37,8 @@ public:
     QComboBox *screenshotMode;
     QLabel *label_3;
     QSpinBox *mouseSpeed;
+    QLabel *label_4;
+    QComboBox *mouseClickMode;
 
     void setupUi(QDialog *SettingDialog)
     {
@@ -70,33 +72,43 @@ public:
         label = new QLabel(formLayoutWidget);
         label->setObjectName("label");
 
-        formLayout->setWidget(0, QFormLayout::ItemRole::LabelRole, label);
+        formLayout->setWidget(1, QFormLayout::ItemRole::LabelRole, label);
 
         mouseControlMode = new QComboBox(formLayoutWidget);
         mouseControlMode->setObjectName("mouseControlMode");
 
-        formLayout->setWidget(0, QFormLayout::ItemRole::FieldRole, mouseControlMode);
+        formLayout->setWidget(1, QFormLayout::ItemRole::FieldRole, mouseControlMode);
 
         label_2 = new QLabel(formLayoutWidget);
         label_2->setObjectName("label_2");
 
-        formLayout->setWidget(2, QFormLayout::ItemRole::LabelRole, label_2);
+        formLayout->setWidget(3, QFormLayout::ItemRole::LabelRole, label_2);
 
         screenshotMode = new QComboBox(formLayoutWidget);
         screenshotMode->setObjectName("screenshotMode");
 
-        formLayout->setWidget(2, QFormLayout::ItemRole::FieldRole, screenshotMode);
+        formLayout->setWidget(3, QFormLayout::ItemRole::FieldRole, screenshotMode);
 
         label_3 = new QLabel(formLayoutWidget);
         label_3->setObjectName("label_3");
 
-        formLayout->setWidget(1, QFormLayout::ItemRole::LabelRole, label_3);
+        formLayout->setWidget(2, QFormLayout::ItemRole::LabelRole, label_3);
 
         mouseSpeed = new QSpinBox(formLayoutWidget);
         mouseSpeed->setObjectName("mouseSpeed");
         mouseSpeed->setMaximum(10);
 
-        formLayout->setWidget(1, QFormLayout::ItemRole::FieldRole, mouseSpeed);
+        formLayout->setWidget(2, QFormLayout::ItemRole::FieldRole, mouseSpeed);
+
+        label_4 = new QLabel(formLayoutWidget);
+        label_4->setObjectName("label_4");
+
+        formLayout->setWidget(0, QFormLayout::ItemRole::LabelRole, label_4);
+
+        mouseClickMode = new QComboBox(formLayoutWidget);
+        mouseClickMode->setObjectName("mouseClickMode");
+
+        formLayout->setWidget(0, QFormLayout::ItemRole::FieldRole, mouseClickMode);
 
 
         retranslateUi(SettingDialog);
@@ -112,6 +124,7 @@ public:
         label->setText(QCoreApplication::translate("SettingDialog", "\351\274\240\346\240\207\346\216\247\345\210\266\346\250\241\345\274\217", nullptr));
         label_2->setText(QCoreApplication::translate("SettingDialog", "\350\216\267\345\217\226\346\210\252\345\233\276\346\226\271\345\274\217", nullptr));
         label_3->setText(QCoreApplication::translate("SettingDialog", "\351\274\240\346\240\207\351\200\237\345\272\246", nullptr));
+        label_4->setText(QCoreApplication::translate("SettingDialog", "\351\274\240\346\240\207\347\202\271\345\207\273\346\250\241\345\274\217", nullptr));
     } // retranslateUi
 
 };

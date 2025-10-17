@@ -18,6 +18,7 @@
 #include <opencv2/opencv.hpp>
 #include <algorithm>
 #include <QDir>
+#include <QTimer>
 #include <random>
 #include <src/widget/main/mainwindow.h>
 #include "Logger.h"
@@ -281,6 +282,8 @@ bool ExecutionSteps::dllSetLogPath()
 
     // 执行截图命令
     QProcess process;
+    process.setProcessChannelMode(QProcess::MergedChannels);
+
     QStringList arguments;
     arguments << "-log"
               << targetPid
@@ -292,28 +295,43 @@ bool ExecutionSteps::dllSetLogPath()
 
     process.start(remoteCaptureExe, arguments);
 
-    // 等待命令完成（设置超时时间，比如10秒）
-    if (!process.waitForFinished(5000)) {
-        qWarning() << "修改log地址命令执行超时";
-        process.kill();
-        return false;
+    // 简化的等待逻辑
+    bool finished = false;
+    QTimer timeoutTimer;
+    timeoutTimer.setSingleShot(true);
+
+    // 使用lambda处理完成和超时
+    QObject::connect(&process, &QProcess::finished, [&](int exitCode, QProcess::ExitStatus) {
+        finished = true;
+    });
+
+    QObject::connect(&timeoutTimer, &QTimer::timeout, [&]() {
+        if (!finished) {
+            process.kill();
+            process.waitForFinished(1000);
+        }
+    });
+
+    timeoutTimer.start(5000);
+
+    // 等待进程完成，但允许处理其他事件
+    while (!finished && process.state() == QProcess::Running) {
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 100);
     }
 
-    // 检查命令执行结果
-    int exitCode = process.exitCode();
-    QByteArray output = process.readAllStandardOutput();
-    QByteArray errorOutput = process.readAllStandardError();
-
-    if (exitCode != 0) {
-        qWarning() << "修改log地址命令执行失败，退出码:" << exitCode;
-        qWarning() << "错误输出:" << errorOutput;
-        return false;
+    // 检查结果
+    bool success = false;
+    if (process.exitStatus() == QProcess::NormalExit && process.exitCode() == 0) {
+        QByteArray output = process.readAll();
+        qDebug() << "修改log地址命令输出:" << output;
+        success = true;
+    } else {
+        QByteArray output = process.readAll();
+        qWarning() << "修改log地址命令执行失败，退出码:" << process.exitCode();
+        qWarning() << "输出:" << output;
     }
 
-    qDebug() << "修改log地址命令输出:" << output;
-
-    ok = true;
-    return ok;
+    return success;
 }
 
 //使用DX11截图
@@ -426,7 +444,7 @@ QString ExecutionSteps::opencvRecognizesAndClick(const QString& templPath, const
     QString screenshotMode = SETTING_CONFIG.getScreenshotMode();
     // 使用 if-else 替代 switch
     if (screenshotMode == "PrintWindow") {
-        hasWinImg = getOnmyojiCaptureByDllInjection(winImg);
+        hasWinImg = getOnmyojiCaptureByPrintWindow(winImg);
     } else if (screenshotMode == "DirectX截图") {
         hasWinImg = getOnmyojiCaptureByDllInjection(winImg);
     } else {
@@ -473,7 +491,7 @@ QString ExecutionSteps::opencvRecognizesAndClick(const QString& templPath, const
     if (randomClick) {
         // 随机点击模式：在匹配区域内随机点击
         clickPt = getRandomPointInRect(matchRect);
-        Logger::log("随机点击点: (" + std::to_string(clickPt.x) + ", " + std::to_string(clickPt.y) + ")");
+        // Logger::log("随机点击点: (" + std::to_string(clickPt.x) + ", " + std::to_string(clickPt.y) + ")");
     } else {
         // 中心点击模式：点击匹配区域的中心点
         clickPt = cv::Point(matchRect.x + matchRect.width / 2,
@@ -500,7 +518,7 @@ QString ExecutionSteps::opencvRecognizesAndClick(const QString& templPath, const
     cv::imwrite(savePath.toStdString(), resultImg);
     // Logger::log("已保存识别结果图片: " + savePath);
 
-    clickInWindow2(clickPt);
+    clickInWindow(clickPt);
 
     return savePath;
 }
@@ -919,31 +937,6 @@ cv::Point ExecutionSteps::getRandomPointInRect(const cv::Rect& r) {
     return cv::Point(x, y);
 }
 
-// 在 hwnd 窗口模拟鼠标点击
-void ExecutionSteps::clickInWindow(const cv::Point& ptClient) {
-    // 转换到屏幕坐标
-    POINT pt = { ptClient.x, ptClient.y };
-    ClientToScreen(hwnd, &pt);
-
-    // 模拟鼠标输入
-    INPUT inputs[2] = {};
-    inputs[0].type = INPUT_MOUSE;
-    inputs[0].mi.dx = pt.x * (65535.0f / GetSystemMetrics(SM_CXSCREEN));
-    inputs[0].mi.dy = pt.y * (65535.0f / GetSystemMetrics(SM_CYSCREEN));
-    inputs[0].mi.dwFlags = MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE | MOUSEEVENTF_LEFTDOWN;
-
-    inputs[1].type = INPUT_MOUSE;
-    inputs[1].mi.dx = inputs[0].mi.dx;
-    inputs[1].mi.dy = inputs[0].mi.dy;
-    inputs[1].mi.dwFlags = MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE | MOUSEEVENTF_LEFTUP;
-
-    SendInput(2, inputs, sizeof(INPUT));
-
-    Logger::log(QString("已点击窗口 (%1, %2)")
-        .arg(pt.x)
-        .arg(pt.y));
-}
-
 bool ExecutionSteps::deleteCaptureFile()
 {
     QString DX11_CAPTURE_PATH = ConfigManager::instance().dx11CapturePath();
@@ -963,25 +956,52 @@ bool ExecutionSteps::deleteCaptureFile()
     }
 }
 
-void ExecutionSteps::clickInWindow2(const cv::Point& clickPoint) {
-    // 创建 MouseSimulator 实例
+void ExecutionSteps::clickInWindow(const cv::Point& clickPoint) {
     MouseSimulator simulator;
+    simulator.SetHumanLikeMode(true);
+    simulator.SetRandomDelayRange(20, 100);
+    simulator.SetJitterLevel(3);
 
-    // 配置模拟器以增强隐蔽性和后台兼容性
-    simulator.SetHumanLikeMode(true);       // 启用人类行为模式
-    simulator.SetRandomDelayRange(20, 100); // 设置短随机延迟以减少检测风险
-    simulator.SetJitterLevel(3);            // 设置轻微抖动以模拟人类操作
+    //日志打印
+    RECT clientRect, windowRect;
+    GetClientRect(hwnd, &clientRect);
+    GetWindowRect(hwnd, &windowRect);
+    Logger::log(QString("窗口信息 - 客户区: %1x%2, 窗口: %3x%4")
+        .arg(clientRect.right).arg(clientRect.bottom)
+        .arg(windowRect.right - windowRect.left).arg(windowRect.bottom - windowRect.top));
 
-    // 使用静默点击方法：StealthClick 使用混合模式（硬件+消息），确保后台执行
-    bool success = simulator.StealthClick(clickPoint.x, clickPoint.y, true);
 
-    if (success) {
-        Logger::log("静默点击成功 at (" + std::to_string(clickPoint.x) + ", " + std::to_string(clickPoint.y) + ")");
-    } else {
-        Logger::log("静默点击失败 at (" + std::to_string(clickPoint.x) + ", " + std::to_string(clickPoint.y) + ")");
-        // 可选： fallback 到硬件点击
-        if (!simulator.HardwareClick(clickPoint.x, clickPoint.y)) {
-            Logger::log(QString("备用硬件点击也失败"));
-        }
+    // 关键：将客户区坐标转换为屏幕坐标
+    POINT screenPoint = { clickPoint.x, clickPoint.y };
+    ClientToScreen(hwnd, &screenPoint);
+
+    Logger::log(QString("坐标转换 - 客户区: (%1, %2) -> 屏幕: (%3, %4)")
+        .arg(clickPoint.x).arg(clickPoint.y)
+        .arg(screenPoint.x).arg(screenPoint.y));
+
+
+    bool success = false;
+    QString mouseClickMode = SETTING_CONFIG.getMouseClickMode();
+    if (mouseClickMode == "PostMessage")
+    {
+        success = simulator.StealthMessageClick(hwnd,clickPoint.x, clickPoint.y);
+    }else if (mouseClickMode == "InputMouse")
+    {
+        POINT start = MouseSimulator::GetCurrentPosition();
+        POINT targetScreen = { screenPoint.x, screenPoint.y };
+        success = simulator.ExecuteTrajectoryWithClick(start,targetScreen,TrajectoryType::BEZIER,SETTING_CONFIG.getMouseSpeed() * 10);
+    }else
+    {
+        //其他...
+        Logger::log(QString("无法识别的鼠标点击模式，执行默认策略"));
+        success = simulator.StealthMessageClick(hwnd,clickPoint.x, clickPoint.y);
+    }
+
+    if (success)
+    {
+        Logger::log(QString("点击成功"));
+    }else
+    {
+        Logger::log(QString("点击失败"));
     }
 }

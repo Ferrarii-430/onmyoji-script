@@ -117,7 +117,7 @@ public:
         label_3->setText(QCoreApplication::translate("TypeOpenCVForm", "\346\230\257\345\220\246\351\232\217\346\234\272\347\202\271\345\207\273", nullptr));
         randomClickCheckBox->setText(QString());
         label_4->setText(QCoreApplication::translate("TypeOpenCVForm", "\346\210\252\345\233\276", nullptr));
-        btnCapture->setText(QString());
+        btnCapture->setText(QCoreApplication::translate("TypeOpenCVForm", "\347\202\271\345\207\273\345\274\200\345\247\213\346\210\252\345\233\276", nullptr));
         labelPreview->setText(QString());
     } // retranslateUi
 
