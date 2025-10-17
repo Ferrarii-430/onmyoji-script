@@ -56,9 +56,9 @@ add_executable(qtTest WIN32
         src/widget/waitForm/waitform.ui
         src/widget/typeOpenCVForm/ScreenCaptureWidget.cpp
         src/widget/typeOpenCVForm/ScreenCaptureWidget.h
-        src/widget/temp/temp.cpp
-        src/widget/temp/temp.h
-        src/widget/temp/temp.ui
+        src/widget/ocrForm/OcrForm.cpp
+        src/widget/ocrForm/OcrForm.h
+        src/widget/ocrForm/ui_OcrForm.h
         src/utils/MouseSimulator.cpp
         src/utils/MouseSimulator.h
         src/common/SettingManager.cpp

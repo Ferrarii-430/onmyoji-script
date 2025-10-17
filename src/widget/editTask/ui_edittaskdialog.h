@@ -42,7 +42,7 @@ public:
         label->setGeometry(QRect(80, 30, 48, 16));
         comboBox = new QComboBox(EditTaskDialog);
         comboBox->setObjectName("comboBox");
-        comboBox->setGeometry(QRect(150, 30, 211, 23));
+        comboBox->setGeometry(QRect(170, 30, 211, 23));
         stackedWidget = new QStackedWidget(EditTaskDialog);
         stackedWidget->setObjectName("stackedWidget");
         stackedWidget->setGeometry(QRect(80, 80, 291, 311));

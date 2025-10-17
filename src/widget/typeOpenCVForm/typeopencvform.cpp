@@ -17,8 +17,32 @@
 TypeOpenCVForm::TypeOpenCVForm(QWidget *parent) :
     QWidget(parent), ui(new Ui::TypeOpenCVForm) {
     ui->setupUi(this);
+    ui->stepInputBox->hide(); // 初始状态隐藏
+    ui->stepInputLabel->hide(); // 初始状态隐藏
+
+    ui->spinScoreBox->setValue(0.55);
+
+    ui->opencvErrorHandle->addItem("继续执行任务","next");
+    ui->opencvErrorHandle->addItem("跳转步骤","jump");
+    ui->opencvErrorHandle->addItem("跳过本次循环","continue");
+    ui->opencvErrorHandle->addItem("停止执行任务","break");
 
     connect(ui->btnCapture, &QPushButton::clicked, this, &TypeOpenCVForm::onCaptureButtonClicked);
+
+    connect(ui->opencvErrorHandle, &QComboBox::currentIndexChanged, this, [this](int index)
+    {
+        // 获取当前选中的用户数据
+            int value = ui->opencvErrorHandle->currentData().toInt();
+
+            // 当值为1时显示stepInput，其他值隐藏
+            if (value == 1) {
+                ui->stepInputBox->show();
+                ui->stepInputLabel->show();
+            } else {
+                ui->stepInputBox->hide();
+                ui->stepInputLabel->hide();
+            }
+    });
 }
 
 TypeOpenCVForm::~TypeOpenCVForm() {
@@ -31,6 +55,16 @@ void TypeOpenCVForm::loadFromJson(const QJsonObject &obj)
     ui->lineTaskNameEdit->setText(obj["taskName"].toString());
     ui->spinScoreBox->setValue(obj["score"].toDouble());
     ui->randomClickCheckBox->setChecked(obj["randomClick"].toBool());
+    ui->opencvErrorHandle->setCurrentIndex(obj["randomClick"].toBool());
+
+    QString currentIdentifyErrorHandle= obj["identifyErrorHandle"].toString();
+    int identifyErrorHandleIndex = ui->opencvErrorHandle->findData(currentIdentifyErrorHandle);
+    if (identifyErrorHandleIndex >= 0) {
+        ui->opencvErrorHandle->setCurrentIndex(identifyErrorHandleIndex);
+    } else {
+        // 如果配置值不在选项中，使用默认值
+        ui->opencvErrorHandle->setCurrentIndex(0);
+    }
 
     QString imagePath = obj["imagePath"].toString();
     if (!imagePath.isEmpty()) {
@@ -62,6 +96,13 @@ QJsonObject TypeOpenCVForm::toJson() const {
     obj["taskName"] = ui->lineTaskNameEdit->text();
     obj["score"] = ui->spinScoreBox->value();
     obj["randomClick"] = ui->randomClickCheckBox->isChecked();
+    obj["identifyErrorHandle"] = ui->opencvErrorHandle->currentData().toString();
+
+    //如果是跳转
+    if (comparesEqual(obj["identifyErrorHandle"], "jump"))
+    {
+        obj["jumpStepsIndex"] = ui->stepInputBox->currentText().toInt();
+    }
 
     // 如果 label 里有图像
     QPixmap pix = ui->labelPreview->pixmap();
