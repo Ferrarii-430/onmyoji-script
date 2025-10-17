@@ -200,7 +200,7 @@ bool ExecutionSteps::getOnmyojiCaptureByDllInjection(cv::Mat& winImg)
     process.start(remoteCaptureExe, arguments);
 
     // 等待命令完成（设置超时时间，比如10秒）
-    if (!process.waitForFinished(10000)) {
+    if (!process.waitForFinished(3000)) {
         qWarning() << "截图命令执行超时";
         process.kill();
         return false;
@@ -462,7 +462,7 @@ QString ExecutionSteps::opencvRecognizesAndClick(const QString& templPath, const
     double score = 0.0;
     cv::Rect matchRect;
     bool found = findTemplateMultiScaleInMatNMS(winImg, templ, matchRect, score,
-                                             1, 1, 0.1, threshold); // 参数根据需要调整
+                                             0.4, 0.9, 0.1, threshold); // 参数根据需要调整
 
     if (!found) {
         Logger::log(QString("未找到匹配区域! score=%1").arg(score));

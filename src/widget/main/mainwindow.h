@@ -55,6 +55,7 @@ private:
     void stopTaskButtonClick();
     void setCurrentItem(const QString &id, const QString &taskName);
     bool m_isRunning = false;
+    bool isInitLogPath = false;
 };
 
 

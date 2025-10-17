@@ -4,33 +4,44 @@
     "name": "配置1",
     "steps": [
       {
+        "imagePath": "D:/CppProduct/qtTest/cmake-build-gt-cmake-692/src/resource/screenshot/207B98D2-6276-772E-4AAA-A0C8B84834D1.png",
+        "randomClick": true,
+        "score": 0.55,
         "stepsId": "207B98D2-6276-772E-4AAA-A0C8B84834D1",
         "taskName": "识图别式神录图标",
-        "type": "OPENCV",
-        "score": 0.55,
-        "randomClick": true,
-        "imagePath": "D:/CppProduct/qtTest/cmake-build-gt-cmake-692/src/resource/screenshot/207B98D2-6276-772E-4AAA-A0C8B84834D1.png",
-        "time": null
+        "time": null,
+        "type": "OPENCV"
       },
       {
+        "imagePath": null,
+        "randomClick": null,
+        "score": null,
         "stepsId": "F25F2899-D0F3-731F-5185-32B8AFA70F21",
         "taskName": "等待2秒",
-        "type": "WAIT",
-        "score": null,
-        "randomClick": null,
-        "imagePath": null,
-        "time": 2000
+        "time": 2000,
+        "type": "WAIT"
       }
     ]
   },
   {
     "id": "DC42C888-2449-41D2-A894-095606E38D12",
     "name": "配置2",
-    "steps": []
+    "steps": [
+    ]
   },
   {
     "id": "2B0C8FD1-F8A0-473D-A87C-8E5119563BC0",
     "name": "配置3",
-    "steps": []
+    "steps": [
+      {
+        "imagePath": "D:/CppProduct/qtTest/cmake-build-gt-cmake-692/src/resource/screenshot/5ffe7bd3-baa1-454a-b2fd-f29a80c758cf.png",
+        "randomClick": true,
+        "score": 0.5,
+        "stepsId": "5ffe7bd3-baa1-454a-b2fd-f29a80c758cf",
+        "taskName": "识别开始挑战",
+        "time": null,
+        "type": "OPENCV"
+      }
+    ]
   }
 ]

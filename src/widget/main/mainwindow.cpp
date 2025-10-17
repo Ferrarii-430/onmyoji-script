@@ -17,6 +17,8 @@
 #include <ConfigTypeEnum.h>
 #include <ExecutionSteps.h>
 #include <QInputDialog>
+
+#include "ConfigManager.h"
 #include "src/utils/common.h"
 #include "QMessageBox"
 #include "SettingManager.h"
@@ -305,7 +307,17 @@ void mainwindow::startTaskButtonClick()
         return;
     }
 
-    ExecutionSteps::getInstance().dllSetLogPath();
+    if (!isInitLogPath)
+    {
+        if (ExecutionSteps::getInstance().dllSetLogPath())
+        {
+            Logger::log(QString("已修改dll日志路径: ") + ConfigManager::instance().dx11LogPath());
+        }else
+        {
+            Logger::log(QString("dll日志路径修改失败: ") + ConfigManager::instance().dx11LogPath());
+        }
+        isInitLogPath = true;
+    }
 
     m_isRunning = true;
     ui->startTaskButton->setEnabled(false);
@@ -378,8 +390,9 @@ void mainwindow::startTaskButtonClick()
 
         //删除掉截图
         // ExecutionSteps::getInstance().deleteCaptureFile();
+
         //每次任务结束都固定休眠1秒，防止无限循环一直执行
-        // Sleep(1000);
+        Sleep(1000);
 
     } while (m_isRunning && (infiniteLoop || number > 0));
 
