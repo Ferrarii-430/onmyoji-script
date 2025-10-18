@@ -10,6 +10,8 @@
 #include <QJsonObject>
 #include <QPixmap>
 #include <QString>
+
+#include "ConfigManager.h"
 #include "Logger.h"
 
 
@@ -165,9 +167,12 @@ void addConfigToJsonFile(const QString &filePath, const QString &configId, const
             newObj["taskName"]   = safeValue(json, "taskName");
             newObj["type"]       = safeValue(json, "type");
             newObj["score"]      = safeValue(json, "score");
+            newObj["ocrText"]    = safeValue(json, "ocrText");
             newObj["randomClick"]= safeValue(json, "randomClick");
             newObj["imagePath"]  = safeValue(json, "image");
             newObj["time"]       = safeValue(json, "time");
+            newObj["jumpStepsIndex"] = safeValue(json, "jumpStepsIndex");
+            newObj["identifyErrorHandle"] = safeValue(json, "identifyErrorHandle");
 
             //获取原来的 steps 数组并修改
             QJsonArray stepsArray = obj.value("steps").toArray();
@@ -333,7 +338,8 @@ void saveBase64ImageToFile(QJsonObject &data) {
     qDebug() << "图片保存成功：" << filePath;
 
     // 5. 写回路径到 JSON
-    data["image"] = filePath;
+    // data["image"] = filePath;
+    data["image"] = stepsId + ".png";
 }
 
 QString cleanString(const QString &s) {
@@ -388,18 +394,18 @@ bool removeConfigById(const QString &filePath, const QString &configId, const QS
                     // 找到对应的stepsId，获取 imagePath
                     if (stepsObj.contains("imagePath") && !stepsObj["imagePath"].isNull()) {
                         imagePathToDelete = stepsObj["imagePath"].toString();
-
+                        QString savePath = ConfigManager::instance().screenshotPath() + imagePathToDelete;
                         // 删除图片文件
                         if (!imagePathToDelete.isEmpty()) {
-                            QFile imageFile(imagePathToDelete);
+                            QFile imageFile(savePath);
                             if (imageFile.exists()) {
                                 if (imageFile.remove()) {
-                                    Logger::log("已删除图片文件: " + imagePathToDelete);
+                                    Logger::log("已删除图片文件: " + savePath);
                                 } else {
-                                    Logger::log("删除图片文件失败: " + imagePathToDelete);
+                                    Logger::log("删除图片文件失败: " + savePath);
                                 }
                             } else {
-                                Logger::log("图片文件不存在: " + imagePathToDelete);
+                                Logger::log("图片文件不存在: " + savePath);
                             }
                         }
                     }

@@ -14,6 +14,22 @@
 WaitForm::WaitForm(QWidget *parent) :
     QWidget(parent), ui(new Ui::WaitForm) {
     ui->setupUi(this);
+
+    ui->randomSleepTimeSpinBox->hide(); // 初始状态隐藏
+    ui->randomSleepTimeLabel->hide(); // 初始状态隐藏
+
+    connect(ui->checkBox, &QCheckBox::checkStateChanged, this, [this](bool value)
+    {
+        if (value)
+        {
+            ui->randomSleepTimeSpinBox->show();
+            ui->randomSleepTimeLabel->show();
+        }else
+        {
+            ui->randomSleepTimeSpinBox->hide();
+            ui->randomSleepTimeLabel->hide();
+        }
+    });
 }
 
 WaitForm::~WaitForm() {

@@ -10,6 +10,7 @@
 
 #include "src/widget/typeOpenCVForm/typeopencvform.h"
 #include "src/widget/waitForm/waitform.h"
+#include "src/widget/ocrForm/OcrForm.h"
 
 enum class EditMode { Add, Edit };
 
@@ -33,6 +34,7 @@ public:
 private:
     TypeOpenCVForm* typeForm;
     WaitForm* waitForm;
+    OcrForm* ocrForm;
     Ui::EditTaskDialog *ui;
 };
 

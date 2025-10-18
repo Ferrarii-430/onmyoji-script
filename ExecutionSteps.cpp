@@ -460,12 +460,13 @@ QString ExecutionSteps::opencvRecognizesAndClick(const QString& templPath, const
     }
 
     //加载模板文件
-    cv::Mat templ = cv::imread(templPath.toStdString()); //cv::IMREAD_COLOR
+    QString tempSavePath = ConfigManager::instance().screenshotPath() + templPath;
+    cv::Mat templ = cv::imread(tempSavePath.toStdString()); //cv::IMREAD_COLOR
     if (templ.empty()) {
-        Logger::log("模板图片加载失败: " + templPath);
+        Logger::log("模板图片加载失败: " + tempSavePath);
         return nullptr;
     }else {
-        Logger::log("已加载模板图片: " + templPath);
+        Logger::log("已加载模板图片: " + tempSavePath);
     }
 
     // 保存原始的图片

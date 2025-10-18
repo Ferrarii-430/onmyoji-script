@@ -16,7 +16,7 @@
   <widget class="QDialogButtonBox" name="buttonBox">
    <property name="geometry">
     <rect>
-     <x>150</x>
+     <x>130</x>
      <y>450</y>
      <width>161</width>
      <height>23</height>
@@ -57,6 +57,19 @@
      <width>291</width>
      <height>311</height>
     </rect>
+   </property>
+  </widget>
+  <widget class="QToolButton" name="testButton">
+   <property name="geometry">
+    <rect>
+     <x>300</x>
+     <y>450</y>
+     <width>71</width>
+     <height>22</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>测试</string>
    </property>
   </widget>
  </widget>

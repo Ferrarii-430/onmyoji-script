@@ -11,6 +11,8 @@
 #include <QPainter>
 #include <qscreen.h>
 #include <QTimer>
+
+#include "ConfigManager.h"
 #include "ui_TypeOpenCVForm.h"
 #include "ScreenCaptureWidget.h"
 
@@ -31,11 +33,8 @@ TypeOpenCVForm::TypeOpenCVForm(QWidget *parent) :
 
     connect(ui->opencvErrorHandle, &QComboBox::currentIndexChanged, this, [this](int index)
     {
-        // 获取当前选中的用户数据
-            int value = ui->opencvErrorHandle->currentData().toInt();
-
             // 当值为1时显示stepInput，其他值隐藏
-            if (value == 1) {
+            if (index == 1) {
                 ui->stepInputBox->show();
                 ui->stepInputLabel->show();
             } else {
@@ -67,13 +66,14 @@ void TypeOpenCVForm::loadFromJson(const QJsonObject &obj)
     }
 
     QString imagePath = obj["imagePath"].toString();
-    if (!imagePath.isEmpty()) {
-        QPixmap pixmap(imagePath);
+    QString savePath = ConfigManager::instance().screenshotPath() + imagePath;
+    if (!savePath.isEmpty()) {
+        QPixmap pixmap(savePath);
         if (!pixmap.isNull()) {
             originalPixmap_ = pixmap;
             QTimer::singleShot(100, this, &TypeOpenCVForm::updatePreview);
         } else {
-            ui->labelPreview->setText("图片加载失败: " + imagePath);
+            ui->labelPreview->setText("图片加载失败: " + savePath);
         }
     }
 }
