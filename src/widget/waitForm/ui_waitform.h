@@ -104,7 +104,7 @@ public:
         label_2->setText(QCoreApplication::translate("WaitForm", "\344\273\273\345\212\241\345\220\215\347\247\260", nullptr));
         label_3->setText(QCoreApplication::translate("WaitForm", "\346\230\257\345\220\246\351\232\217\346\234\272\347\255\211\345\276\205", nullptr));
         checkBox->setText(QString());
-        randomSleepTimeLabel->setText(QCoreApplication::translate("WaitForm", "\351\232\217\346\234\272\345\273\266\350\277\237\346\227\266\351\227\264", nullptr));
+        randomSleepTimeLabel->setText(QCoreApplication::translate("WaitForm", "\345\201\217\347\247\273\351\232\217\346\234\272\346\227\266\351\227\264", nullptr));
     } // retranslateUi
 
 };

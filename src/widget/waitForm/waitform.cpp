@@ -41,6 +41,7 @@ void WaitForm::loadFromJson(const QJsonObject &obj)
     stepDataCopy = obj;
     ui->lineTaskNameEdit->setText(obj["taskName"].toString());
     ui->spinBox->setValue(obj["time"].toInt());
+    ui->randomSleepTimeSpinBox->setValue(obj["offsetTime"].toInt());
 }
 
 QJsonObject WaitForm::toJson() const {
@@ -60,6 +61,7 @@ QJsonObject WaitForm::toJson() const {
     obj["type"] = "WAIT";
     obj["taskName"] = ui->lineTaskNameEdit->text();
     obj["time"] = ui->spinBox->value();
+    obj["offsetTime"] = ui->randomSleepTimeSpinBox->value();
 
     return obj;
 }

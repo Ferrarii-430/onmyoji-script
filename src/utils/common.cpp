@@ -171,6 +171,7 @@ void addConfigToJsonFile(const QString &filePath, const QString &configId, const
             newObj["randomClick"]= safeValue(json, "randomClick");
             newObj["imagePath"]  = safeValue(json, "image");
             newObj["time"]       = safeValue(json, "time");
+            newObj["offsetTime"] = safeValue(json, "offsetTime");
             newObj["jumpStepsIndex"] = safeValue(json, "jumpStepsIndex");
             newObj["identifyErrorHandle"] = safeValue(json, "identifyErrorHandle");
 

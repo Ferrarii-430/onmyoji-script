@@ -73,7 +73,7 @@
     <item row="3" column="0">
      <widget class="QLabel" name="randomSleepTimeLabel">
       <property name="text">
-       <string>随机延迟时间</string>
+       <string>偏移随机时间</string>
       </property>
      </widget>
     </item>
