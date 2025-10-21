@@ -30,7 +30,7 @@ public:
     QLabel *label_2;
     QLineEdit *lineTaskNameEdit;
     QLabel *label_3;
-    QCheckBox *checkBox;
+    QCheckBox *randomWaitCheckBox;
     QLabel *randomSleepTimeLabel;
     QSpinBox *randomSleepTimeSpinBox;
 
@@ -74,10 +74,10 @@ public:
 
         formLayout->setWidget(1, QFormLayout::ItemRole::LabelRole, label_3);
 
-        checkBox = new QCheckBox(formLayoutWidget);
-        checkBox->setObjectName("checkBox");
+        randomWaitCheckBox = new QCheckBox(formLayoutWidget);
+        randomWaitCheckBox->setObjectName("randomWaitCheckBox");
 
-        formLayout->setWidget(1, QFormLayout::ItemRole::FieldRole, checkBox);
+        formLayout->setWidget(1, QFormLayout::ItemRole::FieldRole, randomWaitCheckBox);
 
         randomSleepTimeLabel = new QLabel(formLayoutWidget);
         randomSleepTimeLabel->setObjectName("randomSleepTimeLabel");
@@ -103,7 +103,7 @@ public:
         label->setText(QCoreApplication::translate("WaitForm", "\347\255\211\345\276\205\346\227\266\351\227\264\357\274\210\346\257\253\347\247\222\357\274\211", nullptr));
         label_2->setText(QCoreApplication::translate("WaitForm", "\344\273\273\345\212\241\345\220\215\347\247\260", nullptr));
         label_3->setText(QCoreApplication::translate("WaitForm", "\346\230\257\345\220\246\351\232\217\346\234\272\347\255\211\345\276\205", nullptr));
-        checkBox->setText(QString());
+        randomWaitCheckBox->setText(QString());
         randomSleepTimeLabel->setText(QCoreApplication::translate("WaitForm", "\345\201\217\347\247\273\351\232\217\346\234\272\346\227\266\351\227\264", nullptr));
     } // retranslateUi
 

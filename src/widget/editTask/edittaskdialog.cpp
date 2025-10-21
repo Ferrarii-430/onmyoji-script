@@ -6,6 +6,7 @@
 
 #include "edittaskdialog.h"
 #include <QJsonObject>
+#include <QMessageBox>
 #include <QPushButton>
 #include <../common/ConfigTypeEnum.h>
 
@@ -172,4 +173,104 @@ void EditTaskDialog::onTestButtonClick()
         }
         emit imagePathRequested(savePath); // 发射信号
     }
+}
+
+bool EditTaskDialog::validateWaitFormData(const QJsonObject &data)
+{
+    QString taskName = data["taskName"].toString().trimmed();
+    bool randomWait = data["randomWait"].toBool();
+    int time = data["time"].toInt();
+    int offsetTime = data["offsetTime"].toInt();
+
+    if (taskName.isEmpty()) {
+        QMessageBox::warning(this, "警告", "任务名称不能为空！");
+        return false;
+    }
+
+    if (time <= 0)
+    {
+        QMessageBox::warning(this, "警告", "等待时间不能 ＜= 0 ！");
+        return false;
+    }
+
+    if (offsetTime <= 0)
+    {
+        QMessageBox::warning(this, "警告", "偏移时间不能 <= 0 ！");
+        return false;
+    }
+
+    if (randomWait)
+    {
+        if (offsetTime >= time)
+        {
+            QMessageBox::warning(this, "警告", "偏移时间不能 >= 等待时间 ！");
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool EditTaskDialog::validateOpenCVFormData(const QJsonObject &data)
+{
+    QString taskName = data["taskName"].toString().trimmed();
+    QString imagePath = data["image"].toString().trimmed(); //此时还是image 不是imagePath
+
+    if (taskName.isEmpty()) {
+        QMessageBox::warning(this, "警告", "任务名称不能为空！");
+        return false;
+    }
+
+    if (imagePath.isEmpty()) {
+        QMessageBox::warning(this, "警告", "截图不能为空！");
+        return false;
+    }
+
+    return true;
+}
+
+bool EditTaskDialog::validateOcrFormData(const QJsonObject &data)
+{
+    QString taskName = data["taskName"].toString().trimmed();
+    QString ocrText = data["ocrText"].toString().trimmed();
+
+    if (taskName.isEmpty()) {
+        QMessageBox::warning(this, "警告", "任务名称不能为空！");
+        return false;
+    }
+
+    if (ocrText.isEmpty()) {
+        QMessageBox::warning(this, "警告", "OCR文本不能为空！");
+        return false;
+    }
+
+    return true;
+}
+
+// 在 EditTaskDialog 中添加验证方法
+bool EditTaskDialog::validateData() {
+    QJsonObject data = resultData();
+    QString type = data["type"].toString();
+    bool isValidate = true;
+
+    if (comparesEqual(type, "OPENCV"))
+    {
+        isValidate = validateOpenCVFormData(data);
+    }else if (comparesEqual(type, "WAIT"))
+    {
+        isValidate = validateWaitFormData(data);
+    }else if (comparesEqual(type, "OCR"))
+    {
+        isValidate = validateOcrFormData(data);
+    }
+
+    return isValidate;
+}
+
+// 重写 accept()
+void EditTaskDialog::accept() {
+    if (!validateData()) {
+        return; // 验证失败，不关闭对话框
+    }
+    QDialog::accept();
 }

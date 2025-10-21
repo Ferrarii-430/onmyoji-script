@@ -18,7 +18,7 @@ WaitForm::WaitForm(QWidget *parent) :
     ui->randomSleepTimeSpinBox->hide(); // 初始状态隐藏
     ui->randomSleepTimeLabel->hide(); // 初始状态隐藏
 
-    connect(ui->checkBox, &QCheckBox::checkStateChanged, this, [this](bool value)
+    connect(ui->randomWaitCheckBox, &QCheckBox::checkStateChanged, this, [this](bool value)
     {
         if (value)
         {
@@ -41,6 +41,7 @@ void WaitForm::loadFromJson(const QString &configId, const QJsonObject &obj)
     stepDataCopy = obj;
     ui->lineTaskNameEdit->setText(obj["taskName"].toString());
     ui->spinBox->setValue(obj["time"].toInt());
+    ui->randomWaitCheckBox->setChecked(obj["randomWait"].toBool());
     ui->randomSleepTimeSpinBox->setValue(obj["offsetTime"].toInt());
 }
 
@@ -61,6 +62,7 @@ QJsonObject WaitForm::toJson() const {
     obj["type"] = "WAIT";
     obj["taskName"] = ui->lineTaskNameEdit->text();
     obj["time"] = ui->spinBox->value();
+    obj["randomWait"] = ui->randomWaitCheckBox->isChecked();
     obj["offsetTime"] = ui->randomSleepTimeSpinBox->value();
 
     return obj;

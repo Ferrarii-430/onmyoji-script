@@ -11,6 +11,8 @@
         "stepsId": "207B98D2-6276-772E-4AAA-A0C8B84834D1",
         "taskName": "识图别式神录图标",
         "time": null,
+        "randomWait": false,
+        "offsetTime": null,
         "identifyErrorHandle": "next",
         "jumpStepsId": null,
         "type": "OPENCV"
@@ -23,6 +25,8 @@
         "stepsId": "F25F2899-D0F3-731F-5185-32B8AFA70F21",
         "taskName": "等待2秒",
         "time": 2000,
+        "randomWait": false,
+        "offsetTime": null,
         "identifyErrorHandle": "next",
         "jumpStepsId": null,
         "type": "WAIT"
@@ -47,6 +51,8 @@
         "stepsId": "5ffe7bd3-baa1-454a-b2fd-f29a80c758cf",
         "taskName": "识别开始挑战",
         "time": null,
+        "randomWait": false,
+        "offsetTime": null,
         "identifyErrorHandle": "next",
         "jumpStepsId": null,
         "type": "OPENCV"

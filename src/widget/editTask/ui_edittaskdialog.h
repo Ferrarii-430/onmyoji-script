@@ -59,7 +59,7 @@ public:
 
     void retranslateUi(QDialog *EditTaskDialog)
     {
-        EditTaskDialog->setWindowTitle(QCoreApplication::translate("EditTaskDialog", "EditTaskDialog", nullptr));
+        EditTaskDialog->setWindowTitle(QCoreApplication::translate("EditTaskDialog", "\346\226\271\346\241\210\345\206\205\345\256\271\350\256\276\347\275\256", nullptr));
         label->setText(QCoreApplication::translate("EditTaskDialog", "\344\273\273\345\212\241\347\261\273\345\236\213", nullptr));
     } // retranslateUi
 

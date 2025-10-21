@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>EditTaskDialog</string>
+   <string>方案内容设置</string>
   </property>
   <widget class="QLabel" name="label">
    <property name="geometry">

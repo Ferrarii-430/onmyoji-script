@@ -33,6 +33,11 @@ public:
     QJsonObject resultData() const;
     ~EditTaskDialog() override;
 void onTestButtonClick();
+bool validateWaitFormData(const QJsonObject& data);
+bool validateOpenCVFormData(const QJsonObject& data);
+bool validateOcrFormData(const QJsonObject& data);
+bool validateData();
+void accept();
 void setCurrentIndex();
 
 private:

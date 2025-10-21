@@ -24,6 +24,7 @@ OcrForm::OcrForm(QWidget *parent) :
     ui->opencvErrorHandle->addItem("跳转步骤","jump");
     ui->opencvErrorHandle->addItem("跳过本次循环","continue");
     ui->opencvErrorHandle->addItem("停止执行任务","break");
+    ui->opencvErrorHandle->addItem("重试","retry");
 
     ui->spinScoreBox->setValue(0.55);
 

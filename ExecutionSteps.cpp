@@ -223,7 +223,7 @@ bool ExecutionSteps::getOnmyojiCaptureByDllInjection(cv::Mat& winImg)
 
     // 检查截图文件是否存在
     if (!QFile::exists(DX11_CAPTURE_PATH)) {
-        qWarning() << "截图文件未生成:" << DX11_CAPTURE_PATH;
+        Logger::log(QString("截图文件未生成:" + DX11_CAPTURE_PATH));
         return false;
     }
 
@@ -234,9 +234,7 @@ bool ExecutionSteps::getOnmyojiCaptureByDllInjection(cv::Mat& winImg)
         qWarning() << "无法读取截图文件:" << DX11_CAPTURE_PATH;
         return false;
     }
-
-    qDebug() << "截图成功，图像尺寸:" << winImg.cols << "x" << winImg.rows
-             << "通道数:" << winImg.channels();
+    Logger::log(QString("截图成功，图像尺寸: %1 x %2  通道数: %3").arg(winImg.cols, winImg.rows, winImg.channels()));
 
     ok = true;
     return ok;

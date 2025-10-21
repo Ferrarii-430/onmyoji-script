@@ -125,6 +125,7 @@ void addConfigToJsonFile(const QString &filePath, const QString &configId, const
             newObj["randomClick"]= safeValue(json, "randomClick");
             newObj["imagePath"]  = safeValue(json, "image");
             newObj["time"]       = safeValue(json, "time");
+            newObj["randomWait"] = safeValue(json, "randomWait");
             newObj["offsetTime"] = safeValue(json, "offsetTime");
             newObj["jumpStepsId"] = safeValue(json, "jumpStepsId");
             newObj["identifyErrorHandle"] = safeValue(json, "identifyErrorHandle");
@@ -194,6 +195,7 @@ void updateConfigInJsonFile(const QString &filePath, const QString &configId, co
                     updatedStep["randomClick"]= safeValue(json, "randomClick");
                     updatedStep["imagePath"]  = safeValue(json, "image");
                     updatedStep["time"]       = safeValue(json, "time");
+                    updatedStep["randomWait"] = safeValue(json, "randomWait");
                     updatedStep["offsetTime"] = safeValue(json, "offsetTime");
                     updatedStep["jumpStepsId"] = safeValue(json, "jumpStepsId");
                     updatedStep["identifyErrorHandle"] = safeValue(json, "identifyErrorHandle");

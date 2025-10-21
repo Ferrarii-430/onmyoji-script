@@ -24,6 +24,7 @@
 #include "SettingManager.h"
 #include "src/widget/editTask/edittaskdialog.h"
 #include "src/widget/setting/settingdialog.h"
+#include <QRandomGenerator>
 #include <src/utils/common.h>
 
 //TODO 🐶💩代码 有空我一定重构
@@ -188,6 +189,10 @@ void mainwindow::showStepsInTable(const QJsonArray &steps) {
             dlg->show();
             connect(dlg, &EditTaskDialog::accepted,[dlg, this]() {
                 QJsonObject data = dlg->resultData();
+                if (data.isEmpty()) {
+                    return;
+                }
+
                 // 保存回 JSON 文件 & 刷新表格
                 saveBase64ImageToFile(data);
                 updateConfigInJsonFile(CONFIG_PATH, currentItem.id, data);
@@ -309,8 +314,9 @@ void mainwindow::startTaskButtonClick()
     ui->stopTaskButton->setEnabled(true);
 
     int number = ui->taskCycleNumber->text().toInt();
-    bool infiniteLoop = (number <= 0);
-    Logger::log(QString("循环次数: %1").arg(infiniteLoop ? "无限" : QString::number(number)));
+    int total = number;
+    const bool infiniteLoop = (number <= 0);
+    Logger::log(QString("任务循环次数: %1").arg(infiniteLoop ? "无限" : QString::number(number)));
 
     do {
         // 用于跟踪每个步骤的错误重试次数
@@ -371,14 +377,30 @@ void mainwindow::startTaskButtonClick()
                 }
 
                 case ConfigTypeEnum::WAIT: {
-                        Logger::log(QString("等待%1毫秒...").arg(step["time"].toInt()));
-                        int waitTime = step["time"].toInt();
-                        int interval = 100; // 每100ms检查一次
-                        for (int t = 0; t < waitTime && m_isRunning; t += interval) {
-                            Sleep(qMin(interval, waitTime - t));
-                            QCoreApplication::processEvents();
-                        }
-                        break;
+                            int waitTime = step["time"].toInt();
+                            bool randomWait = step["randomWait"].toBool();
+                            int offsetTime = step["offsetTime"].toInt();
+
+                            int actualWaitTime = waitTime;
+                            if (randomWait && offsetTime > 0) {
+                                // 生成在 [-offsetTime, offsetTime] 范围内的随机偏移量
+                                int randomOffset = QRandomGenerator::global()->bounded(-offsetTime, offsetTime + 1);
+                                actualWaitTime = qMax(0, waitTime + randomOffset); // 确保等待时间非负
+                            }
+
+                            // 记录实际等待时间，如果启用了随机等待则标注
+                            if (randomWait) {
+                                Logger::log(QString("等待%1毫秒（随机偏移，基础时间%2毫秒）...").arg(actualWaitTime).arg(waitTime));
+                            } else {
+                                Logger::log(QString("等待%1毫秒...").arg(actualWaitTime));
+                            }
+
+                            int interval = 100; // 每100ms检查一次
+                            for (int t = 0; t < actualWaitTime && m_isRunning; t += interval) {
+                                Sleep(qMin(interval, actualWaitTime - t));
+                                QCoreApplication::processEvents();
+                            }
+                            break;
                 }
 
                 default: {
@@ -460,6 +482,7 @@ void mainwindow::startTaskButtonClick()
 
         if (!infiniteLoop) {
             number--;
+            Logger::log(QString("当前任务执行次数:(%1/%2)").arg(QString::number(total-number), QString::number(total)));
         }
 
         //删除掉截图
@@ -584,6 +607,10 @@ void mainwindow::onProgrammeContentAddBtnClicked()
     connect(dlg, &EditTaskDialog::accepted, [dlg, this]() {
         QJsonObject data = dlg->resultData();
         // 保存 JSON
+        if (data.isEmpty()) {
+            return;
+        }
+
         saveBase64ImageToFile(data);
         addConfigToJsonFile(CONFIG_PATH,currentItem.id,data);
         QTimer::singleShot(0, dlg, &QObject::deleteLater);  // 延迟一拍
