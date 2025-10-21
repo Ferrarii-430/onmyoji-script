@@ -13,19 +13,6 @@
   <property name="windowTitle">
    <string>EditTaskDialog</string>
   </property>
-  <widget class="QDialogButtonBox" name="buttonBox">
-   <property name="geometry">
-    <rect>
-     <x>130</x>
-     <y>450</y>
-     <width>161</width>
-     <height>23</height>
-    </rect>
-   </property>
-   <property name="standardButtons">
-    <set>QDialogButtonBox::StandardButton::Cancel|QDialogButtonBox::StandardButton::Ok</set>
-   </property>
-  </widget>
   <widget class="QLabel" name="label">
    <property name="geometry">
     <rect>
@@ -55,21 +42,27 @@
      <x>80</x>
      <y>80</y>
      <width>291</width>
-     <height>311</height>
+     <height>350</height>
     </rect>
    </property>
   </widget>
-  <widget class="QToolButton" name="testButton">
+  <widget class="QDialogButtonBox" name="buttonBox">
    <property name="geometry">
     <rect>
-     <x>300</x>
+     <x>130</x>
      <y>450</y>
-     <width>71</width>
-     <height>22</height>
+     <width>221</width>
+     <height>23</height>
     </rect>
    </property>
-   <property name="text">
-    <string>测试</string>
+   <property name="sizePolicy">
+    <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+     <horstretch>0</horstretch>
+     <verstretch>0</verstretch>
+    </sizepolicy>
+   </property>
+   <property name="standardButtons">
+    <set>QDialogButtonBox::StandardButton::Cancel|QDialogButtonBox::StandardButton::Ok</set>
    </property>
   </widget>
  </widget>

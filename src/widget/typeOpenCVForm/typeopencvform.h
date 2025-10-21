@@ -19,9 +19,9 @@ Q_OBJECT
 public:
     explicit TypeOpenCVForm(QWidget *parent = nullptr);
     ~TypeOpenCVForm() override;
-    void loadFromJson(const QJsonObject &obj);
+    void loadFromJson(const QString &configId, const QJsonObject &obj);
+    void initStepInputBoxSelect(QString configId, const QString &stepsId);
     QJsonObject toJson() const;
-
 
 
 private slots:
@@ -32,7 +32,9 @@ private:
     Ui::TypeOpenCVForm *ui;
     QPixmap capturedImage;  // 保存截图
     QPixmap originalPixmap_;
+    QString currentConfigId;
     QJsonObject stepDataCopy;
+    QMap<QString,QString> stepSelect;
 };
 
 

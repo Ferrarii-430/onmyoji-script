@@ -4,25 +4,27 @@
     "name": "配置1",
     "steps": [
       {
-        "imagePath": "D:/CppProduct/qtTest/cmake-build-gt-cmake-692/src/resource/screenshot/207B98D2-6276-772E-4AAA-A0C8B84834D1.png",
+        "imagePath": "207B98D2-6276-772E-4AAA-A0C8B84834D1.png",
         "randomClick": true,
         "score": 0.55,
+        "ocrText": null,
         "stepsId": "207B98D2-6276-772E-4AAA-A0C8B84834D1",
         "taskName": "识图别式神录图标",
         "time": null,
         "identifyErrorHandle": "next",
-        "jumpStepsIndex": null,
+        "jumpStepsId": null,
         "type": "OPENCV"
       },
       {
         "imagePath": null,
         "randomClick": null,
         "score": null,
+        "ocrText": null,
         "stepsId": "F25F2899-D0F3-731F-5185-32B8AFA70F21",
         "taskName": "等待2秒",
         "time": 2000,
         "identifyErrorHandle": "next",
-        "jumpStepsIndex": null,
+        "jumpStepsId": null,
         "type": "WAIT"
       }
     ]
@@ -38,14 +40,15 @@
     "name": "配置3",
     "steps": [
       {
-        "imagePath": "D:/CppProduct/qtTest/cmake-build-gt-cmake-692/src/resource/screenshot/5ffe7bd3-baa1-454a-b2fd-f29a80c758cf.png",
+        "imagePath": "5ffe7bd3-baa1-454a-b2fd-f29a80c758cf.png",
         "randomClick": true,
         "score": 0.5,
+        "ocrText": null,
         "stepsId": "5ffe7bd3-baa1-454a-b2fd-f29a80c758cf",
         "taskName": "识别开始挑战",
         "time": null,
         "identifyErrorHandle": "next",
-        "jumpStepsIndex": null,
+        "jumpStepsId": null,
         "type": "OPENCV"
       }
     ]

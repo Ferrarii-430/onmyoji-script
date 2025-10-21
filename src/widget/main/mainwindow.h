@@ -10,12 +10,6 @@
 #include <QWidget>
 #include <QJsonArray>
 
-
-struct ItemInfo {
-    QString taskName;
-    QString id;
-};
-
 QT_BEGIN_NAMESPACE
 namespace Ui { class mainwindow; }
 QT_END_NAMESPACE
@@ -23,10 +17,11 @@ QT_END_NAMESPACE
 class mainwindow : public QWidget {
 Q_OBJECT
 
+public slots:
+    void showOpenCVIdentifyImage(const QString& savePath) const; // 如果尚未声明为槽
+
 public:
     Ui::mainwindow *ui;
-    QJsonArray m_configArray;
-    ItemInfo currentItem;
     QString CONFIG_PATH = QCoreApplication::applicationDirPath() + "/src/resource/config.json";
     QString DX11_CAPTURE_PATH = QCoreApplication::applicationDirPath() + "/src/resource/thumbnail/debug_capture_result.png";
     QString SCREENSHOT_PATH = QCoreApplication::applicationDirPath() + "/src/resource/screenshot/";
@@ -43,17 +38,14 @@ public:
     void onProgrammeContentAddBtnClicked();
     void onProgrammeUpBtnClicked();
     void onProgrammeDownBtnClicked();
-    void showOpenCVIdentifyImage(const QString& savePath) const;
 
 private:
     void loadListWidgetData();
     void onItemClicked(QListWidgetItem *item);
-    void loadConfig();
     void showStepsInTable(const QJsonArray &steps);
     void showCurrentSelectStepsInTable();
     void startTaskButtonClick();
     void stopTaskButtonClick();
-    void setCurrentItem(const QString &id, const QString &taskName);
     bool m_isRunning = false;
     bool isInitLogPath = false;
 };

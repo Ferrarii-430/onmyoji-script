@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="QtSettings">
-    <option name="myCurrentProfile" value="Release-QT_MinGW" />
+    <option name="myCurrentProfile" value="GT-CMake-6.9.2" />
     <option name="mySettingsPerProfile">
       <map>
-        <entry key="Release-QT_MinGW">
+        <entry key="GT-CMake-6.9.2">
           <value>
             <PerProfileState>
               <option name="myQmlPath" value="$PROJECT_DIR$/../../QT/6.9.2/mingw_64/qml" />

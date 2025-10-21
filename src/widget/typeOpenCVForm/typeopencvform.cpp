@@ -11,10 +11,10 @@
 #include <QPainter>
 #include <qscreen.h>
 #include <QTimer>
-
 #include "ConfigManager.h"
 #include "ui_TypeOpenCVForm.h"
 #include "ScreenCaptureWidget.h"
+#include "src/utils/common.h"
 
 TypeOpenCVForm::TypeOpenCVForm(QWidget *parent) :
     QWidget(parent), ui(new Ui::TypeOpenCVForm) {
@@ -28,6 +28,7 @@ TypeOpenCVForm::TypeOpenCVForm(QWidget *parent) :
     ui->opencvErrorHandle->addItem("跳转步骤","jump");
     ui->opencvErrorHandle->addItem("跳过本次循环","continue");
     ui->opencvErrorHandle->addItem("停止执行任务","break");
+    ui->opencvErrorHandle->addItem("重试","retry");
 
     connect(ui->btnCapture, &QPushButton::clicked, this, &TypeOpenCVForm::onCaptureButtonClicked);
 
@@ -35,6 +36,7 @@ TypeOpenCVForm::TypeOpenCVForm(QWidget *parent) :
     {
             // 当值为1时显示stepInput，其他值隐藏
             if (index == 1) {
+                initStepInputBoxSelect(currentConfigId,stepDataCopy["stepsId"].toString());
                 ui->stepInputBox->show();
                 ui->stepInputLabel->show();
             } else {
@@ -48,32 +50,71 @@ TypeOpenCVForm::~TypeOpenCVForm() {
     delete ui;
 }
 
-void TypeOpenCVForm::loadFromJson(const QJsonObject &obj)
+void TypeOpenCVForm::loadFromJson(const QString &configId, const QJsonObject &obj)
 {
+    currentConfigId = configId;
     stepDataCopy = obj;
     ui->lineTaskNameEdit->setText(obj["taskName"].toString());
     ui->spinScoreBox->setValue(obj["score"].toDouble());
     ui->randomClickCheckBox->setChecked(obj["randomClick"].toBool());
-    ui->opencvErrorHandle->setCurrentIndex(obj["randomClick"].toBool());
 
-    QString currentIdentifyErrorHandle= obj["identifyErrorHandle"].toString();
+    QString currentIdentifyErrorHandle = obj["identifyErrorHandle"].toString();
     int identifyErrorHandleIndex = ui->opencvErrorHandle->findData(currentIdentifyErrorHandle);
     if (identifyErrorHandleIndex >= 0) {
         ui->opencvErrorHandle->setCurrentIndex(identifyErrorHandleIndex);
+        if (identifyErrorHandleIndex == 1)
+        {
+            QString targetId = obj["jumpStepsId"].toString().trimmed();
+            int stepsInputBoxIndex = ui->stepInputBox->findData(targetId);
+            if (stepsInputBoxIndex != -1) {
+                ui->stepInputBox->setCurrentIndex(stepsInputBoxIndex);
+                qDebug() << "成功回显ID:" << targetId;
+            } else {
+                qDebug() << "未找到ID，当前ComboBox内容:" << targetId;
+                for (int i = 0; i < ui->stepInputBox->count(); ++i) {
+                    qDebug() << "索引" << i << "显示文本:" << ui->stepInputBox->itemText(i)
+                             << "用户数据:" << ui->stepInputBox->itemData(i).toString();
+                }
+            }
+        }
     } else {
         // 如果配置值不在选项中，使用默认值
         ui->opencvErrorHandle->setCurrentIndex(0);
     }
 
     QString imagePath = obj["imagePath"].toString();
-    QString savePath = ConfigManager::instance().screenshotPath() + imagePath;
-    if (!savePath.isEmpty()) {
-        QPixmap pixmap(savePath);
-        if (!pixmap.isNull()) {
-            originalPixmap_ = pixmap;
-            QTimer::singleShot(100, this, &TypeOpenCVForm::updatePreview);
-        } else {
-            ui->labelPreview->setText("图片加载失败: " + savePath);
+    if (!imagePath.isEmpty())
+    {
+        QString savePath = ConfigManager::instance().screenshotPath() + imagePath;
+        if (!savePath.isEmpty()) {
+            QPixmap pixmap(savePath);
+            if (!pixmap.isNull()) {
+                originalPixmap_ = pixmap;
+                QTimer::singleShot(100, this, &TypeOpenCVForm::updatePreview);
+            } else {
+                ui->labelPreview->setText("图片加载失败: " + savePath);
+            }
+        }
+    }
+}
+
+void TypeOpenCVForm::initStepInputBoxSelect(QString configId, const QString &stepsId)
+{
+    if (configId.isEmpty())
+    {
+        configId = currentItem.id;
+    }
+
+    if (stepSelect.empty())
+    {
+        stepSelect = getStepsSelect(configId, stepsId);
+    }
+
+    if (!stepSelect.empty())
+    {
+        ui->stepInputBox->clear();
+        for (auto it = stepSelect.cbegin(); it != stepSelect.cend(); ++it) {
+            ui->stepInputBox->addItem(it.key(), it.value());
         }
     }
 }
@@ -99,9 +140,12 @@ QJsonObject TypeOpenCVForm::toJson() const {
     obj["identifyErrorHandle"] = ui->opencvErrorHandle->currentData().toString();
 
     //如果是跳转
-    if (comparesEqual(obj["identifyErrorHandle"], "jump"))
+    if (comparesEqual(obj["identifyErrorHandle"].toString(), "jump"))
     {
-        obj["jumpStepsIndex"] = ui->stepInputBox->currentText().toInt();
+        obj["jumpStepsId"] = ui->stepInputBox->currentData().toString();
+    }else
+    {
+        obj["jumpStepsId"] = QJsonValue::Null;
     }
 
     // 如果 label 里有图像

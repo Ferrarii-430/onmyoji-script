@@ -17,28 +17,22 @@
 #include <QtWidgets/QDialogButtonBox>
 #include <QtWidgets/QLabel>
 #include <QtWidgets/QStackedWidget>
-#include <QtWidgets/QToolButton>
 
 QT_BEGIN_NAMESPACE
 
 class Ui_EditTaskDialog
 {
 public:
-    QDialogButtonBox *buttonBox;
     QLabel *label;
     QComboBox *comboBox;
     QStackedWidget *stackedWidget;
-    QToolButton *testButton;
+    QDialogButtonBox *buttonBox;
 
     void setupUi(QDialog *EditTaskDialog)
     {
         if (EditTaskDialog->objectName().isEmpty())
             EditTaskDialog->setObjectName("EditTaskDialog");
         EditTaskDialog->resize(479, 496);
-        buttonBox = new QDialogButtonBox(EditTaskDialog);
-        buttonBox->setObjectName("buttonBox");
-        buttonBox->setGeometry(QRect(130, 450, 161, 23));
-        buttonBox->setStandardButtons(QDialogButtonBox::StandardButton::Cancel|QDialogButtonBox::StandardButton::Ok);
         label = new QLabel(EditTaskDialog);
         label->setObjectName("label");
         label->setGeometry(QRect(80, 30, 48, 16));
@@ -47,10 +41,16 @@ public:
         comboBox->setGeometry(QRect(165, 30, 211, 23));
         stackedWidget = new QStackedWidget(EditTaskDialog);
         stackedWidget->setObjectName("stackedWidget");
-        stackedWidget->setGeometry(QRect(80, 80, 291, 311));
-        testButton = new QToolButton(EditTaskDialog);
-        testButton->setObjectName("testButton");
-        testButton->setGeometry(QRect(300, 450, 71, 22));
+        stackedWidget->setGeometry(QRect(80, 80, 291, 350));
+        buttonBox = new QDialogButtonBox(EditTaskDialog);
+        buttonBox->setObjectName("buttonBox");
+        buttonBox->setGeometry(QRect(130, 450, 221, 23));
+        QSizePolicy sizePolicy(QSizePolicy::Policy::Fixed, QSizePolicy::Policy::Fixed);
+        sizePolicy.setHorizontalStretch(0);
+        sizePolicy.setVerticalStretch(0);
+        sizePolicy.setHeightForWidth(buttonBox->sizePolicy().hasHeightForWidth());
+        buttonBox->setSizePolicy(sizePolicy);
+        buttonBox->setStandardButtons(QDialogButtonBox::StandardButton::Cancel|QDialogButtonBox::StandardButton::Ok);
 
         retranslateUi(EditTaskDialog);
 
@@ -61,7 +61,6 @@ public:
     {
         EditTaskDialog->setWindowTitle(QCoreApplication::translate("EditTaskDialog", "EditTaskDialog", nullptr));
         label->setText(QCoreApplication::translate("EditTaskDialog", "\344\273\273\345\212\241\347\261\273\345\236\213", nullptr));
-        testButton->setText(QCoreApplication::translate("EditTaskDialog", "\346\265\213\350\257\225", nullptr));
     } // retranslateUi
 
 };

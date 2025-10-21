@@ -14,7 +14,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>mainwindow</string>
+   <string>onmyoji-script v1.3</string>
   </property>
   <widget class="QLabel" name="label">
    <property name="geometry">

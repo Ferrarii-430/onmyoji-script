@@ -36,7 +36,7 @@ WaitForm::~WaitForm() {
     delete ui;
 }
 
-void WaitForm::loadFromJson(const QJsonObject &obj)
+void WaitForm::loadFromJson(const QString &configId, const QJsonObject &obj)
 {
     stepDataCopy = obj;
     ui->lineTaskNameEdit->setText(obj["taskName"].toString());

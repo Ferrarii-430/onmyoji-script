@@ -52,6 +52,30 @@ public:
         return QCoreApplication::applicationDirPath() + "/src/resource/config.json";
     }
 
+    QString rapidOCRExePath() const {
+        return QCoreApplication::applicationDirPath() + "/src/resource/RapidOCR/RapidOCR-json.exe";
+    }
+
+    QString rapidOCRDetPathV4() const {
+        return "ch_PP-OCRv4_det_infer.onnx";
+    }
+
+    QString rapidOCRClsPathV4() const {
+        return "ch_ppocr_mobile_v2.0_cls_infer.onnx";
+    }
+
+    QString rapidOCRRecPathV4() const {
+        return "rec_ch_PP-OCRv4_infer.onnx";
+    }
+
+    QString rapidOCRKeysPath() const {
+        return "dict_chinese.txt";
+    }
+
+    QString rapidOCRModelsPath() const {
+        return QCoreApplication::applicationDirPath() + "/src/resource/RapidOCR/models/";
+    }
+
 private:
     ConfigManager() = default;
     ~ConfigManager() = default;

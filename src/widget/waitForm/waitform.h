@@ -19,7 +19,7 @@ Q_OBJECT
 public:
     explicit WaitForm(QWidget *parent = nullptr);
     ~WaitForm() override;
-    void loadFromJson(const QJsonObject &obj);
+    void loadFromJson(const QString &configId, const QJsonObject &obj);
     QJsonObject toJson() const;
 private:
     Ui::WaitForm *ui;

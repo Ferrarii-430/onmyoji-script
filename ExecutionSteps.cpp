@@ -18,6 +18,7 @@
 #include <opencv2/opencv.hpp>
 #include <algorithm>
 #include <QDir>
+#include "QTemporaryFile"
 #include <QTimer>
 #include <random>
 #include <src/widget/main/mainwindow.h>
@@ -431,6 +432,37 @@ bool EnableDebugPrivilege() {
     return GetLastError() == ERROR_SUCCESS;
 }
 
+QString ExecutionSteps::opencvRecognizesAndClickByBase64(const QString& base64, const double threshold, const bool randomClick)
+{
+    // 检查 base64 字符串是否有效
+    if (base64.isEmpty()) {
+        return "错误: base64 图像数据为空";
+    }
+
+    // 解码 base64 数据
+    QByteArray imageData = QByteArray::fromBase64(base64.toUtf8());
+    if (imageData.isEmpty()) {
+        return "错误: base64 数据解码失败";
+    }
+
+    // 创建临时文件
+    QTemporaryFile tempFile;
+    tempFile.setFileTemplate("recognizes_template.png"); // 设置临时文件模板
+    if (!tempFile.open()) {
+        return "错误: 无法创建临时文件";
+    }
+
+    // 将解码的数据写入临时文件
+    if (tempFile.write(imageData) == -1) {
+        tempFile.close();
+        return "错误: 无法写入临时文件";
+    }
+    tempFile.close(); // 关闭文件以确保数据刷新
+
+    QString result = opencvRecognizesAndClick(tempFile.fileName(),threshold,randomClick);
+    return result;
+}
+
 QString ExecutionSteps::opencvRecognizesAndClick(const QString& templPath, const double threshold, const bool randomClick)
 {
     cv::Mat winImg;
@@ -460,7 +492,7 @@ QString ExecutionSteps::opencvRecognizesAndClick(const QString& templPath, const
     }
 
     //加载模板文件
-    QString tempSavePath = ConfigManager::instance().screenshotPath() + templPath;
+    QString tempSavePath = getTemplatePath(templPath, ConfigManager::instance().screenshotPath());
     cv::Mat templ = cv::imread(tempSavePath.toStdString()); //cv::IMREAD_COLOR
     if (templ.empty()) {
         Logger::log("模板图片加载失败: " + tempSavePath);
@@ -497,7 +529,7 @@ QString ExecutionSteps::opencvRecognizesAndClick(const QString& templPath, const
         // 中心点击模式：点击匹配区域的中心点
         clickPt = cv::Point(matchRect.x + matchRect.width / 2,
                            matchRect.y + matchRect.height / 2);
-        Logger::log("中心点击点: (" + std::to_string(clickPt.x) + ", " + std::to_string(clickPt.y) + ")");
+        // Logger::log("中心点击点: (" + std::to_string(clickPt.x) + ", " + std::to_string(clickPt.y) + ")");
     }
 
     // 保存带识别框和点击位置的图片
@@ -1005,4 +1037,268 @@ void ExecutionSteps::clickInWindow(const cv::Point& clickPoint) {
     {
         Logger::log(QString("点击失败"));
     }
+}
+
+QJsonObject ExecutionSteps::parseOCROutput(const QString& ocrOutput)
+{
+    // 去除开头的无效信息
+    QString jsonStr = ocrOutput;
+
+    // 查找JSON开始位置
+    int jsonStart = jsonStr.indexOf('{');
+    if (jsonStart == -1) {
+        qWarning() << "未找到JSON数据";
+        return QJsonObject();
+    }
+
+    // 提取JSON部分
+    jsonStr = jsonStr.mid(jsonStart);
+
+    // 去除末尾的\r\n
+    jsonStr = jsonStr.trimmed();
+
+    // 将十六进制编码的中文字符转换为Unicode
+    // 处理 \xE8\x8C\xB6 这种格式的编码
+    QString processedStr;
+    for (int i = 0; i < jsonStr.length(); ++i) {
+        if (jsonStr[i] == '\\' && i + 3 < jsonStr.length() && jsonStr[i+1] == 'x') {
+            // 提取十六进制部分
+            QString hexStr = jsonStr.mid(i+2, 2);
+            bool ok;
+            ushort unicodeChar = hexStr.toUShort(&ok, 16);
+            if (ok) {
+                processedStr += QChar(unicodeChar);
+                i += 3; // 跳过 \xXX
+            } else {
+                processedStr += jsonStr[i];
+            }
+        } else {
+            processedStr += jsonStr[i];
+        }
+    }
+
+    // 解析JSON
+    QJsonParseError parseError;
+    QJsonDocument jsonDoc = QJsonDocument::fromJson(processedStr.toUtf8(), &parseError);
+
+    if (parseError.error != QJsonParseError::NoError) {
+        qWarning() << "JSON解析错误:" << parseError.errorString();
+        qWarning() << "错误位置:" << parseError.offset;
+        qWarning() << "处理后的字符串:" << processedStr;
+        return QJsonObject();
+    }
+
+    if (!jsonDoc.isObject()) {
+        qWarning() << "解析结果不是JSON对象";
+        return QJsonObject();
+    }
+
+    return jsonDoc.object();
+}
+
+QJsonObject ExecutionSteps::executeRapidOCR()
+{
+    QJsonObject result;
+    bool ok = false;
+
+    // 定义路径
+    QString DX11_CAPTURE_PATH = ConfigManager::instance().dx11CapturePath();
+    QString rapidOCRExe = ConfigManager::instance().rapidOCRExePath();
+    QString rapidOCRModelsPath = ConfigManager::instance().rapidOCRModelsPath();
+    QString rapidOCRDetPath = ConfigManager::instance().rapidOCRDetPathV4();
+    QString rapidOCRClsPath = ConfigManager::instance().rapidOCRClsPathV4();
+    QString rapidOCRRecPath = ConfigManager::instance().rapidOCRRecPathV4();
+    QString rapidOCRKeysPath = ConfigManager::instance().rapidOCRKeysPath();
+
+    QDir captureDir = QFileInfo(DX11_CAPTURE_PATH).absoluteDir();
+    if (!captureDir.exists()) {
+        captureDir.mkpath(".");
+    }
+
+    // 检查 remote_capture_call.exe 是否存在
+    if (!QFile::exists(rapidOCRExe)) {
+        qWarning() << "rapidOCR-json.exe 不存在:" << rapidOCRExe;
+        return result;
+    }
+
+    // 执行截图命令
+    QProcess process;
+    QStringList arguments;
+    arguments << ("--image_path=" + DX11_CAPTURE_PATH);
+    arguments << ("--models=" + rapidOCRModelsPath);
+    arguments << ("--det=" + rapidOCRDetPath);
+    arguments << ("--cls=" + rapidOCRClsPath);
+    arguments << ("--rec=" + rapidOCRRecPath);
+    // arguments << ("--keys=" + rapidOCRKeysPath);
+
+    qDebug() << "执行ocr识别命令:" << rapidOCRExe << arguments;
+
+    process.start(rapidOCRExe, arguments);
+
+    // 等待命令完成（设置超时时间）
+    if (!process.waitForFinished(5000)) {
+        qWarning() << "ocr识别命令执行超时";
+        process.kill();
+        return result;
+    }
+
+    // 检查命令执行结果
+    int exitCode = process.exitCode();
+    QByteArray output = process.readAllStandardOutput();
+    QByteArray errorOutput = process.readAllStandardError();
+
+    if (exitCode != 0) {
+        qWarning() << "ocr识别命令执行失败，退出码:" << exitCode;
+        qWarning() << "错误输出:" << errorOutput;
+        return result;
+    }
+    result = parseOCROutput(output);
+
+    return result;
+}
+
+QString ExecutionSteps::ocrRecognizesAndClick(const QString& ocrText, const double threshold, const bool randomClick)
+{
+    cv::Mat winImg;
+    bool hasWinImg = false;
+
+    // 首先尝试提升权限
+    if (!EnableDebugPrivilege()) {
+        Logger::log(QString("提升调试权限失败!"));
+    }
+
+    QString screenshotMode = SETTING_CONFIG.getScreenshotMode();
+    // 使用 if-else 替代 switch
+    if (screenshotMode == "PrintWindow") {
+        hasWinImg = getOnmyojiCaptureByPrintWindow(winImg);
+    } else if (screenshotMode == "DirectX截图") {
+        hasWinImg = getOnmyojiCaptureByDllInjection(winImg);
+    } else {
+        Logger::log(QString("无法识别鼠标控制模式，默认使用DirectX截图"));
+        // 默认使用dll注入方式
+        hasWinImg = getOnmyojiCaptureByDllInjection(winImg);
+    }
+
+    if (!hasWinImg)
+    {
+        Logger::log(QString("游戏画面获取失败，请查看日志！"));
+        return nullptr;
+    }
+
+    // 保存原始的图片
+    cv::Mat captureImg = winImg.clone();
+    // 确保目录存在
+    QString saveDir = QCoreApplication::applicationDirPath() + "/src/resource/thumbnail";
+    // 保存图片（覆盖保存） debug用
+    QString saveCapturePath = saveDir + "/debug_capture_result.png";
+    cv::imwrite(saveCapturePath.toStdString(), captureImg);
+
+    QJsonObject result = executeRapidOCR();
+    QString savePath;
+
+    //Debug用，后期记得注释掉
+    if (!result.isEmpty()) {
+        qDebug() << "解析成功:";
+        qDebug() << "code:" << result["code"].toInt();
+
+        QJsonArray dataArray = result["data"].toArray();
+
+        for (int i = 0; i < dataArray.size(); ++i) {
+            QJsonObject item = dataArray[i].toObject();
+            QString text = item["text"].toString();
+            QJsonArray box = item["box"].toArray();
+            double score = item["score"].toDouble();
+
+            if (comparesEqual(text,ocrText))
+            {
+                // qDebug() << "识别到文本" << i << ":" << text << "置信度:" << score << "范围：" << box;
+                if (score >= threshold)
+                {
+                    cv::Rect matchRect;
+                    cv::Point clickPt;
+                    if (box.size() == 4) {
+                        // 提取四个点的坐标
+                        QJsonArray point1 = box[0].toArray();
+                        QJsonArray point2 = box[1].toArray();
+                        QJsonArray point3 = box[2].toArray();
+                        QJsonArray point4 = box[3].toArray();
+
+                        int x1 = point1[0].toInt();
+                        int y1 = point1[1].toInt();
+                        int x2 = point2[0].toInt();
+                        int y2 = point2[1].toInt();
+                        int x3 = point3[0].toInt();
+                        int y3 = point3[1].toInt();
+                        int x4 = point4[0].toInt();
+                        int y4 = point4[1].toInt();
+
+                        // 计算矩形的最小外接矩形
+                        int minX = std::min({x1, x2, x3, x4});
+                        int minY = std::min({y1, y2, y3, y4});
+                        int maxX = std::max({x1, x2, x3, x4});
+                        int maxY = std::max({y1, y2, y3, y4});
+
+                        matchRect = cv::Rect(minX, minY, maxX - minX, maxY - minY);
+
+                        // qDebug() << "转换后的矩形: x=" << matchRect.x << " y=" << matchRect.y
+                        //          << " width=" << matchRect.width << " height=" << matchRect.height;
+                    } else {
+                        qWarning() << "box数组大小不正确，期望4个点，实际:" << box.size();
+                        continue;
+                    }
+
+                    if (randomClick) {
+                        // 随机点击模式：在匹配区域内随机点击
+                        clickPt = getRandomPointInRect(matchRect);
+                        // Logger::log("随机点击点: (" + std::to_string(clickPt.x) + ", " + std::to_string(clickPt.y) + ")");
+                    } else {
+                        // 中心点击模式：点击匹配区域的中心点
+                        clickPt = cv::Point(matchRect.x + matchRect.width / 2,
+                                           matchRect.y + matchRect.height / 2);
+                        Logger::log("中心点击点: (" + std::to_string(clickPt.x) + ", " + std::to_string(clickPt.y) + ")");
+                    }
+
+                    // 保存带识别框和点击位置的图片
+                    cv::Mat resultImg = winImg.clone();
+
+                    // 绘制识别框（绿色）
+                    cv::rectangle(resultImg, matchRect, cv::Scalar(0, 255, 0), 2);
+
+                    // 绘制点击位置（红色圆点）
+                    cv::circle(resultImg, clickPt, 5, cv::Scalar(0, 0, 255), -1);
+
+                    QDir dir(saveDir);
+                    if (!dir.exists()) {
+                        dir.mkpath(".");
+                    }
+
+                    // 保存图片（覆盖保存）
+                    savePath = saveDir + "/debug_match_result.png";
+                    cv::imwrite(savePath.toStdString(), resultImg);
+
+                    clickInWindow(clickPt);
+                    break;
+                }else
+                {
+                    Logger::log(QString("已识别到:" + text + " 但分数过低"));
+                }
+            }
+        }
+    }
+
+
+    return savePath;
+}
+
+// 智能路径处理方法
+QString ExecutionSteps::getTemplatePath(const QString& templatePath, const QString& basePath) {
+    QFileInfo fileInfo(templatePath);
+
+    // 如果已经是绝对路径，直接返回
+    if (fileInfo.isAbsolute()) {
+        return templatePath;
+    }
+
+    // 如果是相对路径，则拼接基础路径
+    return basePath + templatePath;
 }

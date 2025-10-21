@@ -10,6 +10,7 @@ QString getConfigTypeEnumToQStringName(ConfigTypeEnum type) {
     switch (type) {
         case ConfigTypeEnum::OPENCV: return "OpenCV识图";
         case ConfigTypeEnum::WAIT: return "等待";
+        case ConfigTypeEnum::OCR: return "OCR识别";
         default: return "未知";
     }
 }
@@ -27,6 +28,9 @@ ConfigTypeEnum stringToConfigType(const QString& typeStr) {
     if (typeStr.compare("WAIT", Qt::CaseInsensitive) == 0) {
         return ConfigTypeEnum::WAIT;
     }
+    if (typeStr.compare("OCR", Qt::CaseInsensitive) == 0) {
+        return ConfigTypeEnum::OCR;
+    }
     return ConfigTypeEnum::UNKNOWN;
 }
 
@@ -35,6 +39,7 @@ QString configTypeToQString(ConfigTypeEnum type) {
     switch (type) {
         case ConfigTypeEnum::OPENCV: return "OPENCV";
         case ConfigTypeEnum::WAIT: return "WAIT";
+        case ConfigTypeEnum::OCR: return "OCR";
         default: return "UNKNOWN";
     }
 }

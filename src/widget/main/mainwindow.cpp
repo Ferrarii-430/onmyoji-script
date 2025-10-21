@@ -24,6 +24,7 @@
 #include "SettingManager.h"
 #include "src/widget/editTask/edittaskdialog.h"
 #include "src/widget/setting/settingdialog.h"
+#include <src/utils/common.h>
 
 //TODO 🐶💩代码 有空我一定重构
 
@@ -96,28 +97,9 @@ mainwindow::~mainwindow() {
     delete ui;
 }
 
-//加载配置文件
-void mainwindow::loadConfig()
-{
-    QFile file(CONFIG_PATH);
-    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        Logger::log(QString("无法打开配置文件：" + file.errorString() + "路径:" + CONFIG_PATH));
-        return;
-    }
-
-    QByteArray data = file.readAll();
-    QJsonDocument doc = QJsonDocument::fromJson(data);
-    if (!doc.isArray()) return;
-
-    QJsonArray arr = doc.array();
-
-    // 保存全局数据
-    m_configArray = arr;
-}
-
 void mainwindow::loadListWidgetData()
 {
-    loadConfig();
+    refreshConfig();
 
     ui->listWidget->clear();
 
@@ -143,7 +125,8 @@ void mainwindow::loadListWidgetData()
         QJsonObject step = arr[0].toObject();
         QString id = step["id"].toString();
         QString name = step["name"].toString();
-        setCurrentItem(id, name);
+        commonSetCurrentItem(id,name);
+        ui->currentTaskName->setText(name);
         showStepsInTable(arr[0].toObject()["steps"].toArray()); //默认显示第一配置的方案内容
     }
 }
@@ -155,7 +138,8 @@ void mainwindow::onItemClicked(QListWidgetItem *item) {
     QString name = item->text();
     QString id   = item->data(Qt::UserRole).toString();
     // Logger::log(QString( "onItemClicked->选中项 name:" + name + ", id:" + id));
-    setCurrentItem(id, name);
+    commonSetCurrentItem(id,name);
+    ui->currentTaskName->setText(name);
 
     QJsonObject obj = QJsonObject(); //默认为空
     //读取对应的方案步骤数据到表格
@@ -200,7 +184,7 @@ void mainwindow::showStepsInTable(const QJsonArray &steps) {
         ui->tableWidget->setCellWidget(i, 3, editBtn);
         connect(editBtn, &QPushButton::clicked, this, [this, step]() {
             // 弹窗修改，或进入编辑模式
-            EditTaskDialog* dlg = new EditTaskDialog(EditMode::Edit,step,nullptr);
+            EditTaskDialog* dlg = new EditTaskDialog(EditMode::Edit,step,currentItem.id,nullptr);
             dlg->show();
             connect(dlg, &EditTaskDialog::accepted,[dlg, this]() {
                 QJsonObject data = dlg->resultData();
@@ -210,6 +194,7 @@ void mainwindow::showStepsInTable(const QJsonArray &steps) {
                 QTimer::singleShot(0, dlg, &QObject::deleteLater); // 延迟一拍
                 showCurrentSelectStepsInTable();
             });
+            connect(dlg, &EditTaskDialog::imagePathRequested, this, &mainwindow::showOpenCVIdentifyImage);
         });
 
         // 删除按钮
@@ -237,7 +222,7 @@ void mainwindow::showStepsInTable(const QJsonArray &steps) {
 
 void mainwindow::showCurrentSelectStepsInTable()
 {
-    loadConfig();
+    refreshConfig();
     if (currentItem.id.isEmpty())
     {
         Logger::log(QString("当前选择方案ID为空"));
@@ -264,9 +249,9 @@ void mainwindow::showCurrentSelectStepsInTable()
 }
 
 //开启当前选中的任务
+//开启当前选中的任务
 void mainwindow::startTaskButtonClick()
 {
-
     if (currentItem.id.isEmpty())
     {
         Logger::log(QString("没有选中脚本方案"));
@@ -281,7 +266,7 @@ void mainwindow::startTaskButtonClick()
     }
 
     //获取最新配置
-    loadConfig();
+    // refreshConfig();
 
     QJsonObject obj = QJsonObject(); //默认为空
     //读取对应的方案步骤数据到表格
@@ -328,12 +313,16 @@ void mainwindow::startTaskButtonClick()
     Logger::log(QString("循环次数: %1").arg(infiniteLoop ? "无限" : QString::number(number)));
 
     do {
-        for (const QJsonValue &val : steps)
+        // 用于跟踪每个步骤的错误重试次数
+        QMap<int, int> errorRetryMap;
+        bool stopDoLoop = false; // 控制是否停止外部循环
+
+        for (int i = 0; i < steps.size() && m_isRunning && !stopDoLoop; ++i)
         {
-            QJsonObject step = val.toObject();
+            QJsonObject step = steps[i].toObject();
             QString typeStr = step["type"].toString();
             ConfigTypeEnum type = stringToConfigType(typeStr);
-
+            QString savePath;
             switch (type) {
                 case ConfigTypeEnum::OPENCV: {
                         Logger::log(QString("开始进行OpenCV识图"));
@@ -342,10 +331,10 @@ void mainwindow::startTaskButtonClick()
                         const bool randomClick = step["randomClick"].toBool();
                         int retryCount = 0;
 
-                        QString savePath;
                         while (retryCount < 3) {
                             savePath = ExecutionSteps::getInstance().opencvRecognizesAndClick(imagePath, score, randomClick);
                             if (!savePath.isNull()) {
+                                showOpenCVIdentifyImage(savePath);
                                 break; // 成功
                             }
 
@@ -355,14 +344,29 @@ void mainwindow::startTaskButtonClick()
                                 Sleep(1000); // 等待1秒后重试
                             }
                         }
+                        break;
+                }
 
+                case ConfigTypeEnum::OCR:{
+                        Logger::log(QString("开始进行OCR识图"));
+                        QString ocrText = step["ocrText"].toString();
+                        const double score = step["score"].toDouble();
+                        const bool randomClick = step["randomClick"].toBool();
+                        int retryCount = 0;
 
-                        if (savePath.isEmpty())
-                        {
-                            Logger::log(QString("识别失败，跳过当次循环！"));
-                            continue;
+                        while (retryCount < 3) {
+                            savePath = ExecutionSteps::getInstance().ocrRecognizesAndClick(ocrText, score, randomClick);
+                            if (!savePath.isNull()) {
+                                showOpenCVIdentifyImage(savePath);
+                                break; // 成功
+                            }
+
+                            retryCount++;
+                            if (retryCount < 3) {
+                                Logger::log(QString("截图失败，第%1次重试").arg(retryCount));
+                                Sleep(1000); // 等待1秒后重试
+                            }
                         }
-                        showOpenCVIdentifyImage(savePath);
                         break;
                 }
 
@@ -382,6 +386,76 @@ void mainwindow::startTaskButtonClick()
                         break;
                 }
             }
+
+            //识别错误处理
+            if (savePath.isEmpty() && type != ConfigTypeEnum::WAIT)
+            {
+                QString identifyErrorHandle = step["identifyErrorHandle"].toString();
+                if (identifyErrorHandle == "next") {
+                    //什么都不用做继续执行
+                    Logger::log(QString("识别失败，继续执行下一个步骤"));
+                } else if (identifyErrorHandle == "jump") {
+                    //跳转到指定stepsId对应的步骤
+                    if (step.contains("jumpStepsId") && !step["jumpStepsId"].toString().isEmpty()) {
+                        QString jumpStepsId = step["jumpStepsId"].toString();
+                        int targetIndex = -1;
+
+                        // 遍历所有步骤，查找匹配的stepsId
+                        for (int j = 0; j < steps.size(); ++j) {
+                            QJsonObject currentStep = steps[j].toObject();
+                            if (currentStep["stepsId"].toString() == jumpStepsId) {
+                                targetIndex = j;
+                                break;
+                            }
+                        }
+
+                        if (targetIndex != -1) {
+                            i = targetIndex - 1; // 设置i为targetIndex-1，因为循环会i++
+                            Logger::log(QString("识别失败，跳转到步骤ID '%1' (索引 %2)").arg(jumpStepsId).arg(targetIndex));
+                        } else {
+                            Logger::log(QString("未找到步骤ID '%1'，使用默认next处理").arg(jumpStepsId));
+                            // 默认为next
+                        }
+                    } else {
+                        Logger::log(QString("跳转步骤ID未设置，使用默认next处理"));
+                        // 默认为next
+                    }
+                } else if (identifyErrorHandle == "continue") {
+                    //跳过for循环
+                    Logger::log(QString("识别失败，跳过当前任务迭代的剩余步骤"));
+                    break; // 跳出内部for循环，继续外部循环的下一个迭代
+                } else if (identifyErrorHandle == "break") {
+                    //直接停止do循环
+                    Logger::log(QString("识别失败，停止整个任务循环"));
+                    stopDoLoop = true;
+                    break; // 跳出内部for循环
+                } else if (identifyErrorHandle == "retry") {
+                    //重新执行一次当前步骤
+                    int &retryCount = errorRetryMap[i]; // 获取当前步骤的错误重试次数
+                    if (retryCount < 3) { // 最大重试3次
+                        retryCount++;
+                        i = i - 1; // 重试当前步骤
+                        Logger::log(QString("识别失败，第%1次重试当前步骤").arg(retryCount));
+                        continue; // 跳过剩余代码，直接下一次迭代（重试）
+                    } else {
+                        Logger::log(QString("识别失败，重试次数用尽，继续下一个步骤"));
+                        // 默认为next
+                    }
+                } else {
+                    Logger::log(QString("未知的错误处理选项: %1，使用默认next处理").arg(identifyErrorHandle));
+                    // 默认为next
+                }
+            }
+
+            // 如果设置了stopDoLoop，跳出内部循环
+            if (stopDoLoop) {
+                break;
+            }
+        }
+
+        // 如果外部循环需要停止，跳出
+        if (stopDoLoop) {
+            break;
         }
 
         if (!infiniteLoop) {
@@ -414,14 +488,6 @@ void mainwindow::stopTaskButtonClick()
     Logger::log(QString("正在停止任务..."));
 }
 
-//修改当前选择的方案
-void mainwindow::setCurrentItem(const QString &id, const QString &taskName)
-{
-    currentItem.id = id;
-    currentItem.taskName = taskName;
-    ui->currentTaskName->setText(currentItem.taskName);
-}
-
 void mainwindow::appendLogToUI(const QString &msg)
 {
     if (!ui || !ui->plainTextEdit) return;
@@ -449,7 +515,7 @@ void mainwindow::onProgrammeAddBtnClicked()
         addConfigToJsonFile(CONFIG_PATH, configName);
         // 输入了有效内容
         Logger::log("已添加新的配置: " + configName);
-        loadConfig();
+        loadListWidgetData();
     } else {
         // 用户取消或输入为空
         Logger::log(QString("用户未输入或无效的配置名称"));
@@ -479,12 +545,14 @@ void mainwindow::onProgrammeRemoveBtnClicked()
         {
             Logger::log("已删除配置: " + currentItem.taskName);
             loadListWidgetData();  // 刷新配置
-            setCurrentItem("", ""); //清空当前选择
+            commonSetCurrentItem("","");
+            ui->currentTaskName->setText("");
             if (m_configArray.size() > 0)
             {
                 const QString id = m_configArray[0].toObject()["id"].toString();
                 const QString name = m_configArray[0].toObject()["name"].toString();
-                setCurrentItem(id, name);
+                commonSetCurrentItem(id,name);
+                ui->currentTaskName->setText(name);
             }
         }
         else
@@ -511,7 +579,7 @@ void mainwindow::onSettingBtnClicked()
 void mainwindow::onProgrammeContentAddBtnClicked()
 {
     QJsonObject empty;
-    EditTaskDialog* dlg = new EditTaskDialog(EditMode::Add,empty,nullptr); // 非模态
+    EditTaskDialog* dlg = new EditTaskDialog(EditMode::Add,empty,currentItem.id,nullptr); // 非模态
     dlg->show();
     connect(dlg, &EditTaskDialog::accepted, [dlg, this]() {
         QJsonObject data = dlg->resultData();
@@ -521,6 +589,7 @@ void mainwindow::onProgrammeContentAddBtnClicked()
         QTimer::singleShot(0, dlg, &QObject::deleteLater);  // 延迟一拍
         showCurrentSelectStepsInTable();
     });
+    connect(dlg, &EditTaskDialog::imagePathRequested, this, &mainwindow::showOpenCVIdentifyImage);
 }
 
 void mainwindow::onProgrammeUpBtnClicked()
@@ -556,7 +625,7 @@ void mainwindow::showOpenCVIdentifyImage(const QString& savePath) const
         return;
     }
 
-    // 1️⃣ 用 OpenCV 读取图像
+    // 用 OpenCV 读取图像
     cv::Mat img = cv::imread(savePath.toStdString());
     if (img.empty()) {
         qWarning() << "[ERROR] 无法加载图片:" << savePath;
@@ -565,10 +634,10 @@ void mainwindow::showOpenCVIdentifyImage(const QString& savePath) const
         return;
     }
 
-    // 2️⃣ 转换为 Qt 可识别格式（BGR → RGB）
+    // 转换为 Qt 可识别格式（BGR → RGB）
     cv::cvtColor(img, img, cv::COLOR_BGR2RGB);
 
-    // 3️⃣ 封装成 QImage（不拷贝数据）
+    // 封装成 QImage（不拷贝数据）
     QImage qimg(
         img.data,
         img.cols,
@@ -577,7 +646,7 @@ void mainwindow::showOpenCVIdentifyImage(const QString& savePath) const
         QImage::Format_RGB888
     );
 
-    // 4️⃣ 缩放显示：保持比例完整显示在 QLabel 内
+    // 缩放显示：保持比例完整显示在 QLabel 内
     QSize labelSize = ui->openCVIdentifyLabel->size();
     QPixmap pixmap = QPixmap::fromImage(qimg).scaled(
         labelSize,
@@ -585,7 +654,7 @@ void mainwindow::showOpenCVIdentifyImage(const QString& savePath) const
         Qt::SmoothTransformation
     );
 
-    // 5️⃣ 设置显示
+    // 设置显示
     ui->openCVIdentifyLabel->setPixmap(pixmap);
     ui->openCVIdentifyLabel->setAlignment(Qt::AlignCenter);
     ui->openCVIdentifyLabel->setScaledContents(false);  // 不拉伸变形

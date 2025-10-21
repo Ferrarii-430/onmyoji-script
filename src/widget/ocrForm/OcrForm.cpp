@@ -10,6 +10,7 @@
 
 #include "Logger.h"
 #include "ui_OcrForm.h"
+#include "src/utils/common.h"
 //TODO form窗体模板
 
 OcrForm::OcrForm(QWidget *parent) :
@@ -30,6 +31,7 @@ OcrForm::OcrForm(QWidget *parent) :
     {
         // 当值为1时显示stepInput，其他值隐藏
         if (index == 1) {
+            initStepInputBoxSelect(currentConfigId,stepDataCopy["stepsId"].toString());
             ui->stepInputBox->show();
             ui->stepInputLabel->show();
         } else {
@@ -43,21 +45,46 @@ OcrForm::~OcrForm() {
     delete ui;
 }
 
-void OcrForm::loadFromJson(const QJsonObject &obj)
+void OcrForm::loadFromJson(const QString &configId, const QJsonObject &obj)
 {
+    currentConfigId = configId;
     stepDataCopy = obj;
     ui->lineTaskNameEdit->setText(obj["taskName"].toString());
     ui->ocrTextEdit->setText(obj["ocrText"].toString());
     ui->spinScoreBox->setValue(obj["score"].toDouble());
     ui->randomClickCheckBox->setChecked(obj["randomClick"].toBool());
-    ui->opencvErrorHandle->setCurrentIndex(obj["randomClick"].toBool());
     QString currentIdentifyErrorHandle= obj["identifyErrorHandle"].toString();
     int identifyErrorHandleIndex = ui->opencvErrorHandle->findData(currentIdentifyErrorHandle);
     if (identifyErrorHandleIndex >= 0) {
         ui->opencvErrorHandle->setCurrentIndex(identifyErrorHandleIndex);
+        if (identifyErrorHandleIndex == 1)
+        {
+            initStepInputBoxSelect(configId,obj["stepsId"].toString());
+        }
     } else {
         // 如果配置值不在选项中，使用默认值
         ui->opencvErrorHandle->setCurrentIndex(0);
+    }
+}
+
+void OcrForm::initStepInputBoxSelect(QString configId, const QString &stepsId)
+{
+    if (configId.isEmpty())
+    {
+        configId = currentItem.id;
+    }
+
+    if (stepSelect.empty())
+    {
+        stepSelect = getStepsSelect(configId, stepsId);
+    }
+
+    if (!stepSelect.empty())
+    {
+        ui->stepInputBox->clear();
+        for (auto it = stepSelect.cbegin(); it != stepSelect.cend(); ++it) {
+            ui->stepInputBox->addItem(it.key(), it.value());
+        }
     }
 }
 
@@ -85,7 +112,7 @@ QJsonObject OcrForm::toJson() const {
     //如果是跳转
     if (comparesEqual(obj["identifyErrorHandle"], "jump"))
     {
-        obj["jumpStepsIndex"] = ui->stepInputBox->currentText().toInt();
+        obj["jumpStepsId"] = ui->stepInputBox->currentText().toInt();
     }
     return obj;
 }

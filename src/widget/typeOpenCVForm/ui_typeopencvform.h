@@ -45,7 +45,7 @@ public:
     {
         if (TypeOpenCVForm->objectName().isEmpty())
             TypeOpenCVForm->setObjectName("TypeOpenCVForm");
-        TypeOpenCVForm->resize(291, 331);
+        TypeOpenCVForm->resize(291, 350);
         QSizePolicy sizePolicy(QSizePolicy::Policy::Expanding, QSizePolicy::Policy::Expanding);
         sizePolicy.setHorizontalStretch(0);
         sizePolicy.setVerticalStretch(0);
@@ -53,7 +53,7 @@ public:
         TypeOpenCVForm->setSizePolicy(sizePolicy);
         formLayoutWidget = new QWidget(TypeOpenCVForm);
         formLayoutWidget->setObjectName("formLayoutWidget");
-        formLayoutWidget->setGeometry(QRect(0, 0, 291, 331));
+        formLayoutWidget->setGeometry(QRect(0, 0, 291, 351));
         formLayout = new QFormLayout(formLayoutWidget);
         formLayout->setObjectName("formLayout");
         formLayout->setVerticalSpacing(20);

@@ -19,12 +19,15 @@ Q_OBJECT
 public:
     explicit OcrForm(QWidget *parent = nullptr);
     ~OcrForm() override;
-    void loadFromJson(const QJsonObject& obj);
+    void loadFromJson(const QString &configId, const QJsonObject& obj);
+    void initStepInputBoxSelect(QString configId, const QString& stepsId);
     QJsonObject toJson() const;
 
 private:
     Ui::OcrForm *ui;
+    QString currentConfigId;
     QJsonObject stepDataCopy;
+    QMap<QString,QString> stepSelect;
 };
 
 

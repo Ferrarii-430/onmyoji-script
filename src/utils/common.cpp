@@ -38,23 +38,7 @@ QString getPathByRecognitionImg(const std::string &configId, const std::string &
 void addConfigToJsonFile(const QString &filePath, const QString &name)
 {
     QFile file(filePath);
-    QJsonArray rootArray;
-
-    // 1. 如果文件存在则先读取
-    if (file.exists()) {
-        if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-            QByteArray data = file.readAll();
-            file.close();
-
-            QJsonParseError err;
-            QJsonDocument doc = QJsonDocument::fromJson(data, &err);
-            if (err.error == QJsonParseError::NoError && doc.isArray()) {
-                rootArray = doc.array();
-            } else {
-                Logger::log(QString("解析 JSON 出错，重新初始化为数组"));
-            }
-        }
-    }
+    QJsonArray rootArray = m_configArray;
 
     // 2. 构造新对象
     QJsonObject newObj;
@@ -84,22 +68,7 @@ bool removeConfigById(const QString &filePath, const QString &idToRemove)
         return false;
     }
 
-    QJsonArray rootArray;
-
-    // 1. 读取 JSON
-    if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        QByteArray data = file.readAll();
-        file.close();
-
-        QJsonParseError err;
-        QJsonDocument doc = QJsonDocument::fromJson(data, &err);
-        if (err.error == QJsonParseError::NoError && doc.isArray()) {
-            rootArray = doc.array();
-        } else {
-            Logger::log(QString("解析 JSON 出错，文件不是数组"));
-            return false;
-        }
-    }
+    QJsonArray rootArray = m_configArray;
 
     // 2. 遍历删除
     bool removed = false;
@@ -135,23 +104,8 @@ bool removeConfigById(const QString &filePath, const QString &idToRemove)
 void addConfigToJsonFile(const QString &filePath, const QString &configId, const QJsonObject& json)
 {
     QFile file(filePath);
-    QJsonArray rootArray;
+    QJsonArray rootArray = m_configArray;
 
-    // 1. 如果文件存在则先读取
-    if (file.exists()) {
-        if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-            QByteArray data = file.readAll();
-            file.close();
-
-            QJsonParseError err;
-            QJsonDocument doc = QJsonDocument::fromJson(data, &err);
-            if (err.error == QJsonParseError::NoError && doc.isArray()) {
-                rootArray = doc.array();
-            } else {
-                Logger::log(QString("解析 JSON 出错，重新初始化为数组"));
-            }
-        }
-    }
 
     //2.遍历找到对应的方案ID下标
     bool hasConfigId = false;
@@ -172,7 +126,7 @@ void addConfigToJsonFile(const QString &filePath, const QString &configId, const
             newObj["imagePath"]  = safeValue(json, "image");
             newObj["time"]       = safeValue(json, "time");
             newObj["offsetTime"] = safeValue(json, "offsetTime");
-            newObj["jumpStepsIndex"] = safeValue(json, "jumpStepsIndex");
+            newObj["jumpStepsId"] = safeValue(json, "jumpStepsId");
             newObj["identifyErrorHandle"] = safeValue(json, "identifyErrorHandle");
 
             //获取原来的 steps 数组并修改
@@ -209,23 +163,8 @@ void addConfigToJsonFile(const QString &filePath, const QString &configId, const
 // 更新配置文件中的步骤对象 - 更新方案内容
 void updateConfigInJsonFile(const QString &filePath, const QString &configId, const QJsonObject& json) {
     QFile file(filePath);
-    QJsonArray rootArray;
+    QJsonArray rootArray = m_configArray;
 
-    // 1. 如果文件存在则先读取
-    if (file.exists()) {
-        if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-            QByteArray data = file.readAll();
-            file.close();
-
-            QJsonParseError err;
-            QJsonDocument doc = QJsonDocument::fromJson(data, &err);
-            if (err.error == QJsonParseError::NoError && doc.isArray()) {
-                rootArray = doc.array();
-            } else {
-                Logger::log(QString("解析 JSON 出错，重新初始化为数组"));
-            }
-        }
-    }
 
     // 2. 遍历找到对应的方案ID和步骤ID
     bool hasConfigId = false;
@@ -251,9 +190,13 @@ void updateConfigInJsonFile(const QString &filePath, const QString &configId, co
                     updatedStep["taskName"]   = safeValue(json, "taskName");
                     updatedStep["type"]       = safeValue(json, "type");
                     updatedStep["score"]      = safeValue(json, "score");
+                    updatedStep["ocrText"]    = safeValue(json, "ocrText");
                     updatedStep["randomClick"]= safeValue(json, "randomClick");
                     updatedStep["imagePath"]  = safeValue(json, "image");
                     updatedStep["time"]       = safeValue(json, "time");
+                    updatedStep["offsetTime"] = safeValue(json, "offsetTime");
+                    updatedStep["jumpStepsId"] = safeValue(json, "jumpStepsId");
+                    updatedStep["identifyErrorHandle"] = safeValue(json, "identifyErrorHandle");
 
                     // 替换原来的步骤对象
                     stepsArray[j] = updatedStep;
@@ -361,22 +304,7 @@ bool removeConfigById(const QString &filePath, const QString &configId, const QS
         return false;
     }
 
-    QJsonArray rootArray;
-
-    // 读取 JSON
-    if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        QByteArray data = file.readAll();
-        file.close();
-
-        QJsonParseError err;
-        QJsonDocument doc = QJsonDocument::fromJson(data, &err);
-        if (err.error == QJsonParseError::NoError && doc.isArray()) {
-            rootArray = doc.array();
-        } else {
-            Logger::log(QString("解析 JSON 出错，文件不是数组"));
-            return false;
-        }
-    }
+    QJsonArray rootArray = m_configArray;
 
     // 遍历删除
     bool hasConfigId = false;
@@ -465,23 +393,8 @@ void updateProgrammeContent(const QString &filePath, const QString &configId, co
     }
 
     QFile file(filePath);
-    QJsonArray rootArray;
+    QJsonArray rootArray = m_configArray;
 
-    // 1. 如果文件存在则先读取
-    if (file.exists()) {
-        if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-            QByteArray data = file.readAll();
-            file.close();
-
-            QJsonParseError err;
-            QJsonDocument doc = QJsonDocument::fromJson(data, &err);
-            if (err.error == QJsonParseError::NoError && doc.isArray()) {
-                rootArray = doc.array();
-            } else {
-                Logger::log(QString("解析 JSON 出错，重新初始化为数组"));
-            }
-        }
-    }
 
     bool hasConfigId = false;
     for (int i = 0; i < rootArray.size(); ++i)
@@ -522,22 +435,7 @@ bool moveProgramme(const QString &filePath, const QString &configId, const int s
         return false;
     }
 
-    QJsonArray rootArray;
-
-    // 读取 JSON
-    if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        QByteArray data = file.readAll();
-        file.close();
-
-        QJsonParseError err;
-        QJsonDocument doc = QJsonDocument::fromJson(data, &err);
-        if (err.error == QJsonParseError::NoError && doc.isArray()) {
-            rootArray = doc.array();
-        } else {
-            Logger::log(QString("解析 JSON 出错，文件不是数组"));
-            return false;
-        }
-    }
+    QJsonArray rootArray = m_configArray;
 
     // 遍历数据后移动
     bool hasConfigId = false;
@@ -617,4 +515,82 @@ bool moveProgramme(const QString &filePath, const QString &configId, const int s
         Logger::log("写入 JSON 文件失败: " + filePath);
         return false;
     }
+}
+
+void refreshConfig()
+{
+    QFile file(ConfigManager::instance().configPath());
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        Logger::log(QString("无法打开配置文件：" + file.errorString() + "路径:" + ConfigManager::instance().configPath()));
+        return;
+    }
+
+    QByteArray data = file.readAll();
+    QJsonDocument doc = QJsonDocument::fromJson(data);
+    if (!doc.isArray()) return;
+
+    QJsonArray arr = doc.array();
+
+    // 保存全局数据
+    m_configArray = arr;
+}
+
+QJsonArray getConfigJSON()
+{
+    return m_configArray;
+}
+
+QJsonArray getLastConfigJSON()
+{
+    refreshConfig();
+    return m_configArray;
+}
+
+//修改当前选择的方案
+void commonSetCurrentItem(const QString &id, const QString &taskName)
+{
+    currentItem.id = id;
+    currentItem.taskName = taskName;
+}
+
+QMap<QString,QString> getStepsSelect(const QString &configId, const QString &currentStepsId)
+{
+    QMap<QString,QString> stepsSelect;
+    QJsonArray rootArray = m_configArray;
+
+    bool hasConfigId = false;
+    bool hasStepsId = false;
+    for (int i = 0; i < rootArray.size(); ++i)
+    {
+        QJsonObject obj = rootArray[i].toObject();
+        if (comparesEqual(obj["id"].toString(), configId))
+        {
+            // 获取steps数组
+            QJsonArray stepsArray = obj.value("steps").toArray();
+            for (int j = 0; j < stepsArray.size(); ++j)
+            {
+                QJsonObject stepsObj = stepsArray[j].toObject();
+                if (!comparesEqual(stepsObj["stepsId"].toString(), currentStepsId)) //不可以跳转到当前的Step
+                {
+                    QString key = QString("步骤%1-%2").arg(j + 1).arg(stepsObj["taskName"].toString());
+                    stepsSelect.insert(key,stepsObj["stepsId"].toString());
+                    hasStepsId = true;
+                }
+            }
+            hasConfigId = true;
+            break;
+        }
+    }
+
+    if (!hasConfigId) {
+        Logger::log("未找到指定 ConfigId: " + configId);
+        return stepsSelect;
+    }
+
+    if (!hasStepsId) {
+        Logger::log("未找到指定 StepsId: " + currentStepsId);
+        return stepsSelect;
+    }
+
+    return stepsSelect;
 }

@@ -21,15 +21,19 @@ QT_END_NAMESPACE
 class EditTaskDialog : public QDialog {
 Q_OBJECT
 
+signals:
+    void imagePathRequested(const QString &path); // 定义信号
+
 public:
     EditMode m_mode;
     QJsonObject m_stepData;
     QJsonObject m_resultData;
-    explicit EditTaskDialog(EditMode mode, const QJsonObject &stepData, QWidget *parent = nullptr);
+    explicit EditTaskDialog(EditMode mode, const QJsonObject &stepData, const QString &configId, QWidget *parent = nullptr);
     QJsonObject collectData() const;
     QJsonObject resultData() const;
     ~EditTaskDialog() override;
-    void setCurrentIndex();
+void onTestButtonClick();
+void setCurrentIndex();
 
 private:
     TypeOpenCVForm* typeForm;

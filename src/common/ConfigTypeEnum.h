@@ -9,6 +9,7 @@
 enum class ConfigTypeEnum {
     OPENCV,
     WAIT,
+    OCR,
     UNKNOWN
 };
 
