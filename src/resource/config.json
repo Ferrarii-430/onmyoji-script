@@ -4,31 +4,25 @@
     "name": "配置1",
     "steps": [
       {
-        "imagePath": "207B98D2-6276-772E-4AAA-A0C8B84834D1.png",
+        "identifyErrorHandle": "next",
+        "imagePath": "D:/CppProduct/qtTest/cmake-build-gt-cmake-692/src/resource/screenshot/207B98D2-6276-772E-4AAA-A0C8B84834D1.png",
+        "jumpStepsIndex": null,
         "randomClick": true,
         "score": 0.55,
-        "ocrText": null,
         "stepsId": "207B98D2-6276-772E-4AAA-A0C8B84834D1",
         "taskName": "识图别式神录图标",
         "time": null,
-        "randomWait": false,
-        "offsetTime": null,
-        "identifyErrorHandle": "next",
-        "jumpStepsId": null,
         "type": "OPENCV"
       },
       {
+        "identifyErrorHandle": "next",
         "imagePath": null,
+        "jumpStepsIndex": null,
         "randomClick": null,
         "score": null,
-        "ocrText": null,
         "stepsId": "F25F2899-D0F3-731F-5185-32B8AFA70F21",
         "taskName": "等待2秒",
         "time": 2000,
-        "randomWait": false,
-        "offsetTime": null,
-        "identifyErrorHandle": "next",
-        "jumpStepsId": null,
         "type": "WAIT"
       }
     ]
@@ -44,18 +38,133 @@
     "name": "配置3",
     "steps": [
       {
-        "imagePath": "5ffe7bd3-baa1-454a-b2fd-f29a80c758cf.png",
+        "identifyErrorHandle": "next",
+        "imagePath": "D:/CppProduct/qtTest/cmake-build-gt-cmake-692/src/resource/screenshot/5ffe7bd3-baa1-454a-b2fd-f29a80c758cf.png",
+        "jumpStepsIndex": null,
         "randomClick": true,
         "score": 0.5,
-        "ocrText": null,
         "stepsId": "5ffe7bd3-baa1-454a-b2fd-f29a80c758cf",
         "taskName": "识别开始挑战",
         "time": null,
-        "randomWait": false,
-        "offsetTime": null,
-        "identifyErrorHandle": "next",
-        "jumpStepsId": null,
         "type": "OPENCV"
+      }
+    ]
+  },
+  {
+    "id": "84d923e7-8cd1-4e17-86a1-bb23aa6c17d8",
+    "name": "结界突破",
+    "steps": [
+      {
+        "identifyErrorHandle": "next",
+        "imagePath": "56399177-b290-4245-9076-561953b8e5e5.png",
+        "jumpStepsId": null,
+        "ocrText": null,
+        "offsetTime": null,
+        "randomClick": false,
+        "randomWait": null,
+        "score": 0.6,
+        "stepsId": "56399177-b290-4245-9076-561953b8e5e5",
+        "taskName": "识别突破勋章",
+        "time": null,
+        "type": "OPENCV"
+      },
+      {
+        "identifyErrorHandle": null,
+        "imagePath": null,
+        "jumpStepsId": null,
+        "ocrText": null,
+        "offsetTime": 500,
+        "randomClick": null,
+        "randomWait": true,
+        "score": null,
+        "stepsId": "d629ba7c-87ef-42d8-b8fc-82fb2181dab6",
+        "taskName": "随机等待2秒",
+        "time": 2000,
+        "type": "WAIT"
+      },
+      {
+        "identifyErrorHandle": "jump",
+        "imagePath": "8b1a1283-b0b5-4fc7-a94d-8d37eca926ac.png",
+        "jumpStepsId": "56399177-b290-4245-9076-561953b8e5e5",
+        "ocrText": null,
+        "offsetTime": null,
+        "randomClick": false,
+        "randomWait": null,
+        "score": 0.6,
+        "stepsId": "8b1a1283-b0b5-4fc7-a94d-8d37eca926ac",
+        "taskName": "识别空的勋章位置",
+        "time": null,
+        "type": "OPENCV"
+      },
+      {
+        "identifyErrorHandle": null,
+        "imagePath": null,
+        "jumpStepsId": null,
+        "ocrText": null,
+        "offsetTime": 500,
+        "randomClick": null,
+        "randomWait": true,
+        "score": null,
+        "stepsId": "eab19fdf-9f83-4804-957a-48d079666649",
+        "taskName": "随机等待2秒",
+        "time": 2000,
+        "type": "WAIT"
+      },
+      {
+        "identifyErrorHandle": "next",
+        "imagePath": null,
+        "jumpStepsId": null,
+        "ocrText": "进攻",
+        "offsetTime": null,
+        "randomClick": true,
+        "randomWait": null,
+        "score": 0.7,
+        "stepsId": "5f887339-2fd8-4cba-83dc-8dd55cff1597",
+        "taskName": "识别进攻按钮",
+        "time": null,
+        "type": "OCR"
+      },
+      {
+        "identifyErrorHandle": null,
+        "imagePath": null,
+        "jumpStepsId": null,
+        "ocrText": null,
+        "offsetTime": 100,
+        "randomClick": null,
+        "randomWait": true,
+        "score": null,
+        "stepsId": "a162be3b-d829-4ab9-ae51-f3573b18f0b9",
+        "taskName": "等待15秒",
+        "time": 15000,
+        "type": "WAIT"
+      },
+      {
+        "identifyErrorHandle": "next",
+        "imagePath": "cc2e5955-aa4d-485e-a79e-31cabe76ca96.png",
+        "jumpStepsId": null,
+        "ocrText": null,
+        "offsetTime": null,
+        "randomClick": true,
+        "randomWait": null,
+        "score": 0.55,
+        "stepsId": "cc2e5955-aa4d-485e-a79e-31cabe76ca96",
+        "taskName": "识别完成挑战",
+        "time": null,
+        "type": "OPENCV"
+      },
+      {
+        "identifyErrorHandle": null,
+        "imagePath": null,
+        "jumpStepsId": null,
+        "ocrText": null,
+        "offsetTime": 100,
+        "randomClick": null,
+        "randomWait": true,
+        "score": null,
+        "stepsId": "c968a346-b89b-40fe-bc14-d9751829881f",
+        "taskName": "等待4秒",
+        "time": 4000,
+        "type": "WAIT"
       }
     ]
   }
