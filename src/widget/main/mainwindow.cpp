@@ -454,10 +454,10 @@ void mainwindow::startTaskButtonClick()
                 } else if (identifyErrorHandle == "retry") {
                     //重新执行一次当前步骤
                     int &retryCount = errorRetryMap[i]; // 获取当前步骤的错误重试次数
-                    if (retryCount < 3) { // 最大重试3次
+                    if (retryCount < 999) { // 最大重试999次
                         retryCount++;
                         i = i - 1; // 重试当前步骤
-                        Logger::log(QString("识别失败，第%1次重试当前步骤").arg(retryCount));
+                        Logger::log(QString("识别失败，第(%1/999)次重试当前步骤").arg(retryCount));
                         continue; // 跳过剩余代码，直接下一次迭代（重试）
                     } else {
                         Logger::log(QString("识别失败，重试次数用尽，继续下一个步骤"));

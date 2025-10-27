@@ -39,6 +39,7 @@ public:
     QJsonObject executeRapidOCR();
     QString ocrRecognizesAndClick(const QString& ocrText, double threshold, bool randomClick);
     QString getTemplatePath(const QString& templatePath, const QString& basePath);
+    double getDPIScalingFactor();
     bool deleteCaptureFile();
 
 private:

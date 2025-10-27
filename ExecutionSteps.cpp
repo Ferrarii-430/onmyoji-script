@@ -530,6 +530,11 @@ QString ExecutionSteps::opencvRecognizesAndClick(const QString& templPath, const
         // Logger::log("中心点击点: (" + std::to_string(clickPt.x) + ", " + std::to_string(clickPt.y) + ")");
     }
 
+    // 将物理坐标转换为逻辑坐标：除以缩放因子
+    double scaleFactor = getDPIScalingFactor();
+    clickPt.x = static_cast<int>(clickPt.x / scaleFactor);
+    clickPt.y = static_cast<int>(clickPt.y / scaleFactor);
+
     // 保存带识别框和点击位置的图片
     cv::Mat resultImg = winImg.clone();
 
@@ -549,6 +554,8 @@ QString ExecutionSteps::opencvRecognizesAndClick(const QString& templPath, const
     cv::imwrite(savePath.toStdString(), resultImg);
     // Logger::log("已保存识别结果图片: " + savePath);
 
+    // 现在使用转换后的 clickPt 执行点击操作
+    Logger::log(QString("转换后点击点: (%1, %2)").arg(clickPt.x).arg(clickPt.y));
     clickInWindow(clickPt);
 
     return savePath;
@@ -847,7 +854,7 @@ bool ExecutionSteps::findTemplateMultiScaleInMatNMS(const cv::Mat& haystack, con
                 continue;
             }
 
-            Logger::log(QString("[LOG] scale=%1 maxVal=%2 pos=(%3,%4) size=%5x%6")
+            Logger::log(QString("[OpenCV] 缩放=%1 得分=%2 pos=(%3,%4) size=%5x%6")
                 .arg(s).arg(maxVal).arg(maxLoc.x).arg(maxLoc.y)
                 .arg(resizedNeedle.cols).arg(resizedNeedle.rows));
 
@@ -1196,8 +1203,8 @@ QString ExecutionSteps::ocrRecognizesAndClick(const QString& ocrText, const doub
 
     //Debug用，后期记得注释掉
     if (!result.isEmpty()) {
-        qDebug() << "解析成功:";
-        qDebug() << "code:" << result["code"].toInt();
+        // qDebug() << "解析成功:";
+        // qDebug() << "code:" << result["code"].toInt();
 
         QJsonArray dataArray = result["data"].toArray();
 
@@ -1253,7 +1260,7 @@ QString ExecutionSteps::ocrRecognizesAndClick(const QString& ocrText, const doub
                         // 中心点击模式：点击匹配区域的中心点
                         clickPt = cv::Point(matchRect.x + matchRect.width / 2,
                                            matchRect.y + matchRect.height / 2);
-                        Logger::log("中心点击点: (" + std::to_string(clickPt.x) + ", " + std::to_string(clickPt.y) + ")");
+                        // Logger::log("中心点击点: (" + std::to_string(clickPt.x) + ", " + std::to_string(clickPt.y) + ")");
                     }
 
                     // 保存带识别框和点击位置的图片
@@ -1278,7 +1285,7 @@ QString ExecutionSteps::ocrRecognizesAndClick(const QString& ocrText, const doub
                     break;
                 }else
                 {
-                    Logger::log(QString("已识别到:" + text + " 但分数过低"));
+                    Logger::log(QString("[OCR] 已识别到:" + text + " 但分数过低"));
                 }
             }
         }
@@ -1299,4 +1306,12 @@ QString ExecutionSteps::getTemplatePath(const QString& templatePath, const QStri
 
     // 如果是相对路径，则拼接基础路径
     return basePath + templatePath;
+}
+
+// 获取DPI缩放因子
+double ExecutionSteps::getDPIScalingFactor() {
+    HDC hdc = GetDC(NULL);
+    int dpiX = GetDeviceCaps(hdc, LOGPIXELSX);
+    ReleaseDC(NULL, hdc);
+    return dpiX / 96.0; // 标准DPI为96
 }

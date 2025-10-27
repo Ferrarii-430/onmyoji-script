@@ -288,9 +288,18 @@ bool MouseSimulator::HardwareClick(int x, int y) {
 bool MouseSimulator::MessageClick(HWND hWnd, int x, int y) {
     LPARAM lParam = MAKELPARAM(x, y);
 
+    // 按下左键
     PostMessage(hWnd, WM_LBUTTONDOWN, MK_LBUTTON, lParam);
-    Sleep(GetRandomInRange(25, 60));
-    PostMessage(hWnd, WM_LBUTTONUP, 0, lParam);
+    Sleep(GetRandomInRange(25, 60));  // 按下后随机延迟
+
+    // 模拟点击时自然抖动：微小移动
+    int jitterX = x + GetRandomInRange(-1, 1);
+    int jitterY = y + GetRandomInRange(-1, 1);
+    PostMessage(hWnd, WM_MOUSEMOVE, 0, MAKELPARAM(jitterX, jitterY));
+    Sleep(GetRandomInRange(10, 25));
+
+    // 释放左键（在抖动点释放，更真实）
+    PostMessage(hWnd, WM_LBUTTONUP, 0, MAKELPARAM(jitterX, jitterY));
 
     return true;
 }
@@ -320,6 +329,7 @@ bool MouseSimulator::StealthMessageClick(HWND hWnd, int x, int y) {
     PostMessage(hWnd, WM_MOUSEMOVE, 0, MAKELPARAM(x-1, y-1));
     Sleep(GetRandomInRange(5, 15));
 
+    // 执行拟人化点击
     return MessageClick(hWnd, x, y);
 }
 
