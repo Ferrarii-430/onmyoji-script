@@ -91,7 +91,11 @@ mainwindow::mainwindow(QWidget *parent) :
     Logger::log(QString("Config配置加载成功！"));
 
     // 检查OpenCV版本和编译选项
-    Logger::log(QString("OpenCV版本 %1").arg(CV_VERSION));
+    Logger::log(QString("OpenCV 版本 %1").arg(CV_VERSION));
+
+    Logger::log(QString("RapidOCR 版本 v1.1.0"));
+
+    Logger::log(QString("onmyoji-yolo-v5.onnx 加载成功！"));
 }
 
 mainwindow::~mainwindow() {

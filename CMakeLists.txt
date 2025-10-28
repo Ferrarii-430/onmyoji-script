@@ -29,6 +29,8 @@ find_package(OpenCV REQUIRED)
 # ------------------------------
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets)
 
+link_directories(${CMAKE_SOURCE_DIR}/src/lib)
+
 # ------------------------------
 # 源码文件
 # ------------------------------
@@ -67,6 +69,8 @@ add_executable(qtTest WIN32
         src/widget/setting/settingdialog.h
         src/widget/setting/settingdialog.ui
         src/common/ConfigManager.h
+        src/utils/ClassNameCache.cpp
+        src/utils/ClassNameCache.h
 )
 
 # ------------------------------
@@ -77,6 +81,7 @@ add_definitions(-DPROJECT_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 include_directories(
         ${CMAKE_SOURCE_DIR}
         ${CMAKE_SOURCE_DIR}/src/common
+        ${CMAKE_SOURCE_DIR}/src/include
 )
 
 # ------------------------------
@@ -88,6 +93,7 @@ target_link_libraries(qtTest
         Qt6::Gui
         Qt6::Widgets
         ${OpenCV_LIBS}
+        onnxruntime
 )
 
 # ------------------------------
@@ -120,6 +126,13 @@ if(WIN32 AND MINGW)
                 "${QT_BIN_DIR}/Qt6${QT_LIB}.dll"
                 "$<TARGET_FILE_DIR:qtTest>")
     endforeach()
+
+    # 复制 ONNX Runtime DLL
+    add_custom_command(TARGET qtTest POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_SOURCE_DIR}/src/lib/onnxruntime.dll"
+            "$<TARGET_FILE_DIR:qtTest>"
+    )
 
     # 平台插件 qwindows.dll
     add_custom_command(TARGET qtTest POST_BUILD

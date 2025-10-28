@@ -56,6 +56,10 @@ public:
         return QCoreApplication::applicationDirPath() + "/src/resource/RapidOCR/RapidOCR-json.exe";
     }
 
+    QString classesNamePath() const {
+        return QCoreApplication::applicationDirPath() + "/src/resource/classes.txt";
+    }
+
     QString rapidOCRDetPathV4() const {
         return "ch_PP-OCRv4_det_infer.onnx";
     }
