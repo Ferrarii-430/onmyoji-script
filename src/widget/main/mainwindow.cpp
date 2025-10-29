@@ -27,6 +27,9 @@
 #include <QRandomGenerator>
 #include <src/utils/common.h>
 
+#include "src/utils/ClassNameCache.h"
+#include "src/utils/YOLODetector.h"
+
 //TODO 🐶💩代码 有空我一定重构
 
 mainwindow::mainwindow(QWidget *parent) :
@@ -85,6 +88,13 @@ mainwindow::mainwindow(QWidget *parent) :
         Logger::log(QString("Setting配置加载成功！"));
     }
 
+    //读取classes.txt的配置
+    QString classesPath = ConfigManager::instance().classesNamePath();
+    if (ClassNameCache::initialize(classesPath))
+    {
+        Logger::log(QString("classes.txt配置加载成功！"));
+    }
+
     //读取方案的配置
     loadListWidgetData();
 
@@ -95,7 +105,17 @@ mainwindow::mainwindow(QWidget *parent) :
 
     Logger::log(QString("RapidOCR 版本 v1.1.0"));
 
-    Logger::log(QString("onmyoji-yolo-v5.onnx 加载成功！"));
+    QString onnxPath = ConfigManager::instance().onmyojiYoloOnnxPath();
+    bool initSuccess = YOLODetector::getInstance().initialize(onnxPath.toStdWString());
+    if (initSuccess)
+    {
+        Logger::log(QString("onmyoji-yolo-v5.onnx 加载成功！"));
+    }
+
+    ui->taskCycleNumber->setValue(1);
+
+    ExecutionSteps& steps = ExecutionSteps::getInstance();
+    connect(&steps, &ExecutionSteps::requestShowImage, this, &mainwindow::showOpenCVIdentifyImage);
 }
 
 mainwindow::~mainwindow() {
@@ -159,11 +179,23 @@ void mainwindow::onItemClicked(QListWidgetItem *item) {
     }
 
     QJsonArray steps = obj["steps"].toArray();
-    showStepsInTable(steps);
+    if (obj["type"] == "system")
+    {
+        ui->tableWidget->clear(); // 清空表格
+        ui->tableWidget->setRowCount(0);
+        ui->tableWidget->setColumnCount(0);
+        ui->systemConfigTips->show();
+        ui->programmeContentAddBtn->setDisabled(true);
+    }else
+    {
+        ui->programmeContentAddBtn->setDisabled(false);
+        showStepsInTable(steps);
+    }
 }
 
 //加载数据到任务表格
 void mainwindow::showStepsInTable(const QJsonArray &steps) {
+    ui->systemConfigTips->hide();
     ui->tableWidget->clear(); // 清空表格
     ui->tableWidget->setRowCount(steps.size());
     ui->tableWidget->setColumnCount(5); // 新增序号列
@@ -380,31 +412,58 @@ void mainwindow::startTaskButtonClick()
                         break;
                 }
 
+                case ConfigTypeEnum::YOLO:{
+                        Logger::log(QString("开始进行YOLO识图"));
+                        const double score = step["score"].toDouble();
+                        const bool randomClick = step["randomClick"].toBool();
+                        int retryCount = 0;
+
+                        while (retryCount < 3) {
+                            savePath = ExecutionSteps::getInstance().yoloRecognizesAndClick(score, randomClick, "realm_raid-realm-normal", 0.0, 0.3);
+                            if (!savePath.isNull()) {
+                                showOpenCVIdentifyImage(savePath);
+                                break; // 成功
+                            }
+
+                            retryCount++;
+                            if (retryCount < 3) {
+                                Logger::log(QString("截图失败，第%1次重试").arg(retryCount));
+                                Sleep(1000); // 等待1秒后重试
+                            }
+                        }
+                        break;
+                }
+
                 case ConfigTypeEnum::WAIT: {
-                            int waitTime = step["time"].toInt();
-                            bool randomWait = step["randomWait"].toBool();
-                            int offsetTime = step["offsetTime"].toInt();
+                        int waitTime = step["time"].toInt();
+                        bool randomWait = step["randomWait"].toBool();
+                        int offsetTime = step["offsetTime"].toInt();
 
-                            int actualWaitTime = waitTime;
-                            if (randomWait && offsetTime > 0) {
-                                // 生成在 [-offsetTime, offsetTime] 范围内的随机偏移量
-                                int randomOffset = QRandomGenerator::global()->bounded(-offsetTime, offsetTime + 1);
-                                actualWaitTime = qMax(0, waitTime + randomOffset); // 确保等待时间非负
-                            }
+                        int actualWaitTime = waitTime;
+                        if (randomWait && offsetTime > 0) {
+                            // 生成在 [-offsetTime, offsetTime] 范围内的随机偏移量
+                            int randomOffset = QRandomGenerator::global()->bounded(-offsetTime, offsetTime + 1);
+                            actualWaitTime = qMax(0, waitTime + randomOffset); // 确保等待时间非负
+                        }
 
-                            // 记录实际等待时间，如果启用了随机等待则标注
-                            if (randomWait) {
-                                Logger::log(QString("等待%1毫秒（随机偏移，基础时间%2毫秒）...").arg(actualWaitTime).arg(waitTime));
-                            } else {
-                                Logger::log(QString("等待%1毫秒...").arg(actualWaitTime));
-                            }
+                        // 记录实际等待时间，如果启用了随机等待则标注
+                        if (randomWait) {
+                            Logger::log(QString("等待%1毫秒（随机偏移，基础时间%2毫秒）...").arg(actualWaitTime).arg(waitTime));
+                        } else {
+                            Logger::log(QString("等待%1毫秒...").arg(actualWaitTime));
+                        }
 
-                            int interval = 100; // 每100ms检查一次
-                            for (int t = 0; t < actualWaitTime && m_isRunning; t += interval) {
-                                Sleep(qMin(interval, actualWaitTime - t));
-                                QCoreApplication::processEvents();
-                            }
-                            break;
+                        int interval = 100; // 每100ms检查一次
+                        for (int t = 0; t < actualWaitTime && m_isRunning; t += interval) {
+                            Sleep(qMin(interval, actualWaitTime - t));
+                            QCoreApplication::processEvents();
+                        }
+                        break;
+                }
+
+                case ConfigTypeEnum::SYSTEM_BORDER_BREAKTHROUGH:{
+                        ExecutionSteps::getInstance().executeBorderBreakthrough();
+                        break;
                 }
 
                 default: {
@@ -472,6 +531,9 @@ void mainwindow::startTaskButtonClick()
                     // 默认为next
                 }
             }
+
+            //识别成功处理
+            //...
 
             // 如果设置了stopDoLoop，跳出内部循环
             if (stopDoLoop) {

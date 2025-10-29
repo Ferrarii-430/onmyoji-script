@@ -49,6 +49,7 @@ public:
     QToolButton *programmeContentDownButton;
     QPushButton *programmeContentAddBtn;
     QToolButton *settingButton;
+    QLabel *systemConfigTips;
 
     void setupUi(QWidget *mainwindow)
     {
@@ -134,6 +135,13 @@ public:
         settingButton = new QToolButton(mainwindow);
         settingButton->setObjectName("settingButton");
         settingButton->setGeometry(QRect(440, 10, 24, 21));
+        systemConfigTips = new QLabel(mainwindow);
+        systemConfigTips->setObjectName("systemConfigTips");
+        systemConfigTips->setGeometry(QRect(180, 320, 111, 31));
+        QFont font;
+        font.setPointSize(10);
+        systemConfigTips->setFont(font);
+        systemConfigTips->setLineWidth(1);
 
         retranslateUi(mainwindow);
 
@@ -145,7 +153,7 @@ public:
         mainwindow->setWindowTitle(QCoreApplication::translate("mainwindow", "onmyoji-script v1.3", nullptr));
         label->setText(QCoreApplication::translate("mainwindow", "\346\226\271\346\241\210", nullptr));
         label_3->setText(QCoreApplication::translate("mainwindow", "\346\227\245\345\277\227\350\276\223\345\207\272", nullptr));
-        label_4->setText(QCoreApplication::translate("mainwindow", "OpenCV\350\257\206\345\210\253\347\274\251\347\225\245\345\233\276", nullptr));
+        label_4->setText(QCoreApplication::translate("mainwindow", "\345\233\276\345\203\217\350\257\206\345\210\253\347\274\251\347\225\245\345\233\276", nullptr));
         startTaskButton->setText(QCoreApplication::translate("mainwindow", "\345\220\257\345\212\250", nullptr));
         stopTaskButton->setText(QCoreApplication::translate("mainwindow", "\345\201\234\346\255\242", nullptr));
         label_5->setText(QCoreApplication::translate("mainwindow", "\345\276\252\347\216\257\346\254\241\346\225\260", nullptr));
@@ -159,6 +167,7 @@ public:
         programmeContentDownButton->setText(QCoreApplication::translate("mainwindow", "\342\206\223", nullptr));
         programmeContentAddBtn->setText(QCoreApplication::translate("mainwindow", "\346\267\273\345\212\240\346\226\271\346\241\210\345\206\205\345\256\271", nullptr));
         settingButton->setText(QCoreApplication::translate("mainwindow", "\342\232\231\357\270\217", nullptr));
+        systemConfigTips->setText(QCoreApplication::translate("mainwindow", "\347\263\273\347\273\237\351\205\215\347\275\256\344\270\215\345\217\257\346\233\264\346\224\271", nullptr));
     } // retranslateUi
 
 };

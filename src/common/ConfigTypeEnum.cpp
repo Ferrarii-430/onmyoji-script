@@ -11,6 +11,8 @@ QString getConfigTypeEnumToQStringName(ConfigTypeEnum type) {
         case ConfigTypeEnum::OPENCV: return "OpenCV识图";
         case ConfigTypeEnum::WAIT: return "等待";
         case ConfigTypeEnum::OCR: return "OCR识别";
+        case ConfigTypeEnum::YOLO: return "YOLO";
+        case ConfigTypeEnum::SYSTEM_BORDER_BREAKTHROUGH: return "SYSTEM_BORDER_BREAKTHROUGH";
         default: return "未知";
     }
 }
@@ -31,6 +33,12 @@ ConfigTypeEnum stringToConfigType(const QString& typeStr) {
     if (typeStr.compare("OCR", Qt::CaseInsensitive) == 0) {
         return ConfigTypeEnum::OCR;
     }
+    if (typeStr.compare("YOLO", Qt::CaseInsensitive) == 0) {
+        return ConfigTypeEnum::YOLO;
+    }
+    if (typeStr.compare("SYSTEM_BORDER_BREAKTHROUGH", Qt::CaseInsensitive) == 0) {
+        return ConfigTypeEnum::SYSTEM_BORDER_BREAKTHROUGH;
+    }
     return ConfigTypeEnum::UNKNOWN;
 }
 
@@ -40,6 +48,8 @@ QString configTypeToQString(ConfigTypeEnum type) {
         case ConfigTypeEnum::OPENCV: return "OPENCV";
         case ConfigTypeEnum::WAIT: return "WAIT";
         case ConfigTypeEnum::OCR: return "OCR";
+        case ConfigTypeEnum::YOLO: return "YOLO";
+        case ConfigTypeEnum::SYSTEM_BORDER_BREAKTHROUGH: return "SYSTEM_BORDER_BREAKTHROUGH";
         default: return "UNKNOWN";
     }
 }

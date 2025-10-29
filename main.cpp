@@ -299,9 +299,9 @@ int main(int argc, char* argv[])
     mainwindow w;
     w.show();
 
-    QString path = ConfigManager::instance().classesNamePath();
-    ClassNameCache::initialize(path);
-    detectOnmyoji();
+    // QString path = ConfigManager::instance().classesNamePath();
+    // ClassNameCache::initialize(path);
+    // detectOnmyoji();
 
     return QApplication::exec();
 }

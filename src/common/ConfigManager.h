@@ -24,6 +24,10 @@ public:
         return QCoreApplication::applicationDirPath() + "/src/resource/thumbnail/debug_capture_result.png";
     }
 
+    QString matchResultPath() const {
+        return QCoreApplication::applicationDirPath() + "/src/resource/thumbnail/debug_match_result.png";
+    }
+
     QString dx11LogPath() const {
         return QCoreApplication::applicationDirPath() + "/src/resource/log/dx11_log.txt";
     }
@@ -58,6 +62,10 @@ public:
 
     QString classesNamePath() const {
         return QCoreApplication::applicationDirPath() + "/src/resource/classes.txt";
+    }
+
+    QString onmyojiYoloOnnxPath() const {
+        return QCoreApplication::applicationDirPath() + "/src/resource/onmyoji-yolo-v5.onnx";
     }
 
     QString rapidOCRDetPathV4() const {

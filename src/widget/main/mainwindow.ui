@@ -91,7 +91,7 @@
     </rect>
    </property>
    <property name="text">
-    <string>OpenCV识别缩略图</string>
+    <string>图像识别缩略图</string>
    </property>
   </widget>
   <widget class="QToolButton" name="startTaskButton">
@@ -262,6 +262,27 @@
    </property>
    <property name="text">
     <string>⚙️</string>
+   </property>
+  </widget>
+  <widget class="QLabel" name="systemConfigTips">
+   <property name="geometry">
+    <rect>
+     <x>180</x>
+     <y>320</y>
+     <width>111</width>
+     <height>31</height>
+    </rect>
+   </property>
+   <property name="font">
+    <font>
+     <pointsize>10</pointsize>
+    </font>
+   </property>
+   <property name="lineWidth">
+    <number>1</number>
+   </property>
+   <property name="text">
+    <string>系统配置不可更改</string>
    </property>
   </widget>
  </widget>

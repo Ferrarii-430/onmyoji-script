@@ -71,6 +71,8 @@ add_executable(qtTest WIN32
         src/common/ConfigManager.h
         src/utils/ClassNameCache.cpp
         src/utils/ClassNameCache.h
+        src/utils/YOLODetector.cpp
+        src/utils/YOLODetector.h
 )
 
 # ------------------------------

@@ -1,5 +1,6 @@
 {
-    "mouseControlMode": "BEZIER",
-    "mouseSpeed": 7,
-    "screenshotMode": "DirectX截图"
+  "mouseClickMode": "PostMessage",
+  "mouseControlMode": "BEZIER",
+  "mouseSpeed": 7,
+  "screenshotMode": "DirectX截图"
 }

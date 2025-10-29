@@ -44,6 +44,7 @@ void addConfigToJsonFile(const QString &filePath, const QString &name)
     QJsonObject newObj;
     newObj["id"]   = QUuid::createUuid().toString(QUuid::WithoutBraces);  // UUID
     newObj["name"] = name;
+    newObj["type"] = "normal";
     newObj["steps"] = QJsonArray();  // 空数组
 
     // 3. 插入到数组里

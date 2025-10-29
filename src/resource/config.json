@@ -2,6 +2,7 @@
   {
     "id": "CC372B66-AFEC-4CBE-9E19-671CD02CFDC3",
     "name": "配置1",
+    "type": "normal",
     "steps": [
       {
         "identifyErrorHandle": "next",
@@ -30,12 +31,14 @@
   {
     "id": "DC42C888-2449-41D2-A894-095606E38D12",
     "name": "配置2",
+    "type": "normal",
     "steps": [
     ]
   },
   {
     "id": "2B0C8FD1-F8A0-473D-A87C-8E5119563BC0",
     "name": "配置3",
+    "type": "normal",
     "steps": [
       {
         "identifyErrorHandle": "next",
@@ -53,6 +56,7 @@
   {
     "id": "84d923e7-8cd1-4e17-86a1-bb23aa6c17d8",
     "name": "结界突破",
+    "type": "normal",
     "steps": [
       {
         "identifyErrorHandle": "next",
@@ -165,6 +169,48 @@
         "taskName": "等待4秒",
         "time": 4000,
         "type": "WAIT"
+      }
+    ]
+  },
+  {
+    "id": "DO42C777-2449-41D2-A794-055606E39P13",
+    "name": "系统方案-yolo识别",
+    "type": "system",
+    "steps": [
+      {
+        "identifyErrorHandle": "next",
+        "imagePath": null,
+        "jumpStepsId": null,
+        "ocrText": null,
+        "offsetTime": null,
+        "randomClick": true,
+        "randomWait": null,
+        "score": 0.55,
+        "stepsId": "96399177-b280-4245-9076-56695ub8e5e5",
+        "taskName": "识别结界突破挑战",
+        "time": null,
+        "type": "YOLO"
+      }
+    ]
+  },
+  {
+    "id": "D942C888-2449-41D2-A794-055586E39P13",
+    "name": "系统方案-结界突破",
+    "type": "system",
+    "steps": [
+      {
+        "identifyErrorHandle": "next",
+        "imagePath": null,
+        "jumpStepsId": null,
+        "ocrText": null,
+        "offsetTime": null,
+        "randomClick": true,
+        "randomWait": null,
+        "score": 0.55,
+        "stepsId": "96399177-b290-4245-9076-56695ub7e5e5",
+        "taskName": "自动结界突破",
+        "time": null,
+        "type": "SYSTEM_BORDER_BREAKTHROUGH"
       }
     ]
   }

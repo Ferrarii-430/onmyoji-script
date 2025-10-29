@@ -10,6 +10,8 @@ enum class ConfigTypeEnum {
     OPENCV,
     WAIT,
     OCR,
+    YOLO,
+    SYSTEM_BORDER_BREAKTHROUGH,
     UNKNOWN
 };
 

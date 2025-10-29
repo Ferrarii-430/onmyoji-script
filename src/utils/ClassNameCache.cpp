@@ -9,7 +9,6 @@ const QString ClassNameCache::DEFAULT_FILENAME = "classes.txt";
 bool ClassNameCache::loadFromFile(const QString& filename)
 {
     QString fileToLoad = filename.isEmpty() ? ConfigManager::instance().classesNamePath() : filename;
-    qDebug() << fileToLoad;
     QFile file(fileToLoad);
 
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
@@ -30,7 +29,7 @@ bool ClassNameCache::loadFromFile(const QString& filename)
     file.close();
     initialized_ = true;
 
-    qInfo() << "Successfully loaded" << classNames_.size() << "class names from" << fileToLoad;
+    // qInfo() << "Successfully loaded" << classNames_.size() << "class names from" << fileToLoad;
     return true;
 }
 

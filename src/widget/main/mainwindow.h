@@ -18,7 +18,7 @@ class mainwindow : public QWidget {
 Q_OBJECT
 
 public slots:
-    void showOpenCVIdentifyImage(const QString& savePath) const; // 如果尚未声明为槽
+    void showOpenCVIdentifyImage(const QString& savePath) const;
 
 public:
     Ui::mainwindow *ui;
