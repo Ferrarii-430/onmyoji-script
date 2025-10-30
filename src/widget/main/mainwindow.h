@@ -19,6 +19,7 @@ Q_OBJECT
 
 public slots:
     void showOpenCVIdentifyImage(const QString& savePath) const;
+void SetDPIAwareness();
 
 public:
     Ui::mainwindow *ui;

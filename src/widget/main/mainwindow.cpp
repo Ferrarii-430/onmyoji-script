@@ -116,6 +116,9 @@ mainwindow::mainwindow(QWidget *parent) :
 
     ExecutionSteps& steps = ExecutionSteps::getInstance();
     connect(&steps, &ExecutionSteps::requestShowImage, this, &mainwindow::showOpenCVIdentifyImage);
+
+    //设置DPI感知
+    SetDPIAwareness();
 }
 
 mainwindow::~mainwindow() {
@@ -419,7 +422,7 @@ void mainwindow::startTaskButtonClick()
                         int retryCount = 0;
 
                         while (retryCount < 3) {
-                            savePath = ExecutionSteps::getInstance().yoloRecognizesAndClick(score, randomClick, "realm_raid-realm-normal", 0.0, 0.3);
+                            savePath = ExecutionSteps::getInstance().yoloRecognizesAndClick(score, randomClick, "common-btn-yellow_confirm", 0.0, 0.0);
                             if (!savePath.isNull()) {
                                 showOpenCVIdentifyImage(savePath);
                                 break; // 成功
@@ -751,4 +754,38 @@ void mainwindow::showOpenCVIdentifyImage(const QString& savePath) const
     ui->openCVIdentifyLabel->setPixmap(pixmap);
     ui->openCVIdentifyLabel->setAlignment(Qt::AlignCenter);
     ui->openCVIdentifyLabel->setScaledContents(false);  // 不拉伸变形
+}
+
+// 在main函数或应用程序初始化时调用
+void mainwindow::SetDPIAwareness() {
+    // 尝试设置Per-Monitor DPI Awareness (Windows 10+)
+    HMODULE hUser32 = LoadLibraryA("user32.dll");
+    if (hUser32) {
+        typedef BOOL (WINAPI *SetProcessDPIAwarenessContextFunc)(int);
+        SetProcessDPIAwarenessContextFunc pSetProcessDPIAwarenessContext =
+            (SetProcessDPIAwarenessContextFunc)GetProcAddress(hUser32, "SetProcessDpiAwarenessContext");
+        if (pSetProcessDPIAwarenessContext) {
+            pSetProcessDPIAwarenessContext(-4); // DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2
+            FreeLibrary(hUser32);
+            return;
+        }
+        FreeLibrary(hUser32);
+    }
+
+    // 回退到SetProcessDPIAware (Windows Vista+)
+    HMODULE hShcore = LoadLibraryA("shcore.dll");
+    if (hShcore) {
+        typedef HRESULT (WINAPI *SetProcessDpiAwarenessFunc)(int);
+        SetProcessDpiAwarenessFunc pSetProcessDpiAwareness =
+            (SetProcessDpiAwarenessFunc)GetProcAddress(hShcore, "SetProcessDpiAwareness");
+        if (pSetProcessDpiAwareness) {
+            pSetProcessDpiAwareness(2); // PROCESS_PER_MONITOR_DPI_AWARE
+            FreeLibrary(hShcore);
+            return;
+        }
+        FreeLibrary(hShcore);
+    }
+
+    // 最终回退
+    SetProcessDPIAware();
 }

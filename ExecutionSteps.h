@@ -11,8 +11,10 @@
 
 #include "src/utils/YOLODetector.h"
 
-class ExecutionSteps
+class ExecutionSteps: public QObject
 {
+    Q_OBJECT
+
 public:
     // 获取唯一实例
     static ExecutionSteps& getInstance();
@@ -35,6 +37,7 @@ public:
     std::vector<cv::Rect> nonMaxSuppression(const std::vector<cv::Rect>& rects, float iouThreshold);
     float rectIoU(const cv::Rect& a, const cv::Rect& b);
     cv::Point getRandomPointInRect(const cv::Rect& r);
+    cv::Point getRandomPointInRect(const cv::Rect& r, float paddingRatio);
     cv::Point getRandomPointInRectExcludeWidth(const cv::Rect& r,double excludeStartWidth, double excludeEndWidth, int maxAttempts);
     void clickInWindow(const cv::Point& ptClient);
     QJsonObject parseOCROutput(const QString& ocrOutput);
@@ -50,6 +53,7 @@ public:
     bool clickDetectionByLabel(const QString& targetLabel, double threshold, double excludeStart, double excludeEnd);
     bool deleteCaptureFile();
     void processAndShowImage(const QString& imagePath);
+    cv::Mat getOnmyojiCapture();
 
  signals:
     // 声明信号 - 不需要实现

@@ -27,6 +27,7 @@
 #include "SettingManager.h"
 #include "ConfigManager.h"
 #include "src/utils/ClassNameCache.h"
+#include "src/utils/DPIHelper .h"
 #include "src/utils/MouseSimulator.h"
 #include "src/utils/YOLODetector.h"
 
@@ -37,6 +38,8 @@ ExecutionSteps& ExecutionSteps::getInstance() {
 
 void ExecutionSteps::processAndShowImage(const QString& imagePath)
 {
+    qDebug() << imagePath;
+    QThread::msleep(500);
     // 处理完成后，发射信号通知mainwindow显示图像
     emit requestShowImage(imagePath);
 }
@@ -225,7 +228,7 @@ bool ExecutionSteps::getOnmyojiCaptureByDllInjection(cv::Mat& winImg)
     if (exitCode != 0) {
         qWarning() << "截图命令执行失败，退出码:" << exitCode;
         qWarning() << "错误输出:" << errorOutput;
-        return false;
+        // return false;
     }
 
     // qDebug() << "截图命令输出:" << output;
@@ -472,29 +475,9 @@ QString ExecutionSteps::opencvRecognizesAndClickByBase64(const QString& base64, 
 
 QString ExecutionSteps::opencvRecognizesAndClick(const QString& templPath, const double threshold, const bool randomClick)
 {
-    cv::Mat winImg;
-    bool hasWinImg = false;
-
-    // 首先尝试提升权限
-    if (!EnableDebugPrivilege()) {
-        Logger::log(QString("提升调试权限失败!"));
-    }
-
-    QString screenshotMode = SETTING_CONFIG.getScreenshotMode();
-    // 使用 if-else 替代 switch
-    if (screenshotMode == "PrintWindow") {
-        hasWinImg = getOnmyojiCaptureByPrintWindow(winImg);
-    } else if (screenshotMode == "DirectX截图") {
-        hasWinImg = getOnmyojiCaptureByDllInjection(winImg);
-    } else {
-        Logger::log(QString("无法识别鼠标控制模式，默认使用DirectX截图"));
-        // 默认使用dll注入方式
-        hasWinImg = getOnmyojiCaptureByDllInjection(winImg);
-    }
-
-    if (!hasWinImg)
+    cv::Mat winImg = getOnmyojiCapture();
+    if (winImg.empty())
     {
-        Logger::log(QString("游戏画面获取失败，请查看日志！"));
         return nullptr;
     }
 
@@ -507,14 +490,6 @@ QString ExecutionSteps::opencvRecognizesAndClick(const QString& templPath, const
     }else {
         Logger::log("已加载模板图片: " + tempSavePath);
     }
-
-    // 保存原始的图片
-    cv::Mat captureImg = winImg.clone();
-    // 确保目录存在
-    QString saveDir = QCoreApplication::applicationDirPath() + "/src/resource/thumbnail";
-    // 保存图片（覆盖保存）
-    QString saveCapturePath = saveDir + "/debug_capture_result.png";
-    cv::imwrite(saveCapturePath.toStdString(), captureImg);
 
     // 在窗口图像中查找模板
     double score = 0.0;
@@ -553,11 +528,7 @@ QString ExecutionSteps::opencvRecognizesAndClick(const QString& templPath, const
     // 绘制点击位置（红色圆点）
     cv::circle(resultImg, clickPt, 5, cv::Scalar(0, 0, 255), -1);
 
-    QDir dir(saveDir);
-    if (!dir.exists()) {
-        dir.mkpath(".");
-    }
-
+    QString saveDir = ConfigManager::instance().thumbnailPath();
     // 保存图片（覆盖保存）
     QString savePath = saveDir + "/debug_match_result.png";
     cv::imwrite(savePath.toStdString(), resultImg);
@@ -985,6 +956,38 @@ cv::Point ExecutionSteps::getRandomPointInRect(const cv::Rect& r) {
 }
 
 /**
+ *
+ * @param r 识别范围
+ * @param paddingRatio 排除的内边框
+ * @return
+ */
+cv::Point ExecutionSteps::getRandomPointInRect(const cv::Rect& r, float paddingRatio) {
+    // 根据矩形大小计算内边距
+    int paddingX = static_cast<int>(r.width * paddingRatio);
+    int paddingY = static_cast<int>(r.height * paddingRatio);
+
+    // 确保内边距至少为1像素
+    paddingX = std::max(1, paddingX);
+    paddingY = std::max(1, paddingY);
+
+    // 计算内矩形区域
+    int innerX = r.x + paddingX;
+    int innerY = r.y + paddingY;
+    int innerWidth = r.width - 2 * paddingX;
+    int innerHeight = r.height - 2 * paddingY;
+
+    // 确保内矩形有效
+    if (innerWidth <= 0) innerWidth = 1;
+    if (innerHeight <= 0) innerHeight = 1;
+
+    // 在内矩形中生成随机点
+    int x = innerX + rand() % innerWidth;
+    int y = innerY + rand() % innerHeight;
+
+    return cv::Point(x, y);
+}
+
+/**
  * 在矩形区域内随机获取一个点，排除指定宽度百分比的垂直区域（相对于识别框）
  * @param r 目标矩形区域
  * @param excludeStartWidth 排除区域起始宽度百分比 (0.0-1.0，相对于识别框)
@@ -1056,51 +1059,61 @@ bool ExecutionSteps::deleteCaptureFile()
 }
 
 void ExecutionSteps::clickInWindow(const cv::Point& clickPoint) {
+    // 验证窗口句柄
+    if (!IsWindow(hwnd)) {
+        Logger::log(QString("错误: 无效的窗口句柄"));
+        return;
+    }
+
+    // 验证坐标
+    if (!DPIHelper::IsPointInClientRect(hwnd, clickPoint)) {
+        Logger::log(QString("错误: 点击坐标 (%1, %2) 超出客户区范围").arg(clickPoint.x).arg(clickPoint.y));
+        return;
+    }
+
     MouseSimulator simulator;
     simulator.SetHumanLikeMode(true);
     simulator.SetRandomDelayRange(20, 100);
     simulator.SetJitterLevel(3);
 
-    //日志打印
+    // 记录窗口信息
     RECT clientRect, windowRect;
     GetClientRect(hwnd, &clientRect);
     GetWindowRect(hwnd, &windowRect);
-    Logger::log(QString("窗口信息 - 客户区: %1x%2, 窗口: %3x%4")
-        .arg(clientRect.right).arg(clientRect.bottom)
-        .arg(windowRect.right - windowRect.left).arg(windowRect.bottom - windowRect.top));
 
+    Logger::log(QString("窗口信息 - 客户区: %1x%2, 窗口: %3x%4, DPI缩放: %5")
+               .arg(clientRect.right).arg(clientRect.bottom)
+               .arg(windowRect.right - windowRect.left).arg(windowRect.bottom - windowRect.top)
+               .arg(DPIHelper::GetWindowDPIScaling(hwnd)));
 
-    // 关键：将客户区坐标转换为屏幕坐标
+    // 坐标转换
     POINT screenPoint = { clickPoint.x, clickPoint.y };
     ClientToScreen(hwnd, &screenPoint);
 
     Logger::log(QString("坐标转换 - 客户区: (%1, %2) -> 屏幕: (%3, %4)")
-        .arg(clickPoint.x).arg(clickPoint.y)
-        .arg(screenPoint.x).arg(screenPoint.y));
+               .arg(clickPoint.x).arg(clickPoint.y)
+               .arg(screenPoint.x).arg(screenPoint.y));
 
-
+    // 执行点击
     bool success = false;
     QString mouseClickMode = SETTING_CONFIG.getMouseClickMode();
-    if (mouseClickMode == "PostMessage")
-    {
-        success = simulator.StealthMessageClick(hwnd,clickPoint.x, clickPoint.y);
-    }else if (mouseClickMode == "InputMouse")
-    {
+
+    if (mouseClickMode == "PostMessage") {
+        success = simulator.StealthMessageClick(hwnd, clickPoint.x, clickPoint.y);
+    } else if (mouseClickMode == "InputMouse") {
         POINT start = MouseSimulator::GetCurrentPosition();
         POINT targetScreen = { screenPoint.x, screenPoint.y };
-        success = simulator.ExecuteTrajectoryWithClick(start,targetScreen,TrajectoryType::BEZIER,SETTING_CONFIG.getMouseSpeed() * 10);
-    }else
-    {
-        //其他...
+        success = simulator.ExecuteTrajectoryWithClick(start, targetScreen,
+                                                     TrajectoryType::BEZIER,
+                                                     SETTING_CONFIG.getMouseSpeed() * 10);
+    } else {
         Logger::log(QString("无法识别的鼠标点击模式，执行默认策略"));
-        success = simulator.StealthMessageClick(hwnd,clickPoint.x, clickPoint.y);
+        success = simulator.StealthMessageClick(hwnd, clickPoint.x, clickPoint.y);
     }
 
-    if (success)
-    {
+    if (success) {
         Logger::log(QString("点击成功"));
-    }else
-    {
+    } else {
         Logger::log(QString("点击失败"));
     }
 }
@@ -1225,40 +1238,13 @@ QJsonObject ExecutionSteps::executeRapidOCR()
 
 QJsonArray ExecutionSteps::ocrRecognizes()
 {
-    cv::Mat winImg;
-    bool hasWinImg = false;
+    cv::Mat winImg = getOnmyojiCapture();
 
-    // 首先尝试提升权限
-    if (!EnableDebugPrivilege()) {
-        Logger::log(QString("提升调试权限失败!"));
-    }
-
-    QString screenshotMode = SETTING_CONFIG.getScreenshotMode();
-    // 使用 if-else 替代 switch
-    if (screenshotMode == "PrintWindow") {
-        hasWinImg = getOnmyojiCaptureByPrintWindow(winImg);
-    } else if (screenshotMode == "DirectX截图") {
-        hasWinImg = getOnmyojiCaptureByDllInjection(winImg);
-    } else {
-        Logger::log(QString("无法识别鼠标控制模式，默认使用DirectX截图"));
-        // 默认使用dll注入方式
-        hasWinImg = getOnmyojiCaptureByDllInjection(winImg);
-    }
-
-    if (!hasWinImg)
+    if (winImg.empty())
     {
-        Logger::log(QString("游戏画面获取失败，请查看日志！"));
         QJsonArray empty;
         return empty;
     }
-
-    // 保存原始的图片
-    cv::Mat captureImg = winImg.clone();
-    // 确保目录存在
-    QString saveDir = QCoreApplication::applicationDirPath() + "/src/resource/thumbnail";
-    // 保存图片（覆盖保存） debug用
-    QString saveCapturePath = saveDir + "/debug_capture_result.png";
-    cv::imwrite(saveCapturePath.toStdString(), captureImg);
 
     QJsonObject result = executeRapidOCR();
     QJsonArray dataArray = result["data"].toArray();
@@ -1268,41 +1254,16 @@ QJsonArray ExecutionSteps::ocrRecognizes()
 
 QString ExecutionSteps::ocrRecognizesAndClick(const QString& ocrText, const double threshold, const bool randomClick)
 {
-    cv::Mat winImg;
-    bool hasWinImg = false;
+    cv::Mat winImg = getOnmyojiCapture();
     bool hasOcrText = false;
 
-    // 首先尝试提升权限
-    if (!EnableDebugPrivilege()) {
-        Logger::log(QString("提升调试权限失败!"));
-    }
 
-    QString screenshotMode = SETTING_CONFIG.getScreenshotMode();
-    // 使用 if-else 替代 switch
-    if (screenshotMode == "PrintWindow") {
-        hasWinImg = getOnmyojiCaptureByPrintWindow(winImg);
-    } else if (screenshotMode == "DirectX截图") {
-        hasWinImg = getOnmyojiCaptureByDllInjection(winImg);
-    } else {
-        Logger::log(QString("无法识别鼠标控制模式，默认使用DirectX截图"));
-        // 默认使用dll注入方式
-        hasWinImg = getOnmyojiCaptureByDllInjection(winImg);
-    }
-
-    if (!hasWinImg)
+    if (winImg.empty())
     {
-        Logger::log(QString("游戏画面获取失败，请查看日志！"));
         return nullptr;
     }
 
-    // 保存原始的图片
-    cv::Mat captureImg = winImg.clone();
-    // 确保目录存在
-    QString saveDir = QCoreApplication::applicationDirPath() + "/src/resource/thumbnail";
-    // 保存图片（覆盖保存） debug用
-    QString saveCapturePath = saveDir + "/debug_capture_result.png";
-    cv::imwrite(saveCapturePath.toStdString(), captureImg);
-
+    QString saveDir = ConfigManager::instance().thumbnailPath();
     QJsonObject result = executeRapidOCR();
     QString savePath;
 
@@ -1420,39 +1381,17 @@ QString ExecutionSteps::ocrRecognizesAndClick(const QString& ocrText, const doub
  */
 QString ExecutionSteps::yoloRecognizesAndClick(const double threshold, const bool randomClick, const QString& targetLabelName, double excludeStartWidth, double excludeEndWidth)
 {
-    cv::Mat winImg;
-    bool hasWinImg = false;
+    cv::Mat winImg = getOnmyojiCapture();
 
-    // 首先尝试提升权限
-    if (!EnableDebugPrivilege()) {
-        Logger::log(QString("提升调试权限失败!"));
-    }
-
-    QString screenshotMode = SETTING_CONFIG.getScreenshotMode();
-    // 使用 if-else 替代 switch
-    if (screenshotMode == "PrintWindow") {
-        hasWinImg = getOnmyojiCaptureByPrintWindow(winImg);
-    } else if (screenshotMode == "DirectX截图") {
-        hasWinImg = getOnmyojiCaptureByDllInjection(winImg);
-    } else {
-        Logger::log(QString("无法识别鼠标控制模式，默认使用DirectX截图"));
-        // 默认使用dll注入方式
-        hasWinImg = getOnmyojiCaptureByDllInjection(winImg);
-    }
-
-    if (!hasWinImg)
+    if (winImg.empty())
     {
-        Logger::log(QString("游戏画面获取失败，请查看日志！"));
         return nullptr;
     }
 
     // 保存原始的图片
     cv::Mat captureImg = winImg.clone();
     // 确保目录存在
-    QString saveDir = QCoreApplication::applicationDirPath() + "/src/resource/thumbnail";
-    // 保存图片（覆盖保存） debug用
-    QString saveCapturePath = saveDir + "/debug_capture_result.png";
-    cv::imwrite(saveCapturePath.toStdString(), captureImg);
+    QString saveDir = ConfigManager::instance().thumbnailPath();
 
     cv::Point clickPt;
     cv::Rect matchRect;
@@ -1529,27 +1468,9 @@ QString ExecutionSteps::yoloRecognizesAndClick(const double threshold, const boo
 std::vector<Detection> ExecutionSteps::yoloRecognizes(const double threshold, double excludeStartWidth,
                                                       double excludeEndWidth)
 {
-    cv::Mat winImg;
-    bool hasWinImg = false;
+    cv::Mat winImg = getOnmyojiCapture();
 
-    // 首先尝试提升权限
-    if (!EnableDebugPrivilege()) {
-        Logger::log(QString("提升调试权限失败!"));
-    }
-
-    QString screenshotMode = SETTING_CONFIG.getScreenshotMode();
-    // 使用 if-else 替代 switch
-    if (screenshotMode == "PrintWindow") {
-        hasWinImg = getOnmyojiCaptureByPrintWindow(winImg);
-    } else if (screenshotMode == "DirectX截图") {
-        hasWinImg = getOnmyojiCaptureByDllInjection(winImg);
-    } else {
-        Logger::log(QString("无法识别鼠标控制模式，默认使用DirectX截图"));
-        // 默认使用dll注入方式
-        hasWinImg = getOnmyojiCaptureByDllInjection(winImg);
-    }
-
-    if (!hasWinImg)
+    if (winImg.empty())
     {
         Logger::log(QString("游戏画面获取失败，请查看日志！"));
         return {};
@@ -1558,10 +1479,7 @@ std::vector<Detection> ExecutionSteps::yoloRecognizes(const double threshold, do
     // 保存原始的图片
     cv::Mat captureImg = winImg.clone();
     // 确保目录存在
-    QString saveDir = QCoreApplication::applicationDirPath() + "/src/resource/thumbnail";
-    // 保存图片（覆盖保存） debug用
-    QString saveCapturePath = saveDir + "/debug_capture_result.png";
-    cv::imwrite(saveCapturePath.toStdString(), captureImg);
+    QString saveDir = ConfigManager::instance().thumbnailPath();
 
     cv::Rect matchRect;
     auto final_detections = YOLODetector::getInstance().detect(captureImg, threshold);
@@ -1591,8 +1509,7 @@ std::vector<Detection> ExecutionSteps::yoloRecognizes(const double threshold, do
     QString savePath = ConfigManager::instance().matchResultPath();
     // 保存识别点击的结果
     cv::imwrite(savePath.toStdString(), captureImg);
-
-
+    processAndShowImage(savePath);
 
     return final_detections;
 }
@@ -1621,6 +1538,7 @@ double ExecutionSteps::getDPIScalingFactor() {
 //执行 系统方案-结界突破 完整的逻辑 直到消耗完所有券
 void ExecutionSteps::executeBorderBreakthrough()
 {
+    std::vector<Detection> vec;
     Logger::log(QString("开始执行结界突破"));
 
     // 识别当前界面状态
@@ -1631,34 +1549,43 @@ void ExecutionSteps::executeBorderBreakthrough()
         return;
     }
 
-    // 检查是否需要刷新
-    if (hasDetectionWithLabel(detections, "realm_raid-realm-penetrated")) {
-        Logger::log(QString("检测到已挑战结界，执行刷新"));
+    bool hasPenetrated = hasDetectionWithLabel(detections, "realm_raid-realm-penetrated");
+    bool hasNormal = hasDetectionWithLabel(detections, "realm_raid-realm-normal");
 
-        // 点击刷新按钮
-        if (clickDetectionByLabel("common-btn-yellow_confirm", 0.5, 0.0, 0.0)) {
-            QThread::msleep(2000); // 等待刷新确认界面出现
-
-            // 点击确认刷新
-            if (clickDetectionByLabel("common-btn-yellow_confirm", 0.5, 0.0, 0.0)) {
-                Logger::log(QString("刷新成功"));
-                QThread::msleep(3000); // 等待刷新完成
-
-                // 刷新后重新执行
-                executeBorderBreakthrough(); //此时会进入投4逻辑
-                return;
-            } else {
-                Logger::log(QString("未找到确认刷新按钮"));
-            }
-        } else {
-            Logger::log(QString("未找到刷新按钮"));
-        }
+    if (hasPenetrated == false && hasNormal == false)
+    {
+        Logger::log(QString("当前不在结界突破场景，无法继续执行"));
         return;
     }
 
-    std::vector<Detection> vec;
-    //开始进行投4
-    Logger::log(QString("结界突破-开始进行投4"));
+    // // 检查是否需要刷新
+    // if (hasDetectionWithLabel(detections, "realm_raid-realm-penetrated")) {
+    //     Logger::log(QString("检测到已挑战结界，执行刷新"));
+    //
+    //     // 点击刷新按钮
+    //     if (clickDetectionByLabel("common-btn-yellow_confirm", 0.5, 0.0, 0.0)) {
+    //         QThread::msleep(1500); // 等待刷新确认界面出现
+    //
+    //         // 点击确认刷新
+    //         if (clickDetectionByLabel("common-btn-yellow_confirm", 0.5, 0.0, 0.0)) {
+    //             Logger::log(QString("刷新成功"));
+    //             QThread::msleep(3000); // 等待刷新完成
+    //
+    //             // 刷新后重新执行
+    //             executeBorderBreakthrough(); //此时会进入投4逻辑
+    //             return;
+    //         } else {
+    //             Logger::log(QString("未找到确认刷新按钮"));
+    //         }
+    //     } else {
+    //         Logger::log(QString("未找到刷新按钮"));
+    //     }
+    //     return;
+    // }
+    //
+
+    // //开始进行投4
+    // Logger::log(QString("结界突破-开始进行投4"));
     for (const auto& det : detections) {
         if (comparesEqual(det.className, "realm_raid-realm-normal"))
         {
@@ -1666,61 +1593,65 @@ void ExecutionSteps::executeBorderBreakthrough()
             vec.push_back(det);
         }
     }
-    int surrenderIndex[4] = {1,3,5,7};
-    for (int i : surrenderIndex)
-    {
-        cv::Rect matchRect = vec[i].bbox;
-        cv::Point clickPt = getRandomPointInRectExcludeWidth(matchRect, 0.0, 0.3, 10);
-        clickInWindow(clickPt);
-        QThread::msleep(2000);
-
-        Logger::log(QString("点击进攻"));
-        //点击攻击
-        if (clickDetectionByLabel("common-btn-yellow_confirm",0.55,0.0,0.0))
-        {
-            QThread::msleep(4000);
-            //按下esc 再按下enter
-            // 按下 ESC 键，发送到指定窗口
-            PostMessage(hwnd, WM_KEYDOWN, VK_ESCAPE, 0);
-            Sleep(10);
-            PostMessage(hwnd, WM_KEYUP, VK_ESCAPE, 0);
-
-            // 等待 100 毫秒
-            Sleep(100);
-
-            // 按下回车键，发送到指定窗口
-            PostMessage(hwnd, WM_KEYDOWN, VK_RETURN, 0);
-            Sleep(10);
-            PostMessage(hwnd, WM_KEYUP, VK_RETURN, 0);
-
-            QThread::msleep(5000);
-
-            Logger::log(QString("识别失败并点击"));
-            //识别战斗失败 并点击
-            ocrRecognizesAndClick("失败", 0.5, true);
-            QThread::msleep(2000);
-        }else
-        {
-            //找不到 可按下的攻击按钮 话基本就是没有券了，直接结束
-            Logger::log(QString("找不到 可按下的攻击按钮，票已清空"));
-            return;
-        }
-    }
+    // int surrenderIndex[4] = {1,3,5,7};
+    // for (int i : surrenderIndex)
+    // {
+    //     cv::Rect matchRect = vec[i].bbox;
+    //     cv::Point clickPt = getRandomPointInRectExcludeWidth(matchRect, 0.0, 0.3, 10);
+    //     clickInWindow(clickPt);
+    //     QThread::msleep(3000);
+    //
+    //     Logger::log(QString("开始点击进攻"));
+    //     //点击攻击
+    //     if (clickDetectionByLabel("common-btn-yellow_confirm",0.55,0.0,0.0))
+    //     {
+    //         Logger::log(QString("准备退出战斗"));
+    //         QThread::msleep(5000);
+    //         //按下esc 再按下enter
+    //         // 按下 ESC 键，发送到指定窗口
+    //         PostMessage(hwnd, WM_KEYDOWN, VK_ESCAPE, 0);
+    //         Sleep(10);
+    //         PostMessage(hwnd, WM_KEYUP, VK_ESCAPE, 0);
+    //
+    //         // 等待 100 毫秒
+    //         Sleep(200);
+    //
+    //         // 按下回车键，发送到指定窗口
+    //         PostMessage(hwnd, WM_KEYDOWN, VK_RETURN, 0);
+    //         Sleep(10);
+    //         PostMessage(hwnd, WM_KEYUP, VK_RETURN, 0);
+    //
+    //         QThread::msleep(5000);
+    //
+    //         Logger::log(QString("识别失败并点击"));
+    //         //识别战斗失败 并点击
+    //         QString savePath = ocrRecognizesAndClick("失败", 0.5, true);
+    //         processAndShowImage(savePath);
+    //         QThread::msleep(5000);
+    //     }else
+    //     {
+    //         //找不到 可按下的攻击按钮 话基本就是没有券了，直接结束
+    //         Logger::log(QString("找不到 可按下的攻击按钮，票已清空"));
+    //         return;
+    //     }
+    // }
 
     Logger::log(QString("结界突破-开始进行清票操作"));
     for (const Detection det : vec)
     {
         //点击突破框
         cv::Rect matchRect = det.bbox;
+        Logger::log(QString("开始点击突破框"));
         cv::Point clickPt = getRandomPointInRectExcludeWidth(matchRect, 0.0, 0.3, 10);
         clickInWindow(clickPt);
-        QThread::msleep(2000);
+        QThread::msleep(3000);
 
         //点击攻击
+        Logger::log(QString("开始点击进攻"));
         if (clickDetectionByLabel("common-btn-yellow_confirm",0.55,0.0,0.0))
         {
-            // 循环等待直到找到战斗结束框，最多等待10分钟
-            const int MAX_ATTEMPTS = 120;  // 120次 * 5秒 = 10分钟
+            // 循环等待直到找到战斗结束框，最多等待1分钟
+            const int MAX_ATTEMPTS = 12;  // 12次 * 5秒 = 1分钟
             int attempts = 0;
 
             while (attempts < MAX_ATTEMPTS) {
@@ -1813,15 +1744,73 @@ bool ExecutionSteps::hasDetectionWithLabel(const std::vector<Detection>& detecti
 bool ExecutionSteps::clickDetectionByLabel(const QString& targetLabel, double threshold,
                                          double excludeStart, double excludeEnd)
 {
-    auto detections = yoloRecognizes(threshold, excludeStart, excludeEnd);
+    const auto detections_ = yoloRecognizes(threshold, excludeStart, excludeEnd);
 
-    for (const auto& det : detections) {
+    for (const auto& det : detections_) {
         if (comparesEqual(det.className, targetLabel)) {
-            cv::Point clickPt = getRandomPointInRectExcludeWidth(det.bbox, 0.0, 0.0, 10);
-            clickInWindow(clickPt);
+            cv::Point physicalClickPt = getRandomPointInRectExcludeWidth(det.bbox, 0.0, 0.0, 10);
+            // cv::Point physicalClickPt = getRandomPointInRect(det.bbox, 8);
+            // cv::Rect matchRect = det.bbox;
+            // cv::Point physicalClickPt = cv::Point(matchRect.x + matchRect.width / 2,matchRect.y + matchRect.height / 2);
+
+            QString capturePath = ConfigManager::instance().dx11CapturePath();
+            QString matchPath = ConfigManager::instance().matchResultPath();
+            cv::Mat captureImg = cv::imread(capturePath.toStdString());
+            QString labelName = ClassNameCache::getClassName(det.class_id);
+            cv::rectangle(captureImg, det.bbox, cv::Scalar(0, 255, 0), 2);
+            std::string label = labelName.toStdString();
+            // std::string label = "Class " + labelName.toStdString() +
+            // " Conf: " + std::to_string(det.confidence);
+            cv::putText(captureImg, label, cv::Point(det.bbox.x, det.bbox.y - 10),
+                       cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 0), 1);
+            // 保存识别点击的结果
+            cv::imwrite(matchPath.toStdString(), captureImg);
+            processAndShowImage(matchPath);
+
+            clickInWindow(physicalClickPt);
             return true;
         }
     }
 
     return false;
+}
+
+cv::Mat ExecutionSteps::getOnmyojiCapture()
+{
+    cv::Mat winImg;
+    bool hasWinImg = false;
+
+    // 首先尝试提升权限
+    if (!EnableDebugPrivilege()) {
+        Logger::log(QString("提升调试权限失败!"));
+    }
+
+    QString screenshotMode = SETTING_CONFIG.getScreenshotMode();
+    // 使用 if-else 替代 switch
+    if (screenshotMode == "PrintWindow") {
+        hasWinImg = getOnmyojiCaptureByPrintWindow(winImg);
+    } else if (screenshotMode == "DirectX截图") {
+        hasWinImg = getOnmyojiCaptureByDllInjection(winImg);
+    } else {
+        Logger::log(QString("无法识别鼠标控制模式，默认使用DirectX截图"));
+        // 默认使用dll注入方式
+        hasWinImg = getOnmyojiCaptureByDllInjection(winImg);
+    }
+
+    if (!hasWinImg)
+    {
+        Logger::log(QString("游戏画面获取失败，请查看日志！"));
+        return winImg;
+    }
+
+    // 保存原始的图片
+    cv::Mat captureImg = winImg.clone();
+    // 确保目录存在
+    QString saveDir = QCoreApplication::applicationDirPath() + "/src/resource/thumbnail";
+    // 保存图片（覆盖保存） debug用
+    QString saveCapturePath = saveDir + "/debug_capture_result.png";
+    cv::imwrite(saveCapturePath.toStdString(), captureImg);
+    // processAndShowImage(saveCapturePath);
+
+    return winImg;
 }

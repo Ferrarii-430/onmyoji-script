@@ -73,6 +73,7 @@ add_executable(qtTest WIN32
         src/utils/ClassNameCache.h
         src/utils/YOLODetector.cpp
         src/utils/YOLODetector.h
+        "src/utils/DPIHelper .h"
 )
 
 # ------------------------------
