@@ -246,7 +246,7 @@ bool ExecutionSteps::getOnmyojiCaptureByDllInjection(cv::Mat& winImg)
         qWarning() << "无法读取截图文件:" << DX11_CAPTURE_PATH;
         return false;
     }
-    Logger::log(QString("截图成功，图像尺寸: %1 x %2  通道数: %3").arg(winImg.cols, winImg.rows, winImg.channels()));
+    Logger::log(QString("截图成功，图像尺寸: %1 x %2  通道数: %3").arg(winImg.cols).arg(winImg.rows).arg(winImg.channels()));
 
     ok = true;
     return ok;
@@ -1586,7 +1586,7 @@ void ExecutionSteps::executeBorderBreakthrough()
 
     // //开始进行投4
     // Logger::log(QString("结界突破-开始进行投4"));
-    for (const auto& det : detections) {
+    for (auto& det : detections) {
         if (comparesEqual(det.className, "realm_raid-realm-normal"))
         {
             //正常会有9个
@@ -1639,6 +1639,8 @@ void ExecutionSteps::executeBorderBreakthrough()
     Logger::log(QString("结界突破-开始进行清票操作"));
     for (const Detection det : vec)
     {
+        QThread::msleep(3000);
+
         //点击突破框
         cv::Rect matchRect = det.bbox;
         Logger::log(QString("开始点击突破框"));
@@ -1648,70 +1650,24 @@ void ExecutionSteps::executeBorderBreakthrough()
 
         //点击攻击
         Logger::log(QString("开始点击进攻"));
-        if (clickDetectionByLabel("common-btn-yellow_confirm",0.55,0.0,0.0))
+        if (clickDetectionByLabel("common-btn-yellow_confirm",0.50,0.0,0.0))
         {
             // 循环等待直到找到战斗结束框，最多等待1分钟
-            const int MAX_ATTEMPTS = 12;  // 12次 * 5秒 = 1分钟
+            const int MAX_ATTEMPTS = 6;  // 6次 * 10秒 = 1分钟
             int attempts = 0;
 
             while (attempts < MAX_ATTEMPTS) {
-                QThread::msleep(5000);  // 每次循环前等待5秒
+                QThread::msleep(10000);  // 每次循环前等待5秒
                 attempts++;
 
-                qDebug() << "第" << attempts << "次尝试OCR识别...";
+                qDebug() << "第" << attempts << "次尝试OpenCV识别...";
 
-                QJsonArray res = ocrRecognizes();
-                bool found = false;
-
-                for (const QJsonValue& value : res) {
-                    QJsonObject item = value.toObject();
-                    QString text = item["text"].toString();
-
-                    // 检查是否为胜利或失败
-                    if (text == "点击屏幕继续" || text == "失败") {
-                        found = true;
-
-                        // 可以同时获取其他信息，比如坐标和置信度
-                        QJsonArray box = item["box"].toArray();
-                        if (box.size() == 4) {
-                            // 提取四个点的坐标
-                            QJsonArray point1 = box[0].toArray();
-                            QJsonArray point2 = box[1].toArray();
-                            QJsonArray point3 = box[2].toArray();
-                            QJsonArray point4 = box[3].toArray();
-
-                            int x1 = point1[0].toInt();
-                            int y1 = point1[1].toInt();
-                            int x2 = point2[0].toInt();
-                            int y2 = point2[1].toInt();
-                            int x3 = point3[0].toInt();
-                            int y3 = point3[1].toInt();
-                            int x4 = point4[0].toInt();
-                            int y4 = point4[1].toInt();
-
-                            // 计算矩形的最小外接矩形
-                            int minX = std::min({x1, x2, x3, x4});
-                            int minY = std::min({y1, y2, y3, y4});
-                            int maxX = std::max({x1, x2, x3, x4});
-                            int maxY = std::max({y1, y2, y3, y4});
-
-                            matchRect = cv::Rect(minX, minY, maxX - minX, maxY - minY);
-                            cv::Point endClickPt = getRandomPointInRect(matchRect);
-                            clickInWindow(endClickPt);
-
-                            QThread::msleep(3000);
-
-                            qDebug() << "找到目标文本:" << text << "并已点击";
-                        } else {
-                            qWarning() << "box数组大小不正确，期望4个点，实际:" << box.size();
-                        }
-
-                        break;  // 找到目标后跳出内层循环
-                    }
-                }
-
-                if (found) {
+                QString screenshotPath = ConfigManager::instance().screenshotPath();
+                QString savePath = opencvRecognizesAndClick(screenshotPath + "battle_end.png", 0.6, true);
+                if (!savePath.isEmpty())
+                {
                     qDebug() << "成功找到目标文本，退出循环";
+                    processAndShowImage(savePath);
                     break;  // 找到目标后跳出外层循环
                 }
 
@@ -1746,9 +1702,9 @@ bool ExecutionSteps::clickDetectionByLabel(const QString& targetLabel, double th
 {
     const auto detections_ = yoloRecognizes(threshold, excludeStart, excludeEnd);
 
-    for (const auto& det : detections_) {
-        if (comparesEqual(det.className, targetLabel)) {
-            cv::Point physicalClickPt = getRandomPointInRectExcludeWidth(det.bbox, 0.0, 0.0, 10);
+    for (auto& det_ : detections_) {
+        if (comparesEqual(det_.className, targetLabel)) {
+            cv::Point physicalClickPt = getRandomPointInRectExcludeWidth(det_.bbox, 0.0, 0.0, 10);
             // cv::Point physicalClickPt = getRandomPointInRect(det.bbox, 8);
             // cv::Rect matchRect = det.bbox;
             // cv::Point physicalClickPt = cv::Point(matchRect.x + matchRect.width / 2,matchRect.y + matchRect.height / 2);
@@ -1756,12 +1712,12 @@ bool ExecutionSteps::clickDetectionByLabel(const QString& targetLabel, double th
             QString capturePath = ConfigManager::instance().dx11CapturePath();
             QString matchPath = ConfigManager::instance().matchResultPath();
             cv::Mat captureImg = cv::imread(capturePath.toStdString());
-            QString labelName = ClassNameCache::getClassName(det.class_id);
-            cv::rectangle(captureImg, det.bbox, cv::Scalar(0, 255, 0), 2);
+            QString labelName = ClassNameCache::getClassName(det_.class_id);
+            cv::rectangle(captureImg, det_.bbox, cv::Scalar(0, 255, 0), 2);
             std::string label = labelName.toStdString();
             // std::string label = "Class " + labelName.toStdString() +
-            // " Conf: " + std::to_string(det.confidence);
-            cv::putText(captureImg, label, cv::Point(det.bbox.x, det.bbox.y - 10),
+            // " Conf: " + std::to_string(det_.confidence);
+            cv::putText(captureImg, label, cv::Point(det_.bbox.x, det_.bbox.y - 10),
                        cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 0), 1);
             // 保存识别点击的结果
             cv::imwrite(matchPath.toStdString(), captureImg);
@@ -1775,6 +1731,10 @@ bool ExecutionSteps::clickDetectionByLabel(const QString& targetLabel, double th
     return false;
 }
 
+/**
+ *
+ * @return 获取截图并保存
+ */
 cv::Mat ExecutionSteps::getOnmyojiCapture()
 {
     cv::Mat winImg;
