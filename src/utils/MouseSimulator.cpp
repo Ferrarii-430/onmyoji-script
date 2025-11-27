@@ -326,7 +326,8 @@ bool MouseSimulator::StealthHardwareClick(int x, int y) {
 
 bool MouseSimulator::StealthMessageClick(HWND hWnd, int x, int y) {
     // 添加前置消息混淆检测
-    PostMessage(hWnd, WM_MOUSEMOVE, 0, MAKELPARAM(x-1, y-1));
+    PostMessage(hWnd, WM_MOUSEMOVE, 0, MAKELPARAM(x, y));
+    // PostMessage(hWnd, WM_MOUSEMOVE, 0, MAKELPARAM(x-1, y-1));
     Sleep(GetRandomInRange(5, 15));
 
     // 执行拟人化点击

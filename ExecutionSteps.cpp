@@ -21,15 +21,40 @@
 #include <QDir>
 #include "QTemporaryFile"
 #include <QTimer>
+#include <QCoreApplication>
+#include <QEventLoop>
+#include <QElapsedTimer>
 #include <random>
 #include <src/widget/main/mainwindow.h>
 #include "Logger.h"
 #include "SettingManager.h"
 #include "ConfigManager.h"
 #include "src/utils/ClassNameCache.h"
-#include "src/utils/DPIHelper .h"
+#include "src/utils/DPIHelper.h"
 #include "src/utils/MouseSimulator.h"
 #include "src/utils/YOLODetector.h"
+
+void ExecutionSteps::waitWithEventProcessing(int milliseconds)
+{
+    if (milliseconds <= 0) {
+        QCoreApplication::processEvents(QEventLoop::AllEvents);
+        return;
+    }
+
+    QElapsedTimer timer;
+    timer.start();
+
+    while (timer.elapsed() < milliseconds) {
+        const int remaining = milliseconds - static_cast<int>(timer.elapsed());
+        const int slice = std::min(50, remaining);
+
+        QEventLoop loop;
+        QTimer::singleShot(slice, &loop, &QEventLoop::quit);
+        loop.exec(QEventLoop::AllEvents);
+    }
+
+    QCoreApplication::processEvents(QEventLoop::AllEvents);
+}
 
 ExecutionSteps& ExecutionSteps::getInstance() {
     static ExecutionSteps instance; // C++11 保证线程安全
@@ -39,7 +64,7 @@ ExecutionSteps& ExecutionSteps::getInstance() {
 void ExecutionSteps::processAndShowImage(const QString& imagePath)
 {
     qDebug() << imagePath;
-    QThread::msleep(500);
+    waitWithEventProcessing(500);
     // 处理完成后，发射信号通知mainwindow显示图像
     emit requestShowImage(imagePath);
 }
@@ -144,7 +169,7 @@ bool ExecutionSteps::getOnmyojiCaptureByPrintWindow(cv::Mat& winImg)
         ok = captureWindowToMat(hwnd, winImg);
         if (!ok || winImg.empty()) {
             Logger::log(QString("未能捕获窗口。它是最小化的还是受保护的？1秒内重试..."));
-            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+            waitWithEventProcessing(1000);
         }
     }
     if (!ok)
@@ -153,8 +178,6 @@ bool ExecutionSteps::getOnmyojiCaptureByPrintWindow(cv::Mat& winImg)
     }
     return ok;
 }
-
-
 
 //使用DX11截图
 bool ExecutionSteps::getOnmyojiCaptureByDllInjection(cv::Mat& winImg)
@@ -226,8 +249,8 @@ bool ExecutionSteps::getOnmyojiCaptureByDllInjection(cv::Mat& winImg)
     QByteArray errorOutput = process.readAllStandardError();
 
     if (exitCode != 0) {
-        qWarning() << "截图命令执行失败，退出码:" << exitCode;
-        qWarning() << "错误输出:" << errorOutput;
+        // qWarning() << "截图命令执行失败，退出码:" << exitCode;
+        // qWarning() << "错误输出:" << errorOutput;
         // return false;
     }
 
@@ -348,7 +371,7 @@ bool ExecutionSteps::dllSetLogPath()
 //使用DX11截图
 bool ExecutionSteps::dllStopHook()
 {
-bool ok = false;
+    bool ok = false;
 
     // 定义路径
     QString DX11_CAPTURE_PATH = ConfigManager::instance().dx11CapturePath();
@@ -554,7 +577,7 @@ bool ExecutionSteps::captureWindowToMat(HWND hwnd, cv::Mat& outBGR) {
     }
     BringWindowToTop(hwnd);
     SetForegroundWindow(hwnd);
-    Sleep(100); // 给窗口一些时间刷新
+    waitWithEventProcessing(100); // 给窗口一些时间刷新
 
     // 2. 获取正确的窗口区域（包括客户区和非客户区）
     RECT rect{};
@@ -1564,12 +1587,12 @@ void ExecutionSteps::executeBorderBreakthrough()
     //
     //     // 点击刷新按钮
     //     if (clickDetectionByLabel("common-btn-yellow_confirm", 0.5, 0.0, 0.0)) {
-    //         QThread::msleep(1500); // 等待刷新确认界面出现
+    //         waitWithEventProcessing(1500); // 等待刷新确认界面出现
     //
     //         // 点击确认刷新
     //         if (clickDetectionByLabel("common-btn-yellow_confirm", 0.5, 0.0, 0.0)) {
     //             Logger::log(QString("刷新成功"));
-    //             QThread::msleep(3000); // 等待刷新完成
+    //             waitWithEventProcessing(3000); // 等待刷新完成
     //
     //             // 刷新后重新执行
     //             executeBorderBreakthrough(); //此时会进入投4逻辑
@@ -1599,35 +1622,35 @@ void ExecutionSteps::executeBorderBreakthrough()
     //     cv::Rect matchRect = vec[i].bbox;
     //     cv::Point clickPt = getRandomPointInRectExcludeWidth(matchRect, 0.0, 0.3, 10);
     //     clickInWindow(clickPt);
-    //     QThread::msleep(3000);
+    //     waitWithEventProcessing(3000);
     //
     //     Logger::log(QString("开始点击进攻"));
     //     //点击攻击
     //     if (clickDetectionByLabel("common-btn-yellow_confirm",0.55,0.0,0.0))
     //     {
     //         Logger::log(QString("准备退出战斗"));
-    //         QThread::msleep(5000);
+    //         waitWithEventProcessing(5000);
     //         //按下esc 再按下enter
     //         // 按下 ESC 键，发送到指定窗口
     //         PostMessage(hwnd, WM_KEYDOWN, VK_ESCAPE, 0);
-    //         Sleep(10);
+    //         waitWithEventProcessing(10);
     //         PostMessage(hwnd, WM_KEYUP, VK_ESCAPE, 0);
     //
     //         // 等待 100 毫秒
-    //         Sleep(200);
+    //         waitWithEventProcessing(200);
     //
     //         // 按下回车键，发送到指定窗口
     //         PostMessage(hwnd, WM_KEYDOWN, VK_RETURN, 0);
-    //         Sleep(10);
+    //         waitWithEventProcessing(10);
     //         PostMessage(hwnd, WM_KEYUP, VK_RETURN, 0);
     //
-    //         QThread::msleep(5000);
+    //         waitWithEventProcessing(5000);
     //
     //         Logger::log(QString("识别失败并点击"));
     //         //识别战斗失败 并点击
     //         QString savePath = ocrRecognizesAndClick("失败", 0.5, true);
     //         processAndShowImage(savePath);
-    //         QThread::msleep(5000);
+    //         waitWithEventProcessing(5000);
     //     }else
     //     {
     //         //找不到 可按下的攻击按钮 话基本就是没有券了，直接结束
@@ -1639,14 +1662,14 @@ void ExecutionSteps::executeBorderBreakthrough()
     Logger::log(QString("结界突破-开始进行清票操作"));
     for (const Detection det : vec)
     {
-        QThread::msleep(3000);
+        waitWithEventProcessing(3000);
 
         //点击突破框
         cv::Rect matchRect = det.bbox;
         Logger::log(QString("开始点击突破框"));
         cv::Point clickPt = getRandomPointInRectExcludeWidth(matchRect, 0.0, 0.3, 10);
         clickInWindow(clickPt);
-        QThread::msleep(3000);
+        waitWithEventProcessing(3000);
 
         //点击攻击
         Logger::log(QString("开始点击进攻"));
@@ -1657,7 +1680,7 @@ void ExecutionSteps::executeBorderBreakthrough()
             int attempts = 0;
 
             while (attempts < MAX_ATTEMPTS) {
-                QThread::msleep(10000);  // 每次循环前等待5秒
+                waitWithEventProcessing(10000);  // 每次循环前等待10秒
                 attempts++;
 
                 qDebug() << "第" << attempts << "次尝试OpenCV识别...";

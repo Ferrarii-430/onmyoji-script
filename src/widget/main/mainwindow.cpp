@@ -13,6 +13,8 @@
 #include <QJsonArray>
 #include <QTimer>
 #include <QDebug>
+#include <QEventLoop>
+#include <QElapsedTimer>
 #include <opencv2/opencv.hpp>
 #include <ConfigTypeEnum.h>
 #include <ExecutionSteps.h>
@@ -25,6 +27,7 @@
 #include "src/widget/editTask/edittaskdialog.h"
 #include "src/widget/setting/settingdialog.h"
 #include <QRandomGenerator>
+#include <worker.h>
 #include <src/utils/common.h>
 
 #include "src/utils/ClassNameCache.h"
@@ -109,7 +112,7 @@ mainwindow::mainwindow(QWidget *parent) :
     bool initSuccess = YOLODetector::getInstance().initialize(onnxPath.toStdWString());
     if (initSuccess)
     {
-        Logger::log(QString("onmyoji-yolo-v5.onnx 加载成功！"));
+        Logger::log(QString("onmyoji-yolo-v5 加载成功！"));
     }
 
     ui->taskCycleNumber->setValue(1);
@@ -386,7 +389,7 @@ void mainwindow::startTaskButtonClick()
                             retryCount++;
                             if (retryCount < 3) {
                                 Logger::log(QString("截图失败，第%1次重试").arg(retryCount));
-                                Sleep(1000); // 等待1秒后重试
+                                waitWithEventProcessing(1000); // 等待1秒后重试
                             }
                         }
                         break;
@@ -409,7 +412,7 @@ void mainwindow::startTaskButtonClick()
                             retryCount++;
                             if (retryCount < 3) {
                                 Logger::log(QString("截图失败，第%1次重试").arg(retryCount));
-                                Sleep(1000); // 等待1秒后重试
+                                waitWithEventProcessing(1000); // 等待1秒后重试
                             }
                         }
                         break;
@@ -431,7 +434,7 @@ void mainwindow::startTaskButtonClick()
                             retryCount++;
                             if (retryCount < 3) {
                                 Logger::log(QString("截图失败，第%1次重试").arg(retryCount));
-                                Sleep(1000); // 等待1秒后重试
+                                waitWithEventProcessing(1000); // 等待1秒后重试
                             }
                         }
                         break;
@@ -456,11 +459,7 @@ void mainwindow::startTaskButtonClick()
                             Logger::log(QString("等待%1毫秒...").arg(actualWaitTime));
                         }
 
-                        int interval = 100; // 每100ms检查一次
-                        for (int t = 0; t < actualWaitTime && m_isRunning; t += interval) {
-                            Sleep(qMin(interval, actualWaitTime - t));
-                            QCoreApplication::processEvents();
-                        }
+                        waitWithEventProcessing(actualWaitTime);
                         break;
                 }
 
@@ -558,7 +557,7 @@ void mainwindow::startTaskButtonClick()
         // ExecutionSteps::getInstance().deleteCaptureFile();
 
         //每次任务结束都固定休眠1秒，防止无限循环一直执行
-        Sleep(1000);
+        waitWithEventProcessing(1000);
 
     } while (m_isRunning && (infiniteLoop || number > 0));
 
@@ -578,6 +577,28 @@ void mainwindow::stopTaskButtonClick()
 {
     m_isRunning = false;
     Logger::log(QString("正在停止任务..."));
+}
+
+void mainwindow::waitWithEventProcessing(int milliseconds)
+{
+    if (milliseconds <= 0) {
+        QCoreApplication::processEvents(QEventLoop::AllEvents);
+        return;
+    }
+
+    QElapsedTimer timer;
+    timer.start();
+
+    while (timer.elapsed() < milliseconds && m_isRunning) {
+        const int remaining = milliseconds - static_cast<int>(timer.elapsed());
+        const int slice = qMin(50, remaining);
+
+        QEventLoop loop;
+        QTimer::singleShot(slice, &loop, &QEventLoop::quit);
+        loop.exec(QEventLoop::AllEvents);
+    }
+
+    QCoreApplication::processEvents(QEventLoop::AllEvents);
 }
 
 void mainwindow::appendLogToUI(const QString &msg)

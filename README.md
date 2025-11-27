@@ -2,6 +2,8 @@
 
 仅适用于《阴阳师》桌面版游戏的自动化脚本工具。
 
+主要在 https://gitee.com/clannad_cai/onmyoji-script 更新，github偶尔抽风
+
 ## 使用说明
 
 1. 下载最新发行版本的 `yys-script-x64.rar` 完整的解压到文件夹
@@ -43,6 +45,10 @@
 ---
 
 ## 更新日志
+🔮 **v1.4**
+1. 添加yolo v5 识别，模型来自 https://github.com/shuiyuewuyan1/yolo-games-weights 感谢🙏大佬 (偷懒就不自己跑模型了)
+2. 添加全自动突破功能
+
 🔮 **v1.3**
 1. 使用DLL获取游戏截屏
 2. 添加ocr识别功能 鸣谢@umi-ocr

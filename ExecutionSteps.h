@@ -8,7 +8,8 @@
 #include <QString>
 #include <string>
 #include <windows.h>
-
+#include <QEventLoop>
+#include <QElapsedTimer>
 #include "src/utils/YOLODetector.h"
 
 class ExecutionSteps: public QObject
@@ -66,6 +67,8 @@ private:
     // 禁用拷贝和赋值
     ExecutionSteps(const ExecutionSteps&) = delete;
     ExecutionSteps& operator=(const ExecutionSteps&) = delete;
+
+    void waitWithEventProcessing(int milliseconds);
 };
 
 #endif // EXECUTIONSTEPS_H

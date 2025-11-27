@@ -9,6 +9,8 @@
 #include <QListWidget>
 #include <QWidget>
 #include <QJsonArray>
+#include <QEventLoop>
+#include <QElapsedTimer>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class mainwindow; }
@@ -47,6 +49,7 @@ private:
     void showCurrentSelectStepsInTable();
     void startTaskButtonClick();
     void stopTaskButtonClick();
+    void waitWithEventProcessing(int milliseconds);
     bool m_isRunning = false;
     bool isInitLogPath = false;
 };
