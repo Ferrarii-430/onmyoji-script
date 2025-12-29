@@ -2,7 +2,7 @@
 
 仅适用于《阴阳师》桌面版游戏的自动化脚本工具。
 
-主要在 https://gitee.com/clannad_cai/onmyoji-script 更新，github偶尔抽风
+主要在 https://gitee.com/clannad_cai/onmyoji-script 更新发布包，github偶尔抽风
 
 ## 使用说明
 
@@ -25,7 +25,7 @@
 1. 更隐蔽的鼠标策略
 2. 全自动砸豆子
 3. 任务执行途中,做无意义的事情,拟人化
-4. 全自动突破
+4. 全自动突破 ✅
 5. 全自动日常托管
 6. 欢迎在issues提出
 
