@@ -18,6 +18,7 @@
 #include <dwmapi.h>
 #include <opencv2/opencv.hpp>
 #include <algorithm>
+#include <cmath>
 #include <QDir>
 #include "QTemporaryFile"
 #include <QTimer>
@@ -1088,9 +1089,16 @@ void ExecutionSteps::clickInWindow(const cv::Point& clickPoint) {
         return;
     }
 
+    const cv::Point clientPoint = mapCapturePointToClient(clickPoint);
+    Logger::log(QString("点击坐标映射: 捕获(%1,%2) -> 客户区(%3,%4), 捕获尺寸: %5x%6")
+               .arg(clickPoint.x).arg(clickPoint.y)
+               .arg(clientPoint.x).arg(clientPoint.y)
+               .arg(lastCaptureSize_.width)
+               .arg(lastCaptureSize_.height));
+
     // 验证坐标
-    if (!DPIHelper::IsPointInClientRect(hwnd, clickPoint)) {
-        Logger::log(QString("错误: 点击坐标 (%1, %2) 超出客户区范围").arg(clickPoint.x).arg(clickPoint.y));
+    if (!DPIHelper::IsPointInClientRect(hwnd, clientPoint)) {
+        Logger::log(QString("错误: 点击坐标 (%1, %2) 超出客户区范围").arg(clientPoint.x).arg(clientPoint.y));
         return;
     }
 
@@ -1110,11 +1118,11 @@ void ExecutionSteps::clickInWindow(const cv::Point& clickPoint) {
                .arg(DPIHelper::GetWindowDPIScaling(hwnd)));
 
     // 坐标转换
-    POINT screenPoint = { clickPoint.x, clickPoint.y };
+    POINT screenPoint = { clientPoint.x, clientPoint.y };
     ClientToScreen(hwnd, &screenPoint);
 
     Logger::log(QString("坐标转换 - 客户区: (%1, %2) -> 屏幕: (%3, %4)")
-               .arg(clickPoint.x).arg(clickPoint.y)
+               .arg(clientPoint.x).arg(clientPoint.y)
                .arg(screenPoint.x).arg(screenPoint.y));
 
     // 执行点击
@@ -1122,7 +1130,7 @@ void ExecutionSteps::clickInWindow(const cv::Point& clickPoint) {
     QString mouseClickMode = SETTING_CONFIG.getMouseClickMode();
 
     if (mouseClickMode == "PostMessage") {
-        success = simulator.StealthMessageClick(hwnd, clickPoint.x, clickPoint.y);
+        success = simulator.StealthMessageClick(hwnd, clientPoint.x, clientPoint.y);
     } else if (mouseClickMode == "InputMouse") {
         POINT start = MouseSimulator::GetCurrentPosition();
         POINT targetScreen = { screenPoint.x, screenPoint.y };
@@ -1131,7 +1139,7 @@ void ExecutionSteps::clickInWindow(const cv::Point& clickPoint) {
                                                      SETTING_CONFIG.getMouseSpeed() * 10);
     } else {
         Logger::log(QString("无法识别的鼠标点击模式，执行默认策略"));
-        success = simulator.StealthMessageClick(hwnd, clickPoint.x, clickPoint.y);
+        success = simulator.StealthMessageClick(hwnd, clientPoint.x, clientPoint.y);
     }
 
     if (success) {
@@ -1139,6 +1147,50 @@ void ExecutionSteps::clickInWindow(const cv::Point& clickPoint) {
     } else {
         Logger::log(QString("点击失败"));
     }
+}
+
+cv::Point ExecutionSteps::mapCapturePointToClient(const cv::Point& capturePoint)
+{
+    if (!IsWindow(hwnd) || lastCaptureSize_.width <= 0 || lastCaptureSize_.height <= 0) {
+        return capturePoint;
+    }
+
+    RECT clientRect{};
+    RECT windowRect{};
+    if (!GetClientRect(hwnd, &clientRect) || !GetWindowRect(hwnd, &windowRect)) {
+        return capturePoint;
+    }
+
+    const int clientWidth = clientRect.right;
+    const int clientHeight = clientRect.bottom;
+    const int windowWidth = windowRect.right - windowRect.left;
+    const int windowHeight = windowRect.bottom - windowRect.top;
+    const int captureWidth = lastCaptureSize_.width;
+    const int captureHeight = lastCaptureSize_.height;
+
+    cv::Point mapped = capturePoint;
+    constexpr int tolerance = 2;
+
+    if (std::abs(captureWidth - windowWidth) <= tolerance
+        && std::abs(captureHeight - windowHeight) <= tolerance) {
+        POINT clientTopLeft{0, 0};
+        if (ClientToScreen(hwnd, &clientTopLeft)) {
+            const int offsetX = clientTopLeft.x - windowRect.left;
+            const int offsetY = clientTopLeft.y - windowRect.top;
+            mapped.x -= offsetX;
+            mapped.y -= offsetY;
+        }
+    } else if (captureWidth != clientWidth || captureHeight != clientHeight) {
+        const double scaleX = static_cast<double>(clientWidth) / std::max(1, captureWidth);
+        const double scaleY = static_cast<double>(clientHeight) / std::max(1, captureHeight);
+        mapped.x = static_cast<int>(std::round(mapped.x * scaleX));
+        mapped.y = static_cast<int>(std::round(mapped.y * scaleY));
+    }
+
+    mapped.x = std::clamp(mapped.x, 0, std::max(0, clientWidth - 1));
+    mapped.y = std::clamp(mapped.y, 0, std::max(0, clientHeight - 1));
+
+    return mapped;
 }
 
 QJsonObject ExecutionSteps::parseOCROutput(const QString& ocrOutput)
@@ -1795,5 +1847,6 @@ cv::Mat ExecutionSteps::getOnmyojiCapture()
     cv::imwrite(saveCapturePath.toStdString(), captureImg);
     // processAndShowImage(saveCapturePath);
 
+    lastCaptureSize_ = winImg.size();
     return winImg;
 }

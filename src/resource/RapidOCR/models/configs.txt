@@ -1,0 +1,11 @@
+简体中文(V4)
+ch_PP-OCRv4_det_infer.onnx
+ch_ppocr_mobile_v2.0_cls_infer.onnx
+rec_ch_PP-OCRv4_infer.onnx
+dict_chinese.txt
+
+简体中文(V3)
+ch_PP-OCRv3_det_infer.onnx
+ch_ppocr_mobile_v2.0_cls_infer.onnx
+ch_PP-OCRv3_rec_infer.onnx
+dict_chinese.txt

@@ -13,7 +13,6 @@ ScreenCaptureWidget::ScreenCaptureWidget(QWidget *parent)
     screen = QGuiApplication::primaryScreen();
     if (screen) {
         fullPixmap = screen->grabWindow(0);
-        fullPixmap.setDevicePixelRatio(screen->devicePixelRatio());
     }
 
     setGeometry(screen->geometry());
@@ -65,7 +64,7 @@ void ScreenCaptureWidget::mouseReleaseEvent(QMouseEvent *event)
     } else if (event->button() == Qt::LeftButton) {
         // 左键释放：正常截图
         // 获取设备像素比
-        qreal devicePixelRatio = screen->devicePixelRatio();
+        qreal devicePixelRatio = fullPixmap.devicePixelRatio();
 
         // 坐标转换：逻辑坐标 → 物理坐标
         QPoint physicalStart = startPoint * devicePixelRatio;

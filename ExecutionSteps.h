@@ -41,6 +41,7 @@ public:
     cv::Point getRandomPointInRect(const cv::Rect& r, float paddingRatio);
     cv::Point getRandomPointInRectExcludeWidth(const cv::Rect& r,double excludeStartWidth, double excludeEndWidth, int maxAttempts);
     void clickInWindow(const cv::Point& ptClient);
+    cv::Point mapCapturePointToClient(const cv::Point& capturePoint);
     QJsonObject parseOCROutput(const QString& ocrOutput);
     QJsonObject executeRapidOCR();
     QJsonArray ocrRecognizes();
@@ -69,6 +70,7 @@ private:
     ExecutionSteps& operator=(const ExecutionSteps&) = delete;
 
     void waitWithEventProcessing(int milliseconds);
+    cv::Size lastCaptureSize_;
 };
 
 #endif // EXECUTIONSTEPS_H
