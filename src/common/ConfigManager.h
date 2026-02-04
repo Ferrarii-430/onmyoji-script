@@ -64,6 +64,10 @@ public:
         return QCoreApplication::applicationDirPath() + "/src/resource/classes.txt";
     }
 
+    QString labelCatalogPath() const {
+        return QCoreApplication::applicationDirPath() + "/src/resource/yolo_label_catalog.json";
+    }
+
     QString onmyojiYoloOnnxPath() const {
         return QCoreApplication::applicationDirPath() + "/src/resource/onmyoji-yolo-v5.onnx";
     }

@@ -1,0 +1,200 @@
+{
+  "common": [
+    {
+      "className": "common-shikigami-normal",
+      "function": "进入式神录（大）",
+      "scenes": ["主庭院", "战前集结", "地鬼"]
+    },
+    {
+      "className": "common-shikigami-tiny",
+      "function": "进入式神录（小）",
+      "scenes": ["突破", "秘闻"]
+    },
+    {
+      "className": "common-onmyodo",
+      "function": "阴阳术",
+      "scenes": ["庭院", "战前集结"]
+    },
+    {
+      "className": "common-exit-blue",
+      "function": "返回(蓝，圆)",
+      "scenes": ["探索逢魔", "御魂本选择", "觉醒本选择", "商店"]
+    },
+    {
+      "className": "common-exit-battle",
+      "function": "返回(黄，拐弯)",
+      "scenes": ["战斗"]
+    },
+    {
+      "className": "common-exit-yellow",
+      "function": "返回(黄,三角)",
+      "scenes": ["式神录", "秘卷屋", "礼包屋", "召唤"]
+    },
+    {
+      "className": "common-btn-yellow_confirm",
+      "function": "普通功能按钮（黄色，文字）",
+      "scenes": ["刷新", "弹窗的确定", "加为好友", "资金领取"]
+    },
+    {
+      "className": "common-btn-red_cancel",
+      "function": "普通功能按钮（红色，文字）",
+      "scenes": ["弹窗的取消"]
+    },
+    {
+      "className": "common-btn-red_x_transparent",
+      "function": "普通X按钮（半透明，圆，红）",
+      "scenes": ["关闭面板"]
+    },
+    {
+      "className": "common-btn-red_x_solid",
+      "function": "普通X按钮（实心，圆，红）",
+      "scenes": ["关闭结界突破面板"]
+    },
+    {
+      "className": "common-popup-reward",
+      "function": "弹窗：获得奖励",
+      "scenes": ["收取邮件", "收取奖励"]
+    },
+    {
+      "className": "common-popup-confirm",
+      "function": "弹窗：确认",
+      "scenes": ["删除好友", "退出战斗"]
+    },
+    {
+      "className": "common-like",
+      "function": "未赞",
+      "scenes": []
+    },
+    {
+      "className": "common-liked",
+      "function": "已赞",
+      "scenes": []
+    },
+    {
+      "className": "common-mail",
+      "function": "右上角邮件",
+      "scenes": ["庭院", "探索"]
+    },
+    {
+      "className": "common-chat",
+      "function": "右上角世界频道",
+      "scenes": ["庭院", "探索"]
+    },
+    {
+      "className": "common-lock",
+      "function": "锁定",
+      "scenes": ["御魂", "阵容"]
+    },
+    {
+      "className": "common-unlock",
+      "function": "未锁定",
+      "scenes": []
+    },
+    {
+      "className": "common-share-tiny",
+      "function": "分享按钮小",
+      "scenes": ["地鬼面板", "6星式神"]
+    },
+    {
+      "className": "common-share",
+      "function": "分享按钮大",
+      "scenes": ["神秘商人", "地鬼战斗胜利"]
+    },
+    {
+      "className": "common-loading",
+      "function": "转圈等待",
+      "scenes": ["网络不佳"]
+    },
+    {
+      "className": "common-loading-offline",
+      "function": "樱花等待",
+      "scenes": ["掉线"]
+    },
+    {
+      "className": "common-start_game-loading",
+      "function": "进游戏加载",
+      "scenes": []
+    },
+    {
+      "className": "common-start_game-enter_game",
+      "function": "进游戏",
+      "scenes": ["选服务器页面"]
+    },
+    {
+      "className": "common-start_game-logo-netease",
+      "function": "网易游戏logo",
+      "scenes": ["打开游戏"]
+    },
+    {
+      "className": "common-start_game-logo-zen",
+      "function": "zen logo",
+      "scenes": ["打开游戏"]
+    },
+    {
+      "className": "common-moment",
+      "function": "友人帐",
+      "scenes": []
+    }
+  ],
+  "courtyard": [
+    {"className": "courtyard-guild", "function": "寮", "scenes": ["主庭院"]},
+    {"className": "courtyard-shop", "function": "商店", "scenes": ["主庭院"]},
+    {"className": "courtyard-friend", "function": "好友", "scenes": ["主庭院"]},
+    {"className": "courtyard-bounty-normal", "function": "悬赏封印（封）", "scenes": ["主庭院"]},
+    {"className": "courtyard-bounty-active", "function": "悬赏封印（√）", "scenes": ["主庭院"]},
+    {"className": "courtyard-missions", "function": "花合战", "scenes": ["主庭院"]},
+    {"className": "courtyard-exploration", "function": "探索", "scenes": ["主庭院"]},
+    {"className": "courtyard-village", "function": "町中", "scenes": ["主庭院"]},
+    {"className": "courtyard-statue", "function": "庭院左边日曜石", "scenes": ["主庭院"]},
+    {"className": "courtyard-buff", "function": "buff灯笼", "scenes": ["主庭院"]}
+  ],
+  "guild": [
+    {"className": "guild-realm", "function": "进入结界", "scenes": ["寮"]}
+  ],
+  "shop": [
+    {"className": "shop-general", "function": "杂货铺", "scenes": ["勾玉买金币", "买体力"]},
+    {"className": "shop-mystic", "function": "秘卷屋", "scenes": ["每周1500紫蛇皮"]},
+    {"className": "shop-soul", "function": "秘魂屋", "scenes": ["48w金币买御魂"]},
+    {"className": "shop-pack", "function": "礼包屋", "scenes": []},
+    {"className": "shop-pack-daily_free", "function": "每日免费礼包", "scenes": ["50次黑蛋"]},
+    {"className": "shop-lantern", "function": "商店灯笼", "scenes": ["热卖", "推荐", "荣誉"]},
+    {"className": "shop-mystic-trader", "function": "神秘商店", "scenes": ["周三周六奸商"]}
+  ],
+  "exploration": [
+    {"className": "exploration-realm_raid", "function": "突破", "scenes": []},
+    {"className": "exploration-evos", "function": "觉醒", "scenes": []},
+    {"className": "exploration-souls", "function": "御魂", "scenes": []},
+    {"className": "exploration-totem", "function": "御灵", "scenes": []},
+    {"className": "exploration-secret_zones", "function": "秘闻", "scenes": []},
+    {"className": "exploration-area_boss", "function": "地域", "scenes": []},
+    {"className": "exploration-six_realms_gate", "function": "六道", "scenes": []},
+    {"className": "exploration-chapter", "function": "1-28单个副本", "scenes": []},
+    {"className": "exploration-chapter-hard", "function": "困难难度", "scenes": []},
+    {"className": "exploration-buff", "function": "buff灯笼", "scenes": []}
+  ],
+  "realm": [
+    {"className": "realm-realm_card-reward", "function": "领取结界卡", "scenes": []},
+    {"className": "realm-paper_doll-exp", "function": "领取酒壶经验", "scenes": []},
+    {"className": "realm-paper_doll-ap", "function": "领取食盒体力", "scenes": []},
+    {"className": "realm-nurturing", "function": "式神育成", "scenes": []}
+  ],
+  "battle": [
+    {"className": "battle-auto", "function": "自动", "scenes": ["战斗"]},
+    {"className": "battle-ready", "function": "准备", "scenes": ["战斗"]},
+    {"className": "battle-readied", "function": "已准备", "scenes": ["战斗"]},
+    {"className": "battle-victory", "function": "战斗胜利", "scenes": ["战斗"]},
+    {"className": "battle-loss", "function": "失败", "scenes": ["战斗"]},
+    {"className": "battle-preset", "function": "预设", "scenes": ["战斗"]},
+    {"className": "battle-challenge-active", "function": "挑战按钮（可点击）", "scenes": ["进入战斗"]},
+    {"className": "battle-challenge-disabled", "function": "挑战按钮（灰色）", "scenes": ["进入战斗"]}
+  ],
+  "mail": [
+    {"className": "mail-read", "function": "已读邮件", "scenes": ["邮件"]},
+    {"className": "mail-unread", "function": "未读邮件", "scenes": ["邮件"]},
+    {"className": "mail-receive_all", "function": "全部领取", "scenes": ["邮件"]}
+  ],
+  "chapter": [
+    {"className": "chapter-challenge-enemy", "function": "挑战", "scenes": ["小怪"]},
+    {"className": "chapter-challenge-boss", "function": "Boss", "scenes": ["章节Boss"]}
+  ]
+}

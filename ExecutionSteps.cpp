@@ -1581,34 +1581,34 @@ void ExecutionSteps::executeBorderBreakthrough()
         return;
     }
 
-    // // 检查是否需要刷新
-    // if (hasDetectionWithLabel(detections, "realm_raid-realm-penetrated")) {
-    //     Logger::log(QString("检测到已挑战结界，执行刷新"));
-    //
-    //     // 点击刷新按钮
-    //     if (clickDetectionByLabel("common-btn-yellow_confirm", 0.5, 0.0, 0.0)) {
-    //         waitWithEventProcessing(1500); // 等待刷新确认界面出现
-    //
-    //         // 点击确认刷新
-    //         if (clickDetectionByLabel("common-btn-yellow_confirm", 0.5, 0.0, 0.0)) {
-    //             Logger::log(QString("刷新成功"));
-    //             waitWithEventProcessing(3000); // 等待刷新完成
-    //
-    //             // 刷新后重新执行
-    //             executeBorderBreakthrough(); //此时会进入投4逻辑
-    //             return;
-    //         } else {
-    //             Logger::log(QString("未找到确认刷新按钮"));
-    //         }
-    //     } else {
-    //         Logger::log(QString("未找到刷新按钮"));
-    //     }
-    //     return;
-    // }
-    //
+    // 检查是否需要刷新
+    if (hasDetectionWithLabel(detections, "realm_raid-realm-penetrated")) {
+        Logger::log(QString("检测到已挑战结界，执行刷新"));
 
-    // //开始进行投4
-    // Logger::log(QString("结界突破-开始进行投4"));
+        // 点击刷新按钮
+        if (clickDetectionByLabel("common-btn-yellow_confirm", 0.5, 0.0, 0.0)) {
+            waitWithEventProcessing(1500); // 等待刷新确认界面出现
+
+            // 点击确认刷新
+            if (clickDetectionByLabel("common-btn-yellow_confirm", 0.5, 0.0, 0.0)) {
+                Logger::log(QString("刷新成功"));
+                waitWithEventProcessing(3000); // 等待刷新完成
+
+                // 刷新后重新执行
+                executeBorderBreakthrough(); //此时会进入投4逻辑
+                return;
+            } else {
+                Logger::log(QString("未找到确认刷新按钮"));
+            }
+        } else {
+            Logger::log(QString("未找到刷新按钮"));
+        }
+        return;
+    }
+
+
+    //开始进行投4
+    Logger::log(QString("结界突破-开始进行投4"));
     for (auto& det : detections) {
         if (comparesEqual(det.className, "realm_raid-realm-normal"))
         {
@@ -1616,48 +1616,48 @@ void ExecutionSteps::executeBorderBreakthrough()
             vec.push_back(det);
         }
     }
-    // int surrenderIndex[4] = {1,3,5,7};
-    // for (int i : surrenderIndex)
-    // {
-    //     cv::Rect matchRect = vec[i].bbox;
-    //     cv::Point clickPt = getRandomPointInRectExcludeWidth(matchRect, 0.0, 0.3, 10);
-    //     clickInWindow(clickPt);
-    //     waitWithEventProcessing(3000);
-    //
-    //     Logger::log(QString("开始点击进攻"));
-    //     //点击攻击
-    //     if (clickDetectionByLabel("common-btn-yellow_confirm",0.55,0.0,0.0))
-    //     {
-    //         Logger::log(QString("准备退出战斗"));
-    //         waitWithEventProcessing(5000);
-    //         //按下esc 再按下enter
-    //         // 按下 ESC 键，发送到指定窗口
-    //         PostMessage(hwnd, WM_KEYDOWN, VK_ESCAPE, 0);
-    //         waitWithEventProcessing(10);
-    //         PostMessage(hwnd, WM_KEYUP, VK_ESCAPE, 0);
-    //
-    //         // 等待 100 毫秒
-    //         waitWithEventProcessing(200);
-    //
-    //         // 按下回车键，发送到指定窗口
-    //         PostMessage(hwnd, WM_KEYDOWN, VK_RETURN, 0);
-    //         waitWithEventProcessing(10);
-    //         PostMessage(hwnd, WM_KEYUP, VK_RETURN, 0);
-    //
-    //         waitWithEventProcessing(5000);
-    //
-    //         Logger::log(QString("识别失败并点击"));
-    //         //识别战斗失败 并点击
-    //         QString savePath = ocrRecognizesAndClick("失败", 0.5, true);
-    //         processAndShowImage(savePath);
-    //         waitWithEventProcessing(5000);
-    //     }else
-    //     {
-    //         //找不到 可按下的攻击按钮 话基本就是没有券了，直接结束
-    //         Logger::log(QString("找不到 可按下的攻击按钮，票已清空"));
-    //         return;
-    //     }
-    // }
+    int surrenderIndex[4] = {1,3,5,7};
+    for (int i : surrenderIndex)
+    {
+        cv::Rect matchRect = vec[i].bbox;
+        cv::Point clickPt = getRandomPointInRectExcludeWidth(matchRect, 0.0, 0.3, 10);
+        clickInWindow(clickPt);
+        waitWithEventProcessing(3000);
+
+        Logger::log(QString("开始点击进攻"));
+        //点击攻击
+        if (clickDetectionByLabel("common-btn-yellow_confirm",0.55,0.0,0.0))
+        {
+            Logger::log(QString("准备退出战斗"));
+            waitWithEventProcessing(5000);
+            //按下esc 再按下enter
+            // 按下 ESC 键，发送到指定窗口
+            PostMessage(hwnd, WM_KEYDOWN, VK_ESCAPE, 0);
+            waitWithEventProcessing(10);
+            PostMessage(hwnd, WM_KEYUP, VK_ESCAPE, 0);
+
+            // 等待 100 毫秒
+            waitWithEventProcessing(200);
+
+            // 按下回车键，发送到指定窗口
+            PostMessage(hwnd, WM_KEYDOWN, VK_RETURN, 0);
+            waitWithEventProcessing(10);
+            PostMessage(hwnd, WM_KEYUP, VK_RETURN, 0);
+
+            waitWithEventProcessing(5000);
+
+            Logger::log(QString("识别失败并点击"));
+            //识别战斗失败 并点击
+            QString savePath = ocrRecognizesAndClick("失败", 0.5, true);
+            processAndShowImage(savePath);
+            waitWithEventProcessing(5000);
+        }else
+        {
+            //找不到 可按下的攻击按钮 话基本就是没有券了，直接结束
+            Logger::log(QString("找不到 可按下的攻击按钮，票已清空"));
+            return;
+        }
+    }
 
     Logger::log(QString("结界突破-开始进行清票操作"));
     for (const Detection det : vec)
