@@ -99,6 +99,20 @@
     <item row="0" column="1">
      <widget class="QComboBox" name="mouseClickMode"/>
     </item>
+    <item row="4" column="0">
+     <widget class="QLabel" name="label_5">
+      <property name="text">
+       <string>持久化截图</string>
+      </property>
+     </widget>
+    </item>
+    <item row="4" column="1">
+     <widget class="QCheckBox" name="persistScreenshot">
+      <property name="text">
+       <string>保存截图到文件</string>
+      </property>
+     </widget>
+    </item>
    </layout>
   </widget>
  </widget>

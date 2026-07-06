@@ -53,6 +53,7 @@ void SettingDialog::initSetting() const
     ui->mouseSpeed->setValue(SETTING_CONFIG.getMouseSpeed());
     ui->screenshotMode->setCurrentText(SETTING_CONFIG.getScreenshotMode());
     ui->mouseClickMode->setCurrentText(SETTING_CONFIG.getMouseClickMode());
+    ui->persistScreenshot->setChecked(SETTING_CONFIG.getPersistScreenshot());
 
     // 根据配置值设置当前选项
     QString currentMouseMode = SETTING_CONFIG.getMouseControlMode();
@@ -97,6 +98,8 @@ void SettingDialog::onSaveClicked()
     QString mouseMode = ui->mouseControlMode->currentData().toString();
     int mouseSpeed = ui->mouseSpeed->value();
     QString screenshotMode = ui->screenshotMode->currentData().toString();
+    QString mouseClickMode = ui->mouseClickMode->currentData().toString();
+    bool persistScreenshot = ui->persistScreenshot->isChecked();
 
     // 验证数据
     if (mouseSpeed < 1 || mouseSpeed > 10) {
@@ -110,6 +113,8 @@ void SettingDialog::onSaveClicked()
     config["mouseControlMode"] = mouseMode;
     config["mouseSpeed"] = mouseSpeed;
     config["screenshotMode"] = screenshotMode;
+    config["mouseClickMode"] = mouseClickMode;
+    config["persistScreenshot"] = persistScreenshot;
 
     // 保存到文件
     if (saveConfigToFile(config)) {

@@ -30,6 +30,7 @@
 #include "Logger.h"
 #include "SettingManager.h"
 #include "ConfigManager.h"
+#include "Dx11CaptureShared.h"
 #include "src/utils/ClassNameCache.h"
 #include "src/utils/DPIHelper.h"
 #include "src/utils/MouseSimulator.h"
@@ -180,6 +181,75 @@ bool ExecutionSteps::getOnmyojiCaptureByPrintWindow(cv::Mat& winImg)
     return ok;
 }
 
+// 读取共享内存中当前帧的序号（共享内存不可用时返回 0）
+static uint32_t readDx11SharedSequence()
+{
+    HANDLE mapping = OpenFileMappingW(FILE_MAP_READ, FALSE, DX11_SHARED_NAME);
+    if (!mapping) return 0;
+
+    uint32_t seq = 0;
+    void* view = MapViewOfFile(mapping, FILE_MAP_READ, 0, 0, sizeof(Dx11CaptureShared));
+    if (view) {
+        const Dx11CaptureShared* hdr = static_cast<const Dx11CaptureShared*>(view);
+        if (hdr->magic == DX11_SHARED_MAGIC && hdr->version == DX11_SHARED_VERSION) {
+            seq = hdr->sequence;
+        }
+        UnmapViewOfFile(view);
+    }
+    CloseHandle(mapping);
+    return seq;
+}
+
+// 从 DLL 写入的共享内存中直接读取最新一帧（BGRA），转换为 BGR 的 cv::Mat。
+// 无需 PNG 落盘/解码中转。
+static bool readDx11SharedCapture(cv::Mat& outImg)
+{
+    HANDLE mapping = OpenFileMappingW(FILE_MAP_READ, FALSE, DX11_SHARED_NAME);
+    if (!mapping) {
+        qWarning() << "无法打开截图共享内存 (错误码:" << GetLastError() << ")";
+        return false;
+    }
+
+    bool ok = false;
+    uint32_t width = 0, height = 0, dataSize = 0;
+
+    // 先映射头部获取尺寸
+    void* headView = MapViewOfFile(mapping, FILE_MAP_READ, 0, 0, sizeof(Dx11CaptureShared));
+    if (headView) {
+        const Dx11CaptureShared* hdr = static_cast<const Dx11CaptureShared*>(headView);
+        if (hdr->magic == DX11_SHARED_MAGIC && hdr->version == DX11_SHARED_VERSION &&
+            hdr->status == 0 && hdr->channels == 4 &&
+            hdr->width > 0 && hdr->height > 0 &&
+            hdr->dataSize == hdr->width * hdr->height * 4) {
+            width = hdr->width;
+            height = hdr->height;
+            dataSize = hdr->dataSize;
+        } else {
+            qWarning() << "截图共享内存头部无效 (magic/version/status 不匹配)";
+        }
+        UnmapViewOfFile(headView);
+    }
+
+    if (width > 0) {
+        void* view = MapViewOfFile(mapping, FILE_MAP_READ, 0, 0,
+                                   sizeof(Dx11CaptureShared) + dataSize);
+        if (view) {
+            const uchar* pixels = static_cast<const uchar*>(view) + sizeof(Dx11CaptureShared);
+            const cv::Mat bgra(static_cast<int>(height), static_cast<int>(width),
+                               CV_8UC4, const_cast<uchar*>(pixels));
+            // cvtColor 会分配新内存，outImg 不再引用共享内存
+            cv::cvtColor(bgra, outImg, cv::COLOR_BGRA2BGR);
+            ok = !outImg.empty();
+            UnmapViewOfFile(view);
+        } else {
+            qWarning() << "映射截图共享内存失败 (错误码:" << GetLastError() << ")";
+        }
+    }
+
+    CloseHandle(mapping);
+    return ok;
+}
+
 //使用DX11截图
 bool ExecutionSteps::getOnmyojiCaptureByDllInjection(cv::Mat& winImg)
 {
@@ -224,6 +294,14 @@ bool ExecutionSteps::getOnmyojiCaptureByDllInjection(cv::Mat& winImg)
         return false;
     }
 
+    // 是否需要把截图额外持久化为 PNG 文件（开关，默认开）。
+    // 关闭时向 DLL 传入哨兵路径，DLL 只写共享内存、不落盘。
+    const bool persist = SETTING_CONFIG.getPersistScreenshot();
+    const QString capturePathArg = persist ? DX11_CAPTURE_PATH : QStringLiteral("__NO_FILE__");
+
+    // 记录截图前的共享内存序号，用于确认拿到的是本次写入的新帧。
+    const uint32_t prevSeq = readDx11SharedSequence();
+
     // 执行截图命令
     QProcess process;
     QStringList arguments;
@@ -231,7 +309,7 @@ bool ExecutionSteps::getOnmyojiCaptureByDllInjection(cv::Mat& winImg)
               << targetPid
               << DX11_HOOK_DLL_PATH
               << DX11_HOOK_DLL_NAME
-              << DX11_CAPTURE_PATH;
+              << capturePathArg;
 
     // qDebug() << "执行截图命令:" << remoteCaptureExe << arguments;
 
@@ -257,22 +335,31 @@ bool ExecutionSteps::getOnmyojiCaptureByDllInjection(cv::Mat& winImg)
 
     // qDebug() << "截图命令输出:" << output;
 
-    // 检查截图文件是否存在
-    if (!QFile::exists(DX11_CAPTURE_PATH)) {
-        Logger::log(QString("截图文件未生成:" + DX11_CAPTURE_PATH));
-        return false;
+    // 主路径：直接从共享内存读取像素数据，无需 PNG 落盘/解码中转。
+    // 若渲染线程刚出新帧但序号尚未刷新，短暂轮询等待。
+    for (int i = 0; i < 20; ++i) {
+        if (readDx11SharedSequence() != prevSeq) break;
+        QThread::msleep(2);
     }
 
-    // 使用 OpenCV 读取截图
-    winImg = cv::imread(DX11_CAPTURE_PATH.toStdString());
+    if (readDx11SharedCapture(winImg)) {
+        Logger::log(QString("截图成功(共享内存)，图像尺寸: %1 x %2  通道数: %3")
+                        .arg(winImg.cols).arg(winImg.rows).arg(winImg.channels()));
+        return true;
+    }
 
-    if (winImg.empty()) {
+    // 回退：共享内存不可用时，若开启了持久化则尝试读取 PNG 文件。
+    if (persist && QFile::exists(DX11_CAPTURE_PATH)) {
+        winImg = cv::imread(DX11_CAPTURE_PATH.toStdString());
+        if (!winImg.empty()) {
+            Logger::log(QString("截图成功(文件回退)，图像尺寸: %1 x %2  通道数: %3")
+                            .arg(winImg.cols).arg(winImg.rows).arg(winImg.channels()));
+            return true;
+        }
         qWarning() << "无法读取截图文件:" << DX11_CAPTURE_PATH;
-        return false;
     }
-    Logger::log(QString("截图成功，图像尺寸: %1 x %2  通道数: %3").arg(winImg.cols).arg(winImg.rows).arg(winImg.channels()));
 
-    ok = true;
+    Logger::log(QString("截图失败：共享内存与文件均不可用"));
     return ok;
 }
 
@@ -1838,14 +1925,17 @@ cv::Mat ExecutionSteps::getOnmyojiCapture()
         return winImg;
     }
 
-    // 保存原始的图片
-    cv::Mat captureImg = winImg.clone();
-    // 确保目录存在
-    QString saveDir = QCoreApplication::applicationDirPath() + "/src/resource/thumbnail";
-    // 保存图片（覆盖保存） debug用
-    QString saveCapturePath = saveDir + "/debug_capture_result.png";
-    cv::imwrite(saveCapturePath.toStdString(), captureImg);
-    // processAndShowImage(saveCapturePath);
+    // 持久化开关开启时才保存 debug 图片
+    if (SETTING_CONFIG.getPersistScreenshot()) {
+        // 保存原始的图片
+        cv::Mat captureImg = winImg.clone();
+        // 确保目录存在
+        QString saveDir = QCoreApplication::applicationDirPath() + "/src/resource/thumbnail";
+        // 保存图片（覆盖保存） debug用
+        QString saveCapturePath = saveDir + "/debug_capture_result.png";
+        cv::imwrite(saveCapturePath.toStdString(), captureImg);
+        // processAndShowImage(saveCapturePath);
+    }
 
     lastCaptureSize_ = winImg.size();
     return winImg;

@@ -11,6 +11,7 @@
 
 #include <QtCore/QVariant>
 #include <QtWidgets/QApplication>
+#include <QtWidgets/QCheckBox>
 #include <QtWidgets/QComboBox>
 #include <QtWidgets/QDialog>
 #include <QtWidgets/QFormLayout>
@@ -39,6 +40,8 @@ public:
     QSpinBox *mouseSpeed;
     QLabel *label_4;
     QComboBox *mouseClickMode;
+    QLabel *label_5;
+    QCheckBox *persistScreenshot;
 
     void setupUi(QDialog *SettingDialog)
     {
@@ -110,6 +113,16 @@ public:
 
         formLayout->setWidget(0, QFormLayout::ItemRole::FieldRole, mouseClickMode);
 
+        label_5 = new QLabel(formLayoutWidget);
+        label_5->setObjectName("label_5");
+
+        formLayout->setWidget(4, QFormLayout::ItemRole::LabelRole, label_5);
+
+        persistScreenshot = new QCheckBox(formLayoutWidget);
+        persistScreenshot->setObjectName("persistScreenshot");
+
+        formLayout->setWidget(4, QFormLayout::ItemRole::FieldRole, persistScreenshot);
+
 
         retranslateUi(SettingDialog);
 
@@ -125,6 +138,8 @@ public:
         label_2->setText(QCoreApplication::translate("SettingDialog", "\350\216\267\345\217\226\346\210\252\345\233\276\346\226\271\345\274\217", nullptr));
         label_3->setText(QCoreApplication::translate("SettingDialog", "\351\274\240\346\240\207\351\200\237\345\272\246", nullptr));
         label_4->setText(QCoreApplication::translate("SettingDialog", "\351\274\240\346\240\207\347\202\271\345\207\273\346\250\241\345\274\217", nullptr));
+        label_5->setText(QCoreApplication::translate("SettingDialog", "\346\214\201\344\271\205\345\214\226\346\210\252\345\233\276", nullptr));
+        persistScreenshot->setText(QCoreApplication::translate("SettingDialog", "\344\277\235\345\255\230\346\210\252\345\233\276\345\210\260\346\226\207\344\273\266", nullptr));
     } // retranslateUi
 
 };

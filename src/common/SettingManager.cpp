@@ -85,6 +85,13 @@ bool SettingManager::parseConfig() {
         qWarning() << "配置缺少 screenshotMode 字段或类型错误，使用默认值:" << m_screenshotMode;
     }
 
+    // 解析是否持久化截图
+    if (m_config.contains("persistScreenshot") && m_config["persistScreenshot"].isBool()) {
+        m_persistScreenshot = m_config["persistScreenshot"].toBool();
+    } else {
+        qWarning() << "配置缺少 persistScreenshot 字段或类型错误，使用默认值:" << m_persistScreenshot;
+    }
+
     return true;
 }
 

@@ -69,6 +69,7 @@ add_executable(qtTest WIN32
         src/widget/setting/settingdialog.h
         src/widget/setting/settingdialog.ui
         src/common/ConfigManager.h
+        src/common/Dx11CaptureShared.h
         src/utils/ClassNameCache.cpp
         src/utils/ClassNameCache.h
         src/utils/YOLODetector.cpp
