@@ -35,48 +35,83 @@ link_directories(${CMAKE_SOURCE_DIR}/src/lib)
 # 源码文件
 # ------------------------------
 add_executable(qtTest WIN32
-        main.cpp
-        src/widget/main/mainwindow.cpp
-        src/widget/main/mainwindow.h
-        src/widget/main/mainwindow.ui
-        ExecutionSteps.cpp
-        ExecutionSteps.h
-        src/common/ConfigTypeEnum.cpp
-        src/common/ConfigTypeEnum.h
-        src/common/Logger.cpp
-        src/common/Logger.h
-        src/utils/common.cpp
-        src/utils/common.h
-        src/widget/editTask/edittaskdialog.cpp
-        src/widget/editTask/edittaskdialog.h
-        src/widget/editTask/edittaskdialog.ui
-        src/widget/typeOpenCVForm/typeopencvform.cpp
-        src/widget/typeOpenCVForm/typeopencvform.h
-        src/widget/typeOpenCVForm/typeopencvform.ui
-        src/widget/waitForm/waitform.cpp
-        src/widget/waitForm/waitform.h
-        src/widget/waitForm/waitform.ui
-        src/widget/typeOpenCVForm/ScreenCaptureWidget.cpp
-        src/widget/typeOpenCVForm/ScreenCaptureWidget.h
-        src/widget/ocrForm/OcrForm.cpp
-        src/widget/ocrForm/OcrForm.h
-        src/widget/ocrForm/ui_OcrForm.h
-        src/utils/MouseSimulator.cpp
-        src/utils/MouseSimulator.h
-        src/common/SettingManager.cpp
-        src/common/SettingManager.h
-        src/widget/setting/settingdialog.cpp
-        src/widget/setting/settingdialog.h
-        src/widget/setting/settingdialog.ui
-        src/common/ConfigManager.h
-        src/common/Dx11CaptureShared.h
-        src/utils/ClassNameCache.cpp
-        src/utils/ClassNameCache.h
-        src/utils/YOLODetector.cpp
-        src/utils/YOLODetector.h
-        src/utils/DPIHelper.h
-        src/common/worker.cpp
-        src/common/worker.h
+        # 应用入口
+        src/app/main.cpp
+
+        # core: 基础设施（日志/配置/路径/事件循环工具）
+        src/core/AppPaths.h
+        src/core/ConfigTypeEnum.cpp
+        src/core/ConfigTypeEnum.h
+        src/core/EventLoopUtils.cpp
+        src/core/EventLoopUtils.h
+        src/core/Logger.cpp
+        src/core/Logger.h
+        src/core/ProfileStore.cpp
+        src/core/ProfileStore.h
+        src/core/SettingManager.cpp
+        src/core/SettingManager.h
+
+        # platform: Windows 平台能力（进程/DPI/鼠标模拟）
+        src/platform/DPIHelper.h
+        src/platform/MouseSimulator.cpp
+        src/platform/MouseSimulator.h
+        src/platform/ProcessUtils.cpp
+        src/platform/ProcessUtils.h
+
+        # game: 游戏窗口与截图
+        src/game/GameWindow.cpp
+        src/game/GameWindow.h
+        src/game/capture/CaptureService.cpp
+        src/game/capture/CaptureService.h
+        src/game/capture/Dx11CaptureShared.h
+        src/game/capture/Dx11HookCapture.cpp
+        src/game/capture/Dx11HookCapture.h
+        src/game/capture/WindowCapture.cpp
+        src/game/capture/WindowCapture.h
+
+        # vision: 图像识别（模板匹配/YOLO/OCR/几何工具）
+        src/vision/ClassNameCache.cpp
+        src/vision/ClassNameCache.h
+        src/vision/DetectionCatalog.cpp
+        src/vision/DetectionCatalog.h
+        src/vision/Geometry.cpp
+        src/vision/Geometry.h
+        src/vision/OcrEngine.cpp
+        src/vision/OcrEngine.h
+        src/vision/TemplateMatcher.cpp
+        src/vision/TemplateMatcher.h
+        src/vision/YOLODetector.cpp
+        src/vision/YOLODetector.h
+
+        # engine: 脚本动作编排与任务执行
+        src/engine/ScriptActions.cpp
+        src/engine/ScriptActions.h
+        src/engine/TaskRunner.cpp
+        src/engine/TaskRunner.h
+        src/engine/scenarios/BorderBreakthrough.cpp
+        src/engine/scenarios/BorderBreakthrough.h
+
+        # ui: 界面层
+        src/ui/main/mainwindow.cpp
+        src/ui/main/mainwindow.h
+        src/ui/main/mainwindow.ui
+        src/ui/editTask/edittaskdialog.cpp
+        src/ui/editTask/edittaskdialog.h
+        src/ui/editTask/edittaskdialog.ui
+        src/ui/typeOpenCVForm/typeopencvform.cpp
+        src/ui/typeOpenCVForm/typeopencvform.h
+        src/ui/typeOpenCVForm/typeopencvform.ui
+        src/ui/typeOpenCVForm/ScreenCaptureWidget.cpp
+        src/ui/typeOpenCVForm/ScreenCaptureWidget.h
+        src/ui/waitForm/waitform.cpp
+        src/ui/waitForm/waitform.h
+        src/ui/waitForm/waitform.ui
+        src/ui/ocrForm/OcrForm.cpp
+        src/ui/ocrForm/OcrForm.h
+        src/ui/ocrForm/ui_OcrForm.h
+        src/ui/setting/settingdialog.cpp
+        src/ui/setting/settingdialog.h
+        src/ui/setting/settingdialog.ui
 )
 
 # ------------------------------
@@ -86,7 +121,6 @@ add_definitions(-DPROJECT_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 
 include_directories(
         ${CMAKE_SOURCE_DIR}
-        ${CMAKE_SOURCE_DIR}/src/common
         ${CMAKE_SOURCE_DIR}/src/include
 )
 
