@@ -32,7 +32,10 @@ DWORD findPidByProcessName(const std::string& procName)
 
 HWND findWindowByPid(DWORD pid)
 {
-    struct Ctx { DWORD pid; HWND res = nullptr; };
+    // 一个进程常有多个可见带标题窗口（启动器、悬浮层等），旧实现取“第一个”
+    // 很容易命中尺寸极小的辅助窗口，导致后续按客户区尺寸做坐标换算时坍缩为 (0,0)。
+    // 改为在该进程的所有顶层窗口里挑客户区面积最大的那个（真正的游戏主窗口）。
+    struct Ctx { DWORD pid; HWND res = nullptr; long bestArea = 0; };
     Ctx ctx{pid};
 
     auto enumProc = [](HWND hwnd, LPARAM lparam) -> BOOL {
@@ -41,11 +44,16 @@ HWND findWindowByPid(DWORD pid)
         GetWindowThreadProcessId(hwnd, &wpid);
         if (wpid != p->pid) return TRUE;
         if (!IsWindowVisible(hwnd)) return TRUE;
-        wchar_t buf[256] = {};
-        GetWindowTextW(hwnd, buf, sizeof(buf)/sizeof(wchar_t));
-        if (wcslen(buf) == 0) return TRUE;
-        p->res = hwnd;
-        return FALSE;
+        if (GetWindow(hwnd, GW_OWNER) != nullptr) return TRUE; // 跳过归属窗口（弹窗/工具窗）
+
+        RECT rc{};
+        if (!GetClientRect(hwnd, &rc)) return TRUE;
+        const long area = static_cast<long>(rc.right) * static_cast<long>(rc.bottom);
+        if (area > p->bestArea) {
+            p->bestArea = area;
+            p->res = hwnd;
+        }
+        return TRUE;
     };
 
     EnumWindows(enumProc, (LPARAM)&ctx);
