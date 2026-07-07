@@ -144,8 +144,13 @@ target_link_libraries(qtTest
 file(COPY ${CMAKE_SOURCE_DIR}/src/injection/
         DESTINATION ${CMAKE_BINARY_DIR}/)
 
+# 注意：hook 目录下的 libdx11_hook.dll 运行时会被注入到游戏进程（LoadLibrary），
+# 只要游戏/脚本仍持有它，构建目录里的这份就被系统锁定，configure 阶段的 file(COPY)
+# 直接覆盖会报 "Permission denied" 而中断配置。这里先在批量拷贝中排除 hook 目录，
+# 再在构建阶段用 copy_if_different 单独拷贝——内容未变化时会跳过，避免覆盖被占用的文件。
 file(COPY ${CMAKE_SOURCE_DIR}/src/resource/
-        DESTINATION ${CMAKE_BINARY_DIR}/src/resource/)
+        DESTINATION ${CMAKE_BINARY_DIR}/src/resource/
+        PATTERN "hook" EXCLUDE)
 
 # ------------------------------
 # Qt 自动复制依赖 (Qt 6.5+)
@@ -185,6 +190,17 @@ if(WIN32 AND MINGW)
             "${QT_PLUGINS_DIR}/platforms/qwindows.dll"
             "$<TARGET_FILE_DIR:qtTest>/plugins/platforms/")
 endif()
+
+# ------------------------------
+# 单独拷贝注入用的 hook DLL（copy_if_different：内容一致则跳过，避免覆盖被游戏进程锁定的文件）
+# ------------------------------
+add_custom_command(TARGET qtTest POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+        "${CMAKE_BINARY_DIR}/src/resource/hook")
+add_custom_command(TARGET qtTest POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_SOURCE_DIR}/src/resource/hook/libdx11_hook.dll"
+        "${CMAKE_BINARY_DIR}/src/resource/hook/libdx11_hook.dll")
 
 # ------------------------------
 # 可选: 打印调试信息
