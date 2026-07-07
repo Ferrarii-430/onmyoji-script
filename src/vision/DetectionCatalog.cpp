@@ -209,4 +209,3 @@ bool DetectionCatalog::loadFromFile(const QString& catalogPath)
     Logger::log(QString("已加载%1个标签配置").arg(labelIndex_.size()));
     return true;
 }
-*** End of File***
