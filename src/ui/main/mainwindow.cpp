@@ -41,6 +41,7 @@ mainwindow::mainwindow(QWidget *parent) :
     ui->tableWidget->verticalHeader()->setVisible(false);
     ui->openCVIdentifyLabel->setStyleSheet(
         "border: 1px dashed #c0c4d0; border-radius: 6px; background-color: #ffffff;");
+    ui->settingButton->raise(); // 确保不被同层其他控件盖住
 
     // 把 Logger 输出重定向到界面日志框
     Logger::setSink([this](const QString& msg) { appendLogToUI(msg); });

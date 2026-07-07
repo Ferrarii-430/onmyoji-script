@@ -175,10 +175,10 @@
   <widget class="QPushButton" name="programmeAddBtn">
    <property name="geometry">
     <rect>
-     <x>52</x>
-     <y>10</y>
-     <width>80</width>
-     <height>28</height>
+     <x>50</x>
+     <y>8</y>
+     <width>86</width>
+     <height>30</height>
     </rect>
    </property>
    <property name="text">
@@ -188,10 +188,10 @@
   <widget class="QPushButton" name="programmeRemoveBtn">
    <property name="geometry">
     <rect>
-     <x>140</x>
-     <y>10</y>
-     <width>80</width>
-     <height>28</height>
+     <x>142</x>
+     <y>8</y>
+     <width>86</width>
+     <height>30</height>
     </rect>
    </property>
    <property name="text">
@@ -254,14 +254,17 @@
   <widget class="QToolButton" name="settingButton">
    <property name="geometry">
     <rect>
-     <x>455</x>
-     <y>10</y>
-     <width>75</width>
-     <height>28</height>
+     <x>450</x>
+     <y>8</y>
+     <width>80</width>
+     <height>30</height>
     </rect>
    </property>
    <property name="text">
     <string>⚙ 设置</string>
+   </property>
+   <property name="toolButtonStyle">
+    <enum>Qt::ToolButtonStyle::ToolButtonTextOnly</enum>
    </property>
   </widget>
   <widget class="QLabel" name="systemConfigTips">
