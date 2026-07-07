@@ -85,7 +85,7 @@ void executeBorderBreakthrough()
 
         Logger::log(QString("开始点击进攻"));
         //点击攻击
-        if (actions.clickDetectionByLabel("common-btn-yellow_confirm",0.55,0.0,0.0))
+        if (actions.ocrRecognizesAndClick("进攻",0.55,true) != nullptr)
         {
             Logger::log(QString("准备退出战斗"));
             waitWithEventProcessing(5000);
@@ -123,7 +123,7 @@ void executeBorderBreakthrough()
 
         //点击攻击
         Logger::log(QString("开始点击进攻"));
-        if (actions.clickDetectionByLabel("common-btn-yellow_confirm",0.50,0.0,0.0))
+        if (actions.ocrRecognizesAndClick("进攻",0.55,true) != nullptr)
         {
             // 循环等待直到找到战斗结束框，最多等待1分钟
             const int MAX_ATTEMPTS = 6;  // 6次 * 10秒 = 1分钟
