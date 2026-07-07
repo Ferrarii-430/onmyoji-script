@@ -25,9 +25,33 @@ void ScreenCaptureWidget::paintEvent(QPaintEvent *)
     painter.drawPixmap(0, 0, fullPixmap);
 
     if (selecting) {
+        const QRect rect = QRect(startPoint, currentPoint).normalized();
         painter.setPen(QPen(Qt::red, 2));
         painter.setBrush(QColor(255, 0, 0, 50));
-        painter.drawRect(QRect(startPoint, currentPoint).normalized());
+        painter.drawRect(rect);
+
+        // 绘制时实时显示选区位置与尺寸（物理像素，与最终生成图片一致）
+        const qreal dpr = fullPixmap.devicePixelRatio();
+        const QRect phys(QPoint(qRound(rect.left() * dpr), qRound(rect.top() * dpr)),
+                         QSize(qRound(rect.width() * dpr), qRound(rect.height() * dpr)));
+        const QString info = QString("(%1, %2)  %3 x %4")
+                                 .arg(phys.x()).arg(phys.y())
+                                 .arg(phys.width()).arg(phys.height());
+
+        const QFontMetrics fm = painter.fontMetrics();
+        QRect textRect = fm.boundingRect(info).adjusted(-6, -3, 6, 3);
+        // 默认显示在选区左上角上方，靠近屏幕顶部时改到选区内部下方
+        QPoint textPos(rect.left(), rect.top() - textRect.height() - 4);
+        if (textPos.y() < 0) textPos.setY(rect.top() + 4);
+        if (textPos.x() + textRect.width() > width()) textPos.setX(width() - textRect.width());
+        if (textPos.x() < 0) textPos.setX(0);
+        textRect.moveTopLeft(textPos);
+
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(QColor(0, 0, 0, 160));
+        painter.drawRect(textRect);
+        painter.setPen(Qt::white);
+        painter.drawText(textRect, Qt::AlignCenter, info);
     }
 }
 
@@ -37,9 +61,6 @@ void ScreenCaptureWidget::mousePressEvent(QMouseEvent *event)
         selecting = true;
         startPoint = event->pos();
         currentPoint = startPoint;
-
-        // 最小化窗口避免遮挡
-        showMinimized();
         update();
     }
 }
@@ -67,8 +88,9 @@ void ScreenCaptureWidget::mouseReleaseEvent(QMouseEvent *event)
         qreal devicePixelRatio = fullPixmap.devicePixelRatio();
 
         // 坐标转换：逻辑坐标 → 物理坐标
+        currentPoint = event->pos();
         QPoint physicalStart = startPoint * devicePixelRatio;
-        QPoint physicalEnd = event->pos() * devicePixelRatio;
+        QPoint physicalEnd = currentPoint * devicePixelRatio;
 
         QRect selectedRect(physicalStart, physicalEnd);
         selectedRect = selectedRect.normalized();
