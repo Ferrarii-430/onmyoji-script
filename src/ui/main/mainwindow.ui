@@ -14,7 +14,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>onmyoji-script v1.3</string>
+   <string>onmyoji-script v1.5</string>
   </property>
   <widget class="QLabel" name="label">
    <property name="geometry">
@@ -175,27 +175,27 @@
   <widget class="QPushButton" name="programmeAddBtn">
    <property name="geometry">
     <rect>
-     <x>50</x>
+     <x>90</x>
      <y>8</y>
-     <width>86</width>
+     <width>61</width>
      <height>30</height>
     </rect>
    </property>
    <property name="text">
-    <string>添加方案</string>
+    <string>添加</string>
    </property>
   </widget>
   <widget class="QPushButton" name="programmeRemoveBtn">
    <property name="geometry">
     <rect>
-     <x>142</x>
+     <x>160</x>
      <y>8</y>
-     <width>86</width>
+     <width>61</width>
      <height>30</height>
     </rect>
    </property>
    <property name="text">
-    <string>删除方案</string>
+    <string>删除</string>
    </property>
   </widget>
   <widget class="QLabel" name="openCVIdentifyLabel">

@@ -35,7 +35,7 @@ public:
         EditTaskDialog->resize(479, 496);
         label = new QLabel(EditTaskDialog);
         label->setObjectName("label");
-        label->setGeometry(QRect(80, 30, 48, 16));
+        label->setGeometry(QRect(80, 30, 61, 16));
         comboBox = new QComboBox(EditTaskDialog);
         comboBox->setObjectName("comboBox");
         comboBox->setGeometry(QRect(165, 30, 211, 23));

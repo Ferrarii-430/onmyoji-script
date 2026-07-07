@@ -59,9 +59,9 @@ EditTaskDialog::EditTaskDialog(EditMode mode, const QJsonObject &stepData, const
     yoloForm = new YoloForm(this);
 
     ui->stackedWidget->addWidget(typeForm);  // index 0
-    ui->stackedWidget->addWidget(waitForm);  // index 1
-    ui->stackedWidget->addWidget(ocrForm);  // index 2
-    ui->stackedWidget->addWidget(yoloForm); // index 3
+    ui->stackedWidget->addWidget(ocrForm);  // index 1
+    ui->stackedWidget->addWidget(yoloForm);  // index 2
+    ui->stackedWidget->addWidget(waitForm); // index 3
 
     connect(ui->comboBox, &QComboBox::currentIndexChanged, this, [this, testButton](int index){
         ui->stackedWidget->setCurrentIndex(index);
@@ -75,13 +75,13 @@ EditTaskDialog::EditTaskDialog(EditMode mode, const QJsonObject &stepData, const
         if (type == "OPENCV") {
             ui->comboBox->setCurrentIndex(0);
             typeForm->loadFromJson(configId,stepData);
-        } else if (type == "WAIT") {
+        } else if (type == "OCR") {
             ui->comboBox->setCurrentIndex(1);
             waitForm->loadFromJson(configId,stepData);
-        } else if (type == "OCR") {
+        } else if (type == "YOLO") {
             ui->comboBox->setCurrentIndex(2);
             ocrForm->loadFromJson(configId,stepData);
-        } else if (type == "YOLO") {
+        } else if (type == "WAIT") {
             ui->comboBox->setCurrentIndex(3);
             yoloForm->loadFromJson(configId,stepData);
         }
@@ -109,11 +109,11 @@ QJsonObject EditTaskDialog::collectData() const {
     if (index == 0) {
         return typeForm->toJson();
     } else if (index == 1) {
-        return waitForm->toJson();
-    } else if (index == 2) {
         return ocrForm->toJson();
-    } else if (index == 3) {
+    } else if (index == 2) {
         return yoloForm->toJson();
+    } else if (index == 3) {
+        return waitForm->toJson();
     }
     return QJsonObject();
 }
@@ -181,8 +181,6 @@ void EditTaskDialog::onTestButtonClick()
         }
         emit imagePathRequested(savePath); // 发射信号
     } else if (index == 1) {
-        //等待不用管
-    } else if (index == 2) {
         //OCR
         QJsonObject json = ocrForm->toJson();
         QString ocrText = json["ocrText"].toString();
@@ -195,7 +193,7 @@ void EditTaskDialog::onTestButtonClick()
             return;
         }
         emit imagePathRequested(savePath); // 发射信号
-    } else if (index == 3) {
+    } else if (index == 2) {
         //YOLO
         QJsonObject json = yoloForm->toJson();
         QString yoloLabel = json["yoloLabel"].toString();
@@ -208,6 +206,8 @@ void EditTaskDialog::onTestButtonClick()
             return;
         }
         emit imagePathRequested(savePath); // 发射信号
+    } else if (index == 3) {
+        //等待不用管
     }
 }
 
