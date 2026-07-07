@@ -47,48 +47,46 @@ EditTaskDialog::EditTaskDialog(EditMode mode, const QJsonObject &stepData, const
     styleDialogButton(ui->buttonBox->button(QDialogButtonBox::Cancel),
                       "#64748b", "#7586a0", "#55637d");
 
-    ui->comboBox->addItem("OpenCV识图");
-    ui->comboBox->addItem("OCR识别");
-    ui->comboBox->addItem("YOLO识别");
-    ui->comboBox->addItem("等待");
-
-    // 构造函数里
     typeForm = new TypeOpenCVForm(this);
     waitForm = new WaitForm(this);
     ocrForm = new OcrForm(this);
     yoloForm = new YoloForm(this);
 
-    ui->stackedWidget->addWidget(typeForm);  // index 0
-    ui->stackedWidget->addWidget(ocrForm);  // index 1
-    ui->stackedWidget->addWidget(yoloForm);  // index 2
-    ui->stackedWidget->addWidget(waitForm); // index 3
+    // 下拉项、步骤类型、表单页在此处一一对应；调整顺序只改这里即可，
+    // 其余逻辑均按类型字符串（itemData）分发，不依赖下拉项下标
+    const QList<QPair<QString, QString>> pages = {
+        {"OpenCV识图", "OPENCV"},
+        {"OCR识别", "OCR"},
+        {"YOLO识别", "YOLO"},
+        {"等待", "WAIT"},
+    };
+    for (const auto& page : pages) {
+        ui->comboBox->addItem(page.first, page.second);
+        ui->stackedWidget->addWidget(formForType(page.second));
+    }
 
     connect(ui->comboBox, &QComboBox::currentIndexChanged, this, [this, testButton](int index){
         ui->stackedWidget->setCurrentIndex(index);
         // 只有“等待”没有可测试的识别动作
-        testButton->setDisabled(index == 1);
+        testButton->setDisabled(ui->comboBox->itemData(index).toString() == "WAIT");
     });
 
     // 初始化数据
+    QString initType = pages.first().second;
     if (mode == EditMode::Edit && !stepData.isEmpty()) {
-        QString type = stepData["type"].toString();
-        if (type == "OPENCV") {
-            ui->comboBox->setCurrentIndex(0);
-            typeForm->loadFromJson(configId,stepData);
-        } else if (type == "OCR") {
-            ui->comboBox->setCurrentIndex(1);
-            waitForm->loadFromJson(configId,stepData);
-        } else if (type == "YOLO") {
-            ui->comboBox->setCurrentIndex(2);
-            ocrForm->loadFromJson(configId,stepData);
-        } else if (type == "WAIT") {
-            ui->comboBox->setCurrentIndex(3);
-            yoloForm->loadFromJson(configId,stepData);
+        const QString type = stepData["type"].toString();
+        if (ui->comboBox->findData(type) >= 0) {
+            initType = type;
+            if (type == "OPENCV") typeForm->loadFromJson(configId, stepData);
+            else if (type == "OCR") ocrForm->loadFromJson(configId, stepData);
+            else if (type == "YOLO") yoloForm->loadFromJson(configId, stepData);
+            else if (type == "WAIT") waitForm->loadFromJson(configId, stepData);
         }
-    } else {
-        // 默认新增时显示第一个
-        ui->comboBox->setCurrentIndex(0);
     }
+    const int initIndex = ui->comboBox->findData(initType);
+    ui->comboBox->setCurrentIndex(initIndex);
+    ui->stackedWidget->setCurrentIndex(initIndex);
+    testButton->setDisabled(initType == "WAIT");
 
     // 保存按钮
     connect(ui->buttonBox, &QDialogButtonBox::accepted, this, [this]() {
@@ -105,17 +103,24 @@ EditTaskDialog::EditTaskDialog(EditMode mode, const QJsonObject &stepData, const
 }
 
 QJsonObject EditTaskDialog::collectData() const {
-    int index = ui->stackedWidget->currentIndex();
-    if (index == 0) {
-        return typeForm->toJson();
-    } else if (index == 1) {
-        return ocrForm->toJson();
-    } else if (index == 2) {
-        return yoloForm->toJson();
-    } else if (index == 3) {
-        return waitForm->toJson();
-    }
+    const QString type = currentType();
+    if (type == "OPENCV") return typeForm->toJson();
+    if (type == "OCR") return ocrForm->toJson();
+    if (type == "YOLO") return yoloForm->toJson();
+    if (type == "WAIT") return waitForm->toJson();
     return QJsonObject();
+}
+
+QString EditTaskDialog::currentType() const {
+    return ui->comboBox->currentData().toString();
+}
+
+QWidget* EditTaskDialog::formForType(const QString& type) const {
+    if (type == "OPENCV") return typeForm;
+    if (type == "OCR") return ocrForm;
+    if (type == "YOLO") return yoloForm;
+    if (type == "WAIT") return waitForm;
+    return nullptr;
 }
 
 QJsonObject EditTaskDialog::resultData() const {
@@ -159,9 +164,8 @@ void EditTaskDialog::onTestButtonClick()
         return;
     }
 
-    int index = ui->stackedWidget->currentIndex();
-    if (index == 0) {
-        //OpenCV
+    const QString type = currentType();
+    if (type == "OPENCV") {
         QString savePath;
         QJsonObject json = typeForm->toJson();
         QString imagePath = json["image"].toString(); //此时还是image 保存到config文件后是imagePath
@@ -180,8 +184,7 @@ void EditTaskDialog::onTestButtonClick()
             return;
         }
         emit imagePathRequested(savePath); // 发射信号
-    } else if (index == 1) {
-        //OCR
+    } else if (type == "OCR") {
         QJsonObject json = ocrForm->toJson();
         QString ocrText = json["ocrText"].toString();
         const double score = json["score"].toDouble();
@@ -193,8 +196,7 @@ void EditTaskDialog::onTestButtonClick()
             return;
         }
         emit imagePathRequested(savePath); // 发射信号
-    } else if (index == 2) {
-        //YOLO
+    } else if (type == "YOLO") {
         QJsonObject json = yoloForm->toJson();
         QString yoloLabel = json["yoloLabel"].toString();
         const double score = json["score"].toDouble();
@@ -206,9 +208,8 @@ void EditTaskDialog::onTestButtonClick()
             return;
         }
         emit imagePathRequested(savePath); // 发射信号
-    } else if (index == 3) {
-        //等待不用管
     }
+    // 等待（WAIT）无可测试动作
 }
 
 bool EditTaskDialog::validateWaitFormData(const QJsonObject &data)
