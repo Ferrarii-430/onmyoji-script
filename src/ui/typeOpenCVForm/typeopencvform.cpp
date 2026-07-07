@@ -148,8 +148,10 @@ QJsonObject TypeOpenCVForm::toJson() const {
         obj["jumpStepsId"] = QJsonValue::Null;
     }
 
-    // 如果 label 里有图像
-    QPixmap pix = ui->labelPreview->pixmap();
+    // 保存原始截图而非预览控件里的 pixmap：预览图为适配 label 尺寸而被
+    // 缩放并用透明背景补边，用它做模板会与实际框选区域不一致。
+    QPixmap pix = originalPixmap_;
+    if (pix.isNull()) pix = ui->labelPreview->pixmap();
     if (!pix.isNull()) {
         QByteArray bytes;
         QBuffer buffer(&bytes);
