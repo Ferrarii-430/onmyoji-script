@@ -43,6 +43,9 @@ void accept();
 void setCurrentIndex();
 
 private:
+    QString currentType() const;
+    QWidget* formForType(const QString& type) const;
+
     TypeOpenCVForm* typeForm;
     WaitForm* waitForm;
     OcrForm* ocrForm;
