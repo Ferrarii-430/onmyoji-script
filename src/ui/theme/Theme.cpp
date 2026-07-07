@@ -2,6 +2,7 @@
 
 #include <QApplication>
 #include <QFont>
+#include <QPalette>
 #include <QStyleFactory>
 
 namespace theme {
@@ -13,7 +14,7 @@ const char* kStyleSheet = R"QSS(
 QWidget {
     background-color: #f4f5f7;
     color: #2b2d33;
-    font-size: 12px;
+    font-size: 13px;
 }
 QDialog, QMessageBox {
     background-color: #f4f5f7;
@@ -35,7 +36,7 @@ QPushButton, QToolButton {
     color: #ffffff;
     border: none;
     border-radius: 5px;
-    padding: 4px 12px;
+    padding: 3px 8px;
     min-height: 20px;
 }
 QPushButton:hover, QToolButton:hover {
@@ -63,10 +64,11 @@ QToolButton#stopTaskButton {
 QToolButton#stopTaskButton:hover { background-color: #f0564a; }
 QToolButton#stopTaskButton:pressed { background-color: #c93a2e; }
 QToolButton#settingButton {
-    background: transparent;
-    padding: 2px;
+    background-color: #64748b;
+    font-weight: bold;
 }
-QToolButton#settingButton:hover { background-color: #e3e5ec; }
+QToolButton#settingButton:hover { background-color: #7586a0; }
+QToolButton#settingButton:pressed { background-color: #55637d; }
 
 /* ---------- 输入控件 ---------- */
 QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox, QTextEdit {
@@ -87,6 +89,19 @@ QLineEdit:disabled, QSpinBox:disabled, QDoubleSpinBox:disabled, QComboBox:disabl
 QComboBox::drop-down {
     border: none;
     width: 20px;
+}
+/* SpinBox 上下箭头按钮：给浅灰底，箭头由 Fusion 按调色板 ButtonText 绘制 */
+QSpinBox::up-button, QSpinBox::down-button,
+QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {
+    background-color: #e6e8ef;
+    border: none;
+    width: 18px;
+    border-radius: 2px;
+    margin: 1px;
+}
+QSpinBox::up-button:hover, QSpinBox::down-button:hover,
+QDoubleSpinBox::up-button:hover, QDoubleSpinBox::down-button:hover {
+    background-color: #d4d7e0;
 }
 QComboBox QAbstractItemView {
     background-color: #ffffff;
@@ -200,8 +215,25 @@ void apply(QApplication& app)
     // Fusion 在各 Windows 版本上渲染一致，QSS 覆盖更可控
     app.setStyle(QStyleFactory::create("Fusion"));
 
+    // 锁定浅色调色板：系统深色模式下 Fusion 会用白色 ButtonText 画
+    // SpinBox/下拉箭头，落在白底控件上就“消失”了
+    QPalette palette;
+    palette.setColor(QPalette::Window, QColor(0xf4, 0xf5, 0xf7));
+    palette.setColor(QPalette::WindowText, QColor(0x2b, 0x2d, 0x33));
+    palette.setColor(QPalette::Base, Qt::white);
+    palette.setColor(QPalette::AlternateBase, QColor(0xf7, 0xf8, 0xfb));
+    palette.setColor(QPalette::Text, QColor(0x2b, 0x2d, 0x33));
+    palette.setColor(QPalette::Button, QColor(0xe6, 0xe8, 0xef));
+    palette.setColor(QPalette::ButtonText, QColor(0x2b, 0x2d, 0x33));
+    palette.setColor(QPalette::Highlight, QColor(0x5b, 0x6c, 0xf0));
+    palette.setColor(QPalette::HighlightedText, Qt::white);
+    palette.setColor(QPalette::ToolTipBase, QColor(0x2b, 0x2d, 0x33));
+    palette.setColor(QPalette::ToolTipText, Qt::white);
+    palette.setColor(QPalette::PlaceholderText, QColor(0x9a, 0x9d, 0xaa));
+    app.setPalette(palette);
+
     QFont font("Microsoft YaHei UI");
-    font.setPointSize(9);
+    font.setPointSize(10);
     app.setFont(font);
 
     app.setStyleSheet(kStyleSheet);
