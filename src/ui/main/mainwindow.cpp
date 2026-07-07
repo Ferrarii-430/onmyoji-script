@@ -9,6 +9,7 @@
 #include <opencv2/opencv.hpp>
 #include "ui_mainwindow.h"
 #include <QFile>
+#include <QHBoxLayout>
 #include <QHeaderView>
 #include <QJsonArray>
 #include <QTimer>
@@ -222,6 +223,15 @@ void mainwindow::showStepsInTable(const QJsonArray &steps) {
     QStringList headers = {"序号", "任务名称", "类型", "操作",""};
     ui->tableWidget->setHorizontalHeaderLabels(headers);
 
+    // 单元格按钮外包一层容器留出边距，避免按钮铺满整格粘在一起
+    auto wrapCellWidget = [](QWidget* inner) {
+        auto* container = new QWidget();
+        auto* layout = new QHBoxLayout(container);
+        layout->setContentsMargins(8, 4, 8, 4);
+        layout->addWidget(inner);
+        return container;
+    };
+
     for (int i = 0; i < steps.size(); ++i) {
         QJsonObject step = steps[i].toObject();
 
@@ -238,7 +248,7 @@ void mainwindow::showStepsInTable(const QJsonArray &steps) {
 
         // 编辑按钮
         QPushButton *editBtn = new QPushButton("编辑");
-        ui->tableWidget->setCellWidget(i, 3, editBtn);
+        ui->tableWidget->setCellWidget(i, 3, wrapCellWidget(editBtn));
         connect(editBtn, &QPushButton::clicked, this, [this, step]() {
             // 弹窗修改，或进入编辑模式
             EditTaskDialog* dlg = new EditTaskDialog(EditMode::Edit,step,currentItem.id,nullptr);
@@ -260,7 +270,7 @@ void mainwindow::showStepsInTable(const QJsonArray &steps) {
 
         // 删除按钮
         QPushButton *delBtn = new QPushButton("删除");
-        ui->tableWidget->setCellWidget(i, 4, delBtn);
+        ui->tableWidget->setCellWidget(i, 4, wrapCellWidget(delBtn));
         connect(delBtn, &QPushButton::clicked, this, [this, step]() {
             // 添加确认弹窗
             QMessageBox::StandardButton reply;
