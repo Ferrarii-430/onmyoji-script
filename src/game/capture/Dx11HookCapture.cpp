@@ -207,6 +207,16 @@ bool captureByDllInjection(const QString& targetPid, cv::Mat& winImg)
         return true;
     }
 
+    // 注入器报告截图成功(退出码 0)，但共享内存始终打不开——这几乎必然是注入的
+    // libdx11_hook.dll 是不含共享内存写入功能的旧版本(共享内存于 dx11-hook 的
+    // “增加共享内存直传截图数据”提交后才引入)。旧 DLL 只写 PNG，因此下方 PNG
+    // 回退仍能成功，但共享内存直传永远不可用。此时应重新编译并替换 hook DLL。
+    if (exitCode == 0) {
+        qWarning() << "注入器报告截图成功但共享内存不存在：注入的 libdx11_hook.dll "
+                      "很可能是不支持共享内存的旧版本，请用当前 onmyoji-dx11-hook "
+                      "源码重新编译并替换" << DX11_HOOK_DLL_PATH;
+    }
+
     // 回退：共享内存不可用时，若开启了持久化则尝试读取 PNG 文件。
     if (persist && QFile::exists(DX11_CAPTURE_PATH)) {
         winImg = cv::imread(DX11_CAPTURE_PATH.toStdString());
