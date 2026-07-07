@@ -31,6 +31,7 @@ bool DetectionCatalog::reload(const QString& catalogPath)
 {
     initialized_ = false;
     labelIndex_.clear();
+    orderedLabels_.clear();
     groupToLabels_.clear();
     sceneToLabels_.clear();
     return initialize(catalogPath.isEmpty() ? sourcePath_ : catalogPath);
@@ -53,6 +54,14 @@ bool DetectionCatalog::tryGetLabelInfo(const QString& className, LabelInfo& outI
     }
     outInfo = it.value();
     return true;
+}
+
+QList<LabelInfo> DetectionCatalog::allLabels()
+{
+    if (!ensureInitialized()) {
+        return {};
+    }
+    return orderedLabels_;
 }
 
 QStringList DetectionCatalog::labelsForGroup(const QString& groupName)
@@ -154,6 +163,7 @@ bool DetectionCatalog::loadFromFile(const QString& catalogPath)
     }
 
     labelIndex_.clear();
+    orderedLabels_.clear();
     groupToLabels_.clear();
     sceneToLabels_.clear();
 
@@ -187,6 +197,7 @@ bool DetectionCatalog::loadFromFile(const QString& catalogPath)
 
             const QString normalizedLabel = normalizedKey(className);
             labelIndex_.insert(normalizedLabel, info);
+            orderedLabels_.append(info);
             groupToLabels_.insert(normalizedGroup, className);
             for (const auto& scene : info.scenes) {
                 sceneToLabels_.insert(normalizedKey(scene), className);
