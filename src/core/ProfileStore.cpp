@@ -130,6 +130,7 @@ void addConfigToJsonFile(const QString &filePath, const QString &configId, const
             newObj["offsetTime"] = safeValue(json, "offsetTime");
             newObj["jumpStepsId"] = safeValue(json, "jumpStepsId");
             newObj["identifyErrorHandle"] = safeValue(json, "identifyErrorHandle");
+            newObj["yoloLabel"]  = safeValue(json, "yoloLabel");
 
             //获取原来的 steps 数组并修改
             QJsonArray stepsArray = obj.value("steps").toArray();
@@ -200,6 +201,7 @@ void updateConfigInJsonFile(const QString &filePath, const QString &configId, co
                     updatedStep["offsetTime"] = safeValue(json, "offsetTime");
                     updatedStep["jumpStepsId"] = safeValue(json, "jumpStepsId");
                     updatedStep["identifyErrorHandle"] = safeValue(json, "identifyErrorHandle");
+                    updatedStep["yoloLabel"]  = safeValue(json, "yoloLabel");
 
                     // 替换原来的步骤对象
                     stepsArray[j] = updatedStep;
