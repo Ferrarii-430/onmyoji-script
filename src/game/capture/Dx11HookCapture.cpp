@@ -87,10 +87,14 @@ bool readDx11SharedCapture(cv::Mat& outImg)
                                    sizeof(Dx11CaptureShared) + dataSize);
         if (view) {
             const uchar* pixels = static_cast<const uchar*>(view) + sizeof(Dx11CaptureShared);
-            const cv::Mat bgra(static_cast<int>(height), static_cast<int>(width),
+            // DLL 把后备缓冲区的原始字节直接写入共享内存，不做通道交换。
+            // onmyoji 的后备缓冲区格式为 DXGI_FORMAT_R8G8B8A8_UNORM（日志中“格式=28”），
+            // 内存字节序为 R,G,B,A —— 因此必须按 RGBA 解析。此前误用 BGRA2BGR 会把
+            // R/B 通道对调，导致读到的图像红蓝颠倒（与 DLL 侧 PNG 落盘表现一致）。
+            const cv::Mat rgba(static_cast<int>(height), static_cast<int>(width),
                                CV_8UC4, const_cast<uchar*>(pixels));
             // cvtColor 会分配新内存，outImg 不再引用共享内存
-            cv::cvtColor(bgra, outImg, cv::COLOR_BGRA2BGR);
+            cv::cvtColor(rgba, outImg, cv::COLOR_RGBA2BGR);
             ok = !outImg.empty();
             UnmapViewOfFile(view);
         } else {

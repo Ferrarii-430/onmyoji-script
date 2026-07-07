@@ -23,9 +23,11 @@ struct Dx11CaptureShared {
     uint32_t status;    // 0 = 成功，非 0 = 无有效数据
     uint32_t width;
     uint32_t height;
-    uint32_t channels;  // 固定为 4 (BGRA)
+    uint32_t channels;  // 固定为 4
     uint32_t dataSize;  // = width * height * 4
-    // 紧随其后是像素数据（BGRA, top-down, 每行 width*4 字节，无 padding）
+    // 紧随其后是后备缓冲区的原始像素（DLL 不做通道交换），top-down、每行
+    // width*4 字节、无 padding。字节序即后备缓冲区格式：onmyoji 为
+    // DXGI_FORMAT_R8G8B8A8_UNORM，故实际为 R,G,B,A，读取端需按 RGBA 处理。
 };
 #pragma pack(pop)
 
