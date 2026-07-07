@@ -35,7 +35,14 @@ HWND findWindowByPid(DWORD pid)
     // 一个进程常有多个可见带标题窗口（启动器、悬浮层等），旧实现取“第一个”
     // 很容易命中尺寸极小的辅助窗口，导致后续按客户区尺寸做坐标换算时坍缩为 (0,0)。
     // 改为在该进程的所有顶层窗口里挑客户区面积最大的那个（真正的游戏主窗口）。
-    struct Ctx { DWORD pid; HWND res = nullptr; long bestArea = 0; };
+    // 优先：无 owner 的最大窗口；回退：任意可见窗口里最大的，保证总能找到
+    struct Ctx {
+        DWORD pid;
+        HWND best = nullptr;      // 无 owner 窗口中客户区最大者
+        long bestArea = 0;
+        HWND fallback = nullptr;  // 所有可见窗口中客户区最大者
+        long fallbackArea = -1;
+    };
     Ctx ctx{pid};
 
     auto enumProc = [](HWND hwnd, LPARAM lparam) -> BOOL {
@@ -44,20 +51,24 @@ HWND findWindowByPid(DWORD pid)
         GetWindowThreadProcessId(hwnd, &wpid);
         if (wpid != p->pid) return TRUE;
         if (!IsWindowVisible(hwnd)) return TRUE;
-        if (GetWindow(hwnd, GW_OWNER) != nullptr) return TRUE; // 跳过归属窗口（弹窗/工具窗）
 
         RECT rc{};
-        if (!GetClientRect(hwnd, &rc)) return TRUE;
+        GetClientRect(hwnd, &rc);
         const long area = static_cast<long>(rc.right) * static_cast<long>(rc.bottom);
-        if (area > p->bestArea) {
+
+        if (area > p->fallbackArea) {
+            p->fallbackArea = area;
+            p->fallback = hwnd;
+        }
+        if (GetWindow(hwnd, GW_OWNER) == nullptr && area > p->bestArea) {
             p->bestArea = area;
-            p->res = hwnd;
+            p->best = hwnd;
         }
         return TRUE;
     };
 
     EnumWindows(enumProc, (LPARAM)&ctx);
-    return ctx.res;
+    return ctx.best ? ctx.best : ctx.fallback;
 }
 
 bool enableDebugPrivilege()
