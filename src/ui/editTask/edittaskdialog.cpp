@@ -27,6 +27,26 @@ EditTaskDialog::EditTaskDialog(EditMode mode, const QJsonObject &stepData, const
 
     QPushButton* testButton = ui->buttonBox->addButton(tr("测试"), QDialogButtonBox::ActionRole);
 
+    // 直接对按钮设样式，避免 QDialogButtonBox 内部角色/焦点差异导致
+    // 圆角、尺寸不一致；三个按钮分别配色：保存绿 / 测试橙 / 取消灰
+    auto styleDialogButton = [](QPushButton* btn, const QString& bg,
+                                const QString& hover, const QString& pressed) {
+        btn->setFixedSize(88, 32);
+        btn->setCursor(Qt::PointingHandCursor);
+        btn->setStyleSheet(QString(
+            "QPushButton { background-color: %1; color: #ffffff; border: none;"
+            " border-radius: 5px; padding: 0; font-weight: bold; }"
+            "QPushButton:hover { background-color: %2; }"
+            "QPushButton:pressed { background-color: %3; }")
+            .arg(bg, hover, pressed));
+    };
+    styleDialogButton(ui->buttonBox->button(QDialogButtonBox::Ok),
+                      "#34a853", "#3fbb60", "#2c8f46");
+    styleDialogButton(testButton,
+                      "#f59e0b", "#fbad2e", "#d9880a");
+    styleDialogButton(ui->buttonBox->button(QDialogButtonBox::Cancel),
+                      "#64748b", "#7586a0", "#55637d");
+
     ui->comboBox->addItem("OpenCV识图");
     ui->comboBox->addItem("OCR识别");
     ui->comboBox->addItem("YOLO识别");
