@@ -250,6 +250,8 @@ QString ScriptActions::yoloRecognizesAndClick(const double threshold, const bool
     // 在图像上绘制检测结果
     for (const auto& det : final_detections) {
         QString labelName = ClassNameCache::getClassName(det.class_id);
+        // Logger::log(labelName);
+        // qDebug() << det.confidence << ", id:" << det.class_id;
         cv::rectangle(captureImg, det.bbox, cv::Scalar(0, 255, 0), 2);
         std::string label = labelName.toStdString();
         cv::putText(captureImg, label, cv::Point(det.bbox.x, det.bbox.y - 10),

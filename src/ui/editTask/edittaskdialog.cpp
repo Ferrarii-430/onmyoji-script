@@ -28,9 +28,9 @@ EditTaskDialog::EditTaskDialog(EditMode mode, const QJsonObject &stepData, const
     QPushButton* testButton = ui->buttonBox->addButton(tr("测试"), QDialogButtonBox::ActionRole);
 
     ui->comboBox->addItem("OpenCV识图");
-    ui->comboBox->addItem("等待");
     ui->comboBox->addItem("OCR识别");
     ui->comboBox->addItem("YOLO识别");
+    ui->comboBox->addItem("等待");
 
     // 构造函数里
     typeForm = new TypeOpenCVForm(this);
