@@ -9,6 +9,7 @@
 #include <opencv2/opencv.hpp>
 #include "ui_mainwindow.h"
 #include <QFile>
+#include <QHeaderView>
 #include <QJsonArray>
 #include <QTimer>
 #include <QDebug>
@@ -30,6 +31,15 @@
 mainwindow::mainwindow(QWidget *parent) :
     QWidget(parent), ui(new Ui::mainwindow) {
     ui->setupUi(this);
+
+    // 配合全局 QSS 的 alternate-background-color 显示斑马纹
+    ui->listWidget->setAlternatingRowColors(true);
+    ui->tableWidget->setAlternatingRowColors(true);
+    ui->tableWidget->setSelectionBehavior(QAbstractItemView::SelectRows);
+    ui->tableWidget->setShowGrid(false);
+    ui->tableWidget->verticalHeader()->setVisible(false);
+    ui->openCVIdentifyLabel->setStyleSheet(
+        "border: 1px dashed #c0c4d0; border-radius: 6px; background-color: #ffffff;");
 
     // 把 Logger 输出重定向到界面日志框
     Logger::setSink([this](const QString& msg) { appendLogToUI(msg); });

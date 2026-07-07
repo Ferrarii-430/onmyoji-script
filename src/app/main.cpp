@@ -4,6 +4,7 @@
 #include <opencv2/core/utils/logger.hpp>
 
 #include "src/ui/main/mainwindow.h"
+#include "src/ui/theme/Theme.h"
 
 // 重定向所有 qDebug/qWarning 到标准输出
 static void myMessageHandler(QtMsgType type, const QMessageLogContext &context, const QString &msg) {
@@ -35,6 +36,7 @@ int main(int argc, char* argv[])
     qInstallMessageHandler(myMessageHandler);
 
     QApplication a(argc, argv);
+    theme::apply(a);
     mainwindow w;
     w.show();
 
