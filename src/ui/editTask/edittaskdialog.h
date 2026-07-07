@@ -11,6 +11,7 @@
 #include "src/ui/typeOpenCVForm/typeopencvform.h"
 #include "src/ui/waitForm/waitform.h"
 #include "src/ui/ocrForm/OcrForm.h"
+#include "src/ui/yoloForm/YoloForm.h"
 
 enum class EditMode { Add, Edit };
 
@@ -36,6 +37,7 @@ void onTestButtonClick();
 bool validateWaitFormData(const QJsonObject& data);
 bool validateOpenCVFormData(const QJsonObject& data);
 bool validateOcrFormData(const QJsonObject& data);
+bool validateYoloFormData(const QJsonObject& data);
 bool validateData();
 void accept();
 void setCurrentIndex();
@@ -44,6 +46,7 @@ private:
     TypeOpenCVForm* typeForm;
     WaitForm* waitForm;
     OcrForm* ocrForm;
+    YoloForm* yoloForm;
     Ui::EditTaskDialog *ui;
 };
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QHash>
+#include <QList>
 #include <QMultiHash>
 #include <QString>
 #include <QStringList>
@@ -23,6 +24,8 @@ public:
     static bool isInitialized();
 
     static bool tryGetLabelInfo(const QString& className, LabelInfo& outInfo);
+    // 按目录文件中的分组/声明顺序返回全部标签，供 UI 下拉选择使用
+    static QList<LabelInfo> allLabels();
     static QStringList labelsForGroup(const QString& groupName);
     static QStringList labelsForScene(const QString& sceneName);
 
@@ -39,6 +42,7 @@ private:
     static inline bool initialized_ = false;
     static inline QString sourcePath_;
     static inline QHash<QString, LabelInfo> labelIndex_;
+    static inline QList<LabelInfo> orderedLabels_;
     static inline QMultiHash<QString, QString> groupToLabels_;
     static inline QMultiHash<QString, QString> sceneToLabels_;
 };

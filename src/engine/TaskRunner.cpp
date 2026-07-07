@@ -83,10 +83,16 @@ QString TaskRunner::executeStep(const QJsonObject& step)
                 Logger::log(QString("开始进行YOLO识图"));
                 const double score = step["score"].toDouble();
                 const bool randomClick = step["randomClick"].toBool();
+                // 目标标签来自步骤配置；旧配置没有 yoloLabel 时沿用原先的默认标签
+                QString yoloLabel = step["yoloLabel"].toString();
+                if (yoloLabel.isEmpty()) {
+                    yoloLabel = "common-btn-yellow_confirm";
+                }
+                Logger::log(QString("YOLO目标标签: %1").arg(yoloLabel));
                 int retryCount = 0;
 
                 while (retryCount < 3) {
-                    savePath = actions.yoloRecognizesAndClick(score, randomClick, "common-btn-yellow_confirm", 0.0, 0.0);
+                    savePath = actions.yoloRecognizesAndClick(score, randomClick, yoloLabel, 0.0, 0.0);
                     if (!savePath.isNull()) {
                         emit showImage(savePath);
                         break; // 成功

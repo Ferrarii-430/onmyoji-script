@@ -30,25 +30,23 @@ EditTaskDialog::EditTaskDialog(EditMode mode, const QJsonObject &stepData, const
     ui->comboBox->addItem("OpenCV识图");
     ui->comboBox->addItem("等待");
     ui->comboBox->addItem("OCR识别");
+    ui->comboBox->addItem("YOLO识别");
 
     // 构造函数里
     typeForm = new TypeOpenCVForm(this);
     waitForm = new WaitForm(this);
     ocrForm = new OcrForm(this);
+    yoloForm = new YoloForm(this);
 
     ui->stackedWidget->addWidget(typeForm);  // index 0
     ui->stackedWidget->addWidget(waitForm);  // index 1
     ui->stackedWidget->addWidget(ocrForm);  // index 2
+    ui->stackedWidget->addWidget(yoloForm); // index 3
 
     connect(ui->comboBox, &QComboBox::currentIndexChanged, this, [this, testButton](int index){
         ui->stackedWidget->setCurrentIndex(index);
-        if (index == 0) {
-            testButton->setDisabled(false);
-        } else if (index == 1) {
-            testButton->setDisabled(true);
-        } else if (index == 2) {
-            testButton->setDisabled(false);
-        }
+        // 只有“等待”没有可测试的识别动作
+        testButton->setDisabled(index == 1);
     });
 
     // 初始化数据
@@ -63,6 +61,9 @@ EditTaskDialog::EditTaskDialog(EditMode mode, const QJsonObject &stepData, const
         } else if (type == "OCR") {
             ui->comboBox->setCurrentIndex(2);
             ocrForm->loadFromJson(configId,stepData);
+        } else if (type == "YOLO") {
+            ui->comboBox->setCurrentIndex(3);
+            yoloForm->loadFromJson(configId,stepData);
         }
     } else {
         // 默认新增时显示第一个
@@ -91,6 +92,8 @@ QJsonObject EditTaskDialog::collectData() const {
         return waitForm->toJson();
     } else if (index == 2) {
         return ocrForm->toJson();
+    } else if (index == 3) {
+        return yoloForm->toJson();
     }
     return QJsonObject();
 }
@@ -172,6 +175,19 @@ void EditTaskDialog::onTestButtonClick()
             return;
         }
         emit imagePathRequested(savePath); // 发射信号
+    } else if (index == 3) {
+        //YOLO
+        QJsonObject json = yoloForm->toJson();
+        QString yoloLabel = json["yoloLabel"].toString();
+        const double score = json["score"].toDouble();
+        const bool randomClick = json["randomClick"].toBool();
+        QString savePath = ScriptActions::instance().yoloRecognizesAndClick(score, randomClick, yoloLabel, 0.0, 0.0);
+        if (savePath.isEmpty())
+        {
+            Logger::log(QString("测试YOLO识别失败"));
+            return;
+        }
+        emit imagePathRequested(savePath); // 发射信号
     }
 }
 
@@ -247,6 +263,24 @@ bool EditTaskDialog::validateOcrFormData(const QJsonObject &data)
     return true;
 }
 
+bool EditTaskDialog::validateYoloFormData(const QJsonObject &data)
+{
+    QString taskName = data["taskName"].toString().trimmed();
+    QString yoloLabel = data["yoloLabel"].toString().trimmed();
+
+    if (taskName.isEmpty()) {
+        QMessageBox::warning(this, "警告", "任务名称不能为空！");
+        return false;
+    }
+
+    if (yoloLabel.isEmpty()) {
+        QMessageBox::warning(this, "警告", "识别标签不能为空！");
+        return false;
+    }
+
+    return true;
+}
+
 // 在 EditTaskDialog 中添加验证方法
 bool EditTaskDialog::validateData() {
     QJsonObject data = resultData();
@@ -262,6 +296,9 @@ bool EditTaskDialog::validateData() {
     }else if (comparesEqual(type, "OCR"))
     {
         isValidate = validateOcrFormData(data);
+    }else if (comparesEqual(type, "YOLO"))
+    {
+        isValidate = validateYoloFormData(data);
     }
 
     return isValidate;
