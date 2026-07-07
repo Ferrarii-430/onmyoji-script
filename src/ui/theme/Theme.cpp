@@ -1,9 +1,16 @@
 #include "Theme.h"
 
 #include <QApplication>
+#include <QDir>
 #include <QFont>
+#include <QPainter>
+#include <QPainterPath>
 #include <QPalette>
+#include <QPixmap>
+#include <QPolygonF>
 #include <QStyleFactory>
+
+#include <functional>
 
 namespace theme {
 
@@ -90,7 +97,8 @@ QComboBox::drop-down {
     border: none;
     width: 20px;
 }
-/* SpinBox 上下箭头按钮：给浅灰底，箭头由 Fusion 按调色板 ButtonText 绘制 */
+/* SpinBox/下拉箭头：QSS 自定义了按钮子控件后 Qt 不再画默认箭头，
+   必须显式提供 image；图标由 theme::apply 启动时绘制生成 */
 QSpinBox::up-button, QSpinBox::down-button,
 QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {
     background-color: #e6e8ef;
@@ -102,6 +110,21 @@ QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {
 QSpinBox::up-button:hover, QSpinBox::down-button:hover,
 QDoubleSpinBox::up-button:hover, QDoubleSpinBox::down-button:hover {
     background-color: #d4d7e0;
+}
+QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {
+    image: url(%ARROW_UP%);
+    width: 10px;
+    height: 6px;
+}
+QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {
+    image: url(%ARROW_DOWN%);
+    width: 10px;
+    height: 6px;
+}
+QComboBox::down-arrow {
+    image: url(%ARROW_DOWN%);
+    width: 10px;
+    height: 6px;
 }
 QComboBox QAbstractItemView {
     background-color: #ffffff;
@@ -124,6 +147,7 @@ QCheckBox::indicator {
 QCheckBox::indicator:checked {
     background-color: #5b6cf0;
     border-color: #5b6cf0;
+    image: url(%CHECK_MARK%);
 }
 
 /* ---------- 列表 / 表格 ---------- */
@@ -204,10 +228,67 @@ QScrollBar::add-page, QScrollBar::sub-page {
 QStackedWidget {
     background: transparent;
 }
+QDialogButtonBox {
+    /* 统一按 Windows 习惯排列，避免不同角色按钮分散两端 */
+    button-layout: 0;
+}
 QDialogButtonBox QPushButton {
-    min-width: 64px;
+    min-width: 72px;
+    padding: 4px 14px;
 }
 )QSS";
+
+// 把矢量绘制的小图标落盘到临时目录，供 QSS 的 image: url() 引用
+QString writeIcon(const QString& name, const QSize& size,
+                  const std::function<void(QPainter&, const QSizeF&)>& draw)
+{
+    QPixmap pm(size * 2); // 2x 供高 DPI 缩放
+    pm.setDevicePixelRatio(2.0);
+    pm.fill(Qt::transparent);
+    QPainter painter(&pm);
+    painter.setRenderHint(QPainter::Antialiasing);
+    draw(painter, QSizeF(size));
+    painter.end();
+
+    const QString path = QDir::temp().filePath("onmyoji_theme_" + name + ".png");
+    pm.save(path, "PNG");
+    return QDir::fromNativeSeparators(path);
+}
+
+QString makeArrowIcon(bool up, const QColor& color)
+{
+    return writeIcon(up ? "arrow_up" : "arrow_down", QSize(10, 6),
+                     [up, color](QPainter& p, const QSizeF& s) {
+        QPolygonF triangle;
+        if (up) {
+            triangle << QPointF(s.width() / 2, 0.5)
+                     << QPointF(s.width() - 0.5, s.height() - 0.5)
+                     << QPointF(0.5, s.height() - 0.5);
+        } else {
+            triangle << QPointF(0.5, 0.5)
+                     << QPointF(s.width() - 0.5, 0.5)
+                     << QPointF(s.width() / 2, s.height() - 0.5);
+        }
+        p.setPen(Qt::NoPen);
+        p.setBrush(color);
+        p.drawPolygon(triangle);
+    });
+}
+
+QString makeCheckIcon(const QColor& color)
+{
+    return writeIcon("check", QSize(12, 12), [color](QPainter& p, const QSizeF& s) {
+        QPen pen(color, 2.0);
+        pen.setCapStyle(Qt::RoundCap);
+        pen.setJoinStyle(Qt::RoundJoin);
+        p.setPen(pen);
+        QPainterPath path;
+        path.moveTo(s.width() * 0.22, s.height() * 0.55);
+        path.lineTo(s.width() * 0.42, s.height() * 0.75);
+        path.lineTo(s.width() * 0.80, s.height() * 0.28);
+        p.drawPath(path);
+    });
+}
 } // namespace
 
 void apply(QApplication& app)
@@ -236,7 +317,12 @@ void apply(QApplication& app)
     font.setPointSize(10);
     app.setFont(font);
 
-    app.setStyleSheet(kStyleSheet);
+    const QColor arrowColor(0x4a, 0x4d, 0x57);
+    QString qss = QString::fromUtf8(kStyleSheet);
+    qss.replace("%ARROW_UP%", makeArrowIcon(true, arrowColor));
+    qss.replace("%ARROW_DOWN%", makeArrowIcon(false, arrowColor));
+    qss.replace("%CHECK_MARK%", makeCheckIcon(Qt::white));
+    app.setStyleSheet(qss);
 }
 
 } // namespace theme
