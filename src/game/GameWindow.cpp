@@ -65,11 +65,15 @@ void GameWindow::clickInWindow(const cv::Point& clickPoint)
     }
 
     const cv::Point clientPoint = mapCapturePointToClient(clickPoint);
-    Logger::log(QString("点击坐标映射: 捕获(%1,%2) -> 客户区(%3,%4), 捕获尺寸: %5x%6")
+    RECT mapClientRect{};
+    GetClientRect(hwnd_, &mapClientRect);
+    Logger::log(QString("点击坐标映射: 捕获(%1,%2) -> 客户区(%3,%4), 捕获尺寸: %5x%6, 客户区尺寸: %7x%8")
                .arg(clickPoint.x).arg(clickPoint.y)
                .arg(clientPoint.x).arg(clientPoint.y)
                .arg(lastCaptureSize_.width)
-               .arg(lastCaptureSize_.height));
+               .arg(lastCaptureSize_.height)
+               .arg(mapClientRect.right)
+               .arg(mapClientRect.bottom));
 
     if (!DPIHelper::IsPointInClientRect(hwnd_, clientPoint)) {
         Logger::log(QString("错误: 点击坐标 (%1, %2) 超出客户区范围").arg(clientPoint.x).arg(clientPoint.y));
