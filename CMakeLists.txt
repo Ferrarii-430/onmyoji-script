@@ -111,6 +111,8 @@ add_executable(qtTest WIN32
         src/ui/ocrForm/ui_OcrForm.h
         src/ui/yoloForm/YoloForm.cpp
         src/ui/yoloForm/YoloForm.h
+        src/ui/theme/Theme.cpp
+        src/ui/theme/Theme.h
         src/ui/setting/settingdialog.cpp
         src/ui/setting/settingdialog.h
         src/ui/setting/settingdialog.ui
