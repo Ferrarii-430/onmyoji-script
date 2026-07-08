@@ -49,6 +49,9 @@ public:
     // 发射信号让 UI 显示识别结果图
     void processAndShowImage(const QString& imagePath);
 
+    // 在最近一次截图上绘制识别框和点击标记，保存并回显到缩略框
+    void showClickFeedback(const cv::Rect& matchRect, const cv::Point& clickPt);
+
 signals:
     void requestShowImage(const QString& imagePath);
 

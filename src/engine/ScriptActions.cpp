@@ -48,6 +48,23 @@ void ScriptActions::processAndShowImage(const QString& imagePath)
     emit requestShowImage(imagePath);
 }
 
+void ScriptActions::showClickFeedback(const cv::Rect& matchRect, const cv::Point& clickPt)
+{
+    QString capturePath = AppPaths::instance().dx11CapturePath();
+    cv::Mat captureImg = cv::imread(capturePath.toStdString());
+    if (captureImg.empty()) {
+        Logger::log(QString("共享内存截图缺失，跳过调试图保存"));
+        return;
+    }
+
+    cv::rectangle(captureImg, matchRect, cv::Scalar(0, 255, 0), 2);
+    drawClickMarker(captureImg, clickPt);
+
+    QString matchPath = AppPaths::instance().matchResultPath();
+    cv::imwrite(matchPath.toStdString(), captureImg);
+    processAndShowImage(matchPath);
+}
+
 QString ScriptActions::opencvRecognizesAndClickByBase64(const QString& base64, const double threshold, const bool randomClick)
 {
     if (base64.isEmpty()) {

@@ -93,6 +93,7 @@ void executeBorderBreakthrough()
         // Logger::log(vec[i].className);
         // std::cout << matchRect << std::endl;
         window.clickInWindow(clickPt);
+        actions.showClickFeedback(matchRect, clickPt);
         waitWithEventProcessing(3000);
 
         Logger::log(QString("开始点击进攻"));
@@ -161,6 +162,7 @@ void executeBorderBreakthrough()
         Logger::log(QString("开始点击突破框"));
         cv::Point clickPt = vision::randomPointInRectExcludeWidth(matchRect, 0.0, 0.3, 10);
         window.clickInWindow(clickPt);
+        actions.showClickFeedback(matchRect, clickPt);
         waitWithEventProcessing(3000);
 
         //点击攻击
