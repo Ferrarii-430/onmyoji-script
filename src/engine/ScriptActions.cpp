@@ -1,6 +1,7 @@
 #include "src/engine/ScriptActions.h"
 
 #include <windows.h>
+#include <cmath>
 #include <QDebug>
 #include <QDir>
 #include <QFileInfo>
@@ -127,7 +128,8 @@ QJsonArray ScriptActions::ocrRecognizes()
     return result["data"].toArray();
 }
 
-QString ScriptActions::ocrRecognizesAndClick(const QString& ocrText, const double threshold, const bool randomClick)
+QString ScriptActions::ocrRecognizesAndClick(const QString& ocrText, const double threshold, const bool randomClick,
+                                             const QRectF& roiPercent)
 {
     cv::Mat winImg = capture::captureGameWindow();
     bool hasOcrText = false;
@@ -138,7 +140,44 @@ QString ScriptActions::ocrRecognizesAndClick(const QString& ocrText, const doubl
     }
 
     QString saveDir = AppPaths::instance().thumbnailPath();
-    QJsonObject result = vision::runRapidOCR();
+
+    // 按百分比计算识别区域（相对图片尺寸），宽/高 <= 0 时识别整张图
+    cv::Rect roiRect(0, 0, winImg.cols, winImg.rows);
+    bool useRoi = false;
+    if (roiPercent.width() > 0.0 && roiPercent.height() > 0.0) {
+        const int x = static_cast<int>(std::round(winImg.cols * roiPercent.x() / 100.0));
+        const int y = static_cast<int>(std::round(winImg.rows * roiPercent.y() / 100.0));
+        const int w = static_cast<int>(std::round(winImg.cols * roiPercent.width() / 100.0));
+        const int h = static_cast<int>(std::round(winImg.rows * roiPercent.height() / 100.0));
+        cv::Rect wanted(x, y, w, h);
+        roiRect = wanted & cv::Rect(0, 0, winImg.cols, winImg.rows);
+        if (roiRect.width <= 0 || roiRect.height <= 0) {
+            Logger::log(QString("OCR识别区域无效: (%1%%,%2%%,%3%%,%4%%)，改为识别整张图片")
+                            .arg(roiPercent.x()).arg(roiPercent.y())
+                            .arg(roiPercent.width()).arg(roiPercent.height()));
+            roiRect = cv::Rect(0, 0, winImg.cols, winImg.rows);
+        } else if (roiRect.x != 0 || roiRect.y != 0 ||
+                   roiRect.width != winImg.cols || roiRect.height != winImg.rows) {
+            useRoi = true;
+        }
+    }
+
+    QString ocrImagePath;
+    if (useRoi) {
+        QDir dir(saveDir);
+        if (!dir.exists()) {
+            dir.mkpath(".");
+        }
+        ocrImagePath = saveDir + "ocr_roi_capture.png";
+        cv::imwrite(ocrImagePath.toStdString(), winImg(roiRect));
+        Logger::log(QString("OCR识别区域: 百分比(%1%%,%2%%,%3%%,%4%%) -> 像素(%5,%6,%7x%8)")
+                        .arg(roiPercent.x()).arg(roiPercent.y())
+                        .arg(roiPercent.width()).arg(roiPercent.height())
+                        .arg(roiRect.x).arg(roiRect.y)
+                        .arg(roiRect.width).arg(roiRect.height));
+    }
+
+    QJsonObject result = vision::runRapidOCR(ocrImagePath);
     QString savePath;
 
     if (!result.isEmpty()) {
@@ -179,7 +218,9 @@ QString ScriptActions::ocrRecognizesAndClick(const QString& ocrText, const doubl
                         int maxX = std::max({x1, x2, x3, x4});
                         int maxY = std::max({y1, y2, y3, y4});
 
-                        matchRect = cv::Rect(minX, minY, maxX - minX, maxY - minY);
+                        // OCR 坐标相对于裁剪区域，换算回全图坐标
+                        matchRect = cv::Rect(minX + roiRect.x, minY + roiRect.y,
+                                             maxX - minX, maxY - minY);
                     } else {
                         qWarning() << "box数组大小不正确，期望4个点，实际:" << box.size();
                         continue;
@@ -194,6 +235,9 @@ QString ScriptActions::ocrRecognizesAndClick(const QString& ocrText, const doubl
 
                     // 保存带识别框和点击位置的图片
                     cv::Mat resultImg = winImg.clone();
+                    if (useRoi) {
+                        cv::rectangle(resultImg, roiRect, cv::Scalar(255, 128, 0), 2);
+                    }
                     cv::rectangle(resultImg, matchRect, cv::Scalar(0, 255, 0), 2);
                     cv::circle(resultImg, clickPt, 5, cv::Scalar(0, 0, 255), -1);
 

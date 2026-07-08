@@ -3,6 +3,7 @@
 
 #include <QJsonArray>
 #include <QObject>
+#include <QRectF>
 #include <QString>
 #include <opencv2/core/mat.hpp>
 #include <vector>
@@ -28,7 +29,10 @@ public:
 
     // OCR 识别
     QJsonArray ocrRecognizes();
-    QString ocrRecognizesAndClick(const QString& ocrText, double threshold, bool randomClick);
+    // roiPercent 为识别区域（左/上/宽/高，单位为图片尺寸的百分比 0~100）；
+    // 宽或高 <= 0 时表示识别整张图片
+    QString ocrRecognizesAndClick(const QString& ocrText, double threshold, bool randomClick,
+                                  const QRectF& roiPercent = QRectF());
 
     // YOLO 识别
     std::vector<Detection> yoloRecognizes(double threshold, double excludeStartWidth, double excludeEndWidth);

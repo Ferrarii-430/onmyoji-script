@@ -189,7 +189,9 @@ void EditTaskDialog::onTestButtonClick()
         QString ocrText = json["ocrText"].toString();
         const double score = json["score"].toDouble();
         const bool randomClick = json["randomClick"].toBool();
-        QString savePath = ScriptActions::instance().ocrRecognizesAndClick(ocrText, score, randomClick);
+        const QRectF roiPercent(json["ocrRoiX"].toDouble(), json["ocrRoiY"].toDouble(),
+                                json["ocrRoiW"].toDouble(), json["ocrRoiH"].toDouble());
+        QString savePath = ScriptActions::instance().ocrRecognizesAndClick(ocrText, score, randomClick, roiPercent);
         if (savePath.isEmpty())
         {
             Logger::log(QString("测试OCR识别失败"));

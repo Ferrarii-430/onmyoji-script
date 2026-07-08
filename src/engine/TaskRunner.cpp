@@ -61,10 +61,12 @@ QString TaskRunner::executeStep(const QJsonObject& step)
                 QString ocrText = step["ocrText"].toString();
                 const double score = step["score"].toDouble();
                 const bool randomClick = step["randomClick"].toBool();
+                const QRectF roiPercent(step["ocrRoiX"].toDouble(), step["ocrRoiY"].toDouble(),
+                                        step["ocrRoiW"].toDouble(), step["ocrRoiH"].toDouble());
                 int retryCount = 0;
 
                 while (retryCount < 3) {
-                    savePath = actions.ocrRecognizesAndClick(ocrText, score, randomClick);
+                    savePath = actions.ocrRecognizesAndClick(ocrText, score, randomClick, roiPercent);
                     if (!savePath.isNull()) {
                         emit showImage(savePath);
                         break; // 成功

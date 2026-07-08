@@ -66,11 +66,11 @@ QJsonObject parseOcrOutput(const QString& ocrOutput)
 
 } // namespace
 
-QJsonObject runRapidOCR()
+QJsonObject runRapidOCR(const QString& imagePath)
 {
     QJsonObject result;
 
-    QString DX11_CAPTURE_PATH = AppPaths::instance().dx11CapturePath();
+    QString DX11_CAPTURE_PATH = imagePath.isEmpty() ? AppPaths::instance().dx11CapturePath() : imagePath;
     QString rapidOCRExe = AppPaths::instance().rapidOCRExePath();
     QString rapidOCRModelsPath = AppPaths::instance().rapidOCRModelsPath();
     QString rapidOCRDetPath = AppPaths::instance().rapidOCRDetPathV4();

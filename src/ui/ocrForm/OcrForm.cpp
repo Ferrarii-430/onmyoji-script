@@ -54,6 +54,13 @@ void OcrForm::loadFromJson(const QString &configId, const QJsonObject &obj)
     ui->ocrTextEdit->setText(obj["ocrText"].toString());
     ui->spinScoreBox->setValue(obj["score"].toDouble());
     ui->randomClickCheckBox->setChecked(obj["randomClick"].toBool());
+
+    // 识别区域（百分比）；旧配置无该字段时默认整张图片
+    ui->roiXBox->setValue(obj["ocrRoiX"].toDouble(0.0));
+    ui->roiYBox->setValue(obj["ocrRoiY"].toDouble(0.0));
+    ui->roiWBox->setValue(obj["ocrRoiW"].toDouble(100.0));
+    ui->roiHBox->setValue(obj["ocrRoiH"].toDouble(100.0));
+
     QString currentIdentifyErrorHandle= obj["identifyErrorHandle"].toString();
     int identifyErrorHandleIndex = ui->opencvErrorHandle->findData(currentIdentifyErrorHandle);
     if (identifyErrorHandleIndex >= 0) {
@@ -108,6 +115,10 @@ QJsonObject OcrForm::toJson() const {
     obj["ocrText"] = ui->ocrTextEdit->text();
     obj["score"] = ui->spinScoreBox->value();
     obj["randomClick"] = ui->randomClickCheckBox->isChecked();
+    obj["ocrRoiX"] = ui->roiXBox->value();
+    obj["ocrRoiY"] = ui->roiYBox->value();
+    obj["ocrRoiW"] = ui->roiWBox->value();
+    obj["ocrRoiH"] = ui->roiHBox->value();
     obj["identifyErrorHandle"] = ui->opencvErrorHandle->currentData().toString();
 
     //如果是跳转

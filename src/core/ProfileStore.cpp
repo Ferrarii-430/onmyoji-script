@@ -131,6 +131,10 @@ void addConfigToJsonFile(const QString &filePath, const QString &configId, const
             newObj["jumpStepsId"] = safeValue(json, "jumpStepsId");
             newObj["identifyErrorHandle"] = safeValue(json, "identifyErrorHandle");
             newObj["yoloLabel"]  = safeValue(json, "yoloLabel");
+            newObj["ocrRoiX"]    = safeValue(json, "ocrRoiX");
+            newObj["ocrRoiY"]    = safeValue(json, "ocrRoiY");
+            newObj["ocrRoiW"]    = safeValue(json, "ocrRoiW");
+            newObj["ocrRoiH"]    = safeValue(json, "ocrRoiH");
 
             //获取原来的 steps 数组并修改
             QJsonArray stepsArray = obj.value("steps").toArray();
@@ -202,6 +206,10 @@ void updateConfigInJsonFile(const QString &filePath, const QString &configId, co
                     updatedStep["jumpStepsId"] = safeValue(json, "jumpStepsId");
                     updatedStep["identifyErrorHandle"] = safeValue(json, "identifyErrorHandle");
                     updatedStep["yoloLabel"]  = safeValue(json, "yoloLabel");
+                    updatedStep["ocrRoiX"]    = safeValue(json, "ocrRoiX");
+                    updatedStep["ocrRoiY"]    = safeValue(json, "ocrRoiY");
+                    updatedStep["ocrRoiW"]    = safeValue(json, "ocrRoiW");
+                    updatedStep["ocrRoiH"]    = safeValue(json, "ocrRoiH");
 
                     // 替换原来的步骤对象
                     stepsArray[j] = updatedStep;
