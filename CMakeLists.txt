@@ -11,6 +11,11 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
+if(WIN32)
+    enable_language(RC)
+    string(APPEND CMAKE_RC_FLAGS " -I \"${CMAKE_CURRENT_SOURCE_DIR}/img\"")
+endif()
+
 # ------------------------------
 # 路径配置
 # ------------------------------
@@ -37,6 +42,7 @@ link_directories(${CMAKE_SOURCE_DIR}/src/lib)
 add_executable(qtTest WIN32
         # 应用入口
         src/app/main.cpp
+        resources.qrc
 
         # core: 基础设施（日志/配置/路径/事件循环工具）
         src/core/AppPaths.h
@@ -119,6 +125,10 @@ add_executable(qtTest WIN32
         src/ui/setting/settingdialog.h
         src/ui/setting/settingdialog.ui
 )
+
+if(WIN32)
+    target_sources(qtTest PRIVATE img/logo.rc)
+endif()
 
 # ------------------------------
 # 宏定义 & 包含目录
