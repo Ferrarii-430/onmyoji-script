@@ -5,6 +5,7 @@
 #include <QObject>
 #include <QRectF>
 #include <QString>
+#include <QStringList>
 #include <opencv2/core/mat.hpp>
 #include <vector>
 
@@ -35,6 +36,8 @@ public:
 
     // YOLO 识别
     std::vector<Detection> yoloRecognizes(double threshold, double excludeStartWidth, double excludeEndWidth);
+    // YOLO 是否包含指定标签；matchAll 为 false 时任一标签命中即返回 true
+    bool yoloContainsLabels(double threshold, const QStringList& targetLabels, bool matchAll = false);
     QString yoloRecognizesAndClick(double threshold, bool randomClick, const QString& targetLabelName,
                                    double excludeStartWidth, double excludeEndWidth);
 
