@@ -1,4 +1,5 @@
 #include <QApplication>
+#include <QIcon>
 #include <iostream>
 #include <opencv2/core/utility.hpp>
 #include <opencv2/core/utils/logger.hpp>
@@ -36,6 +37,7 @@ int main(int argc, char* argv[])
     qInstallMessageHandler(myMessageHandler);
 
     QApplication a(argc, argv);
+    a.setWindowIcon(QIcon(":/img/logo.jpg"));
     theme::apply(a);
     mainwindow w;
     w.show();
