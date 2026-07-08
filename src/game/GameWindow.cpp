@@ -11,6 +11,31 @@
 #include "src/platform/MouseSimulator.h"
 #include "src/platform/ProcessUtils.h"
 
+namespace {
+
+// 从顶层窗口开始逐层命中测试，定位点击坐标下真正接收输入的子窗口，
+// 并把坐标换算到该子窗口的客户区坐标系。
+HWND resolveMessageTarget(HWND topWindow, cv::Point& clientPoint)
+{
+    HWND current = topWindow;
+    POINT pt{clientPoint.x, clientPoint.y};
+
+    while (true) {
+        HWND child = ChildWindowFromPointEx(current, pt,
+            CWP_SKIPINVISIBLE | CWP_SKIPDISABLED | CWP_SKIPTRANSPARENT);
+        if (!child || child == current) {
+            break;
+        }
+        MapWindowPoints(current, child, &pt, 1);
+        current = child;
+    }
+
+    clientPoint = cv::Point(pt.x, pt.y);
+    return current;
+}
+
+} // namespace
+
 GameWindow& GameWindow::instance()
 {
     static GameWindow instance;
@@ -115,11 +140,22 @@ void GameWindow::clickInWindow(const cv::Point& clickPoint)
     bool success = false;
     QString mouseClickMode = SETTING_CONFIG.getMouseClickMode();
 
+    cv::Point messagePoint = clientPoint;
+    HWND messageTarget = hwnd_;
+    if (!isDegenerateClientRect) {
+        messageTarget = resolveMessageTarget(hwnd_, messagePoint);
+        if (messageTarget != hwnd_) {
+            Logger::log(QString("消息点击目标为子窗口: (%1, %2) -> (%3, %4)")
+                       .arg(clientPoint.x).arg(clientPoint.y)
+                       .arg(messagePoint.x).arg(messagePoint.y));
+        }
+    }
+
     if (isDegenerateClientRect) {
         Logger::log(QString("窗口最小化或客户区为0，使用后台消息点击(PostMessage)"));
-        success = simulator.StealthMessageClick(hwnd_, clientPoint.x, clientPoint.y);
+        success = simulator.StealthMessageClick(messageTarget, messagePoint.x, messagePoint.y);
     } else if (mouseClickMode == "PostMessage") {
-        success = simulator.StealthMessageClick(hwnd_, clientPoint.x, clientPoint.y);
+        success = simulator.StealthMessageClick(messageTarget, messagePoint.x, messagePoint.y);
     } else if (mouseClickMode == "InputMouse") {
         POINT start = MouseSimulator::GetCurrentPosition();
         POINT targetScreen = { screenPoint.x, screenPoint.y };
@@ -128,7 +164,7 @@ void GameWindow::clickInWindow(const cv::Point& clickPoint)
                                                      SETTING_CONFIG.getMouseSpeed() * 10);
     } else {
         Logger::log(QString("无法识别的鼠标点击模式，执行默认策略"));
-        success = simulator.StealthMessageClick(hwnd_, clientPoint.x, clientPoint.y);
+        success = simulator.StealthMessageClick(messageTarget, messagePoint.x, messagePoint.y);
     }
 
     if (success) {
