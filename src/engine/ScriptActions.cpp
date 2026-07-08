@@ -115,7 +115,7 @@ QString ScriptActions::opencvRecognizesAndClick(const QString& templPath, const 
     return savePath;
 }
 
-QJsonArray ScriptActions::ocrRecognizes()
+QJsonArray ScriptActions::ocrRecognizes(const QRectF& roiPercent)
 {
     cv::Mat winImg = capture::captureGameWindow();
 
@@ -124,8 +124,78 @@ QJsonArray ScriptActions::ocrRecognizes()
         return QJsonArray();
     }
 
-    QJsonObject result = vision::runRapidOCR();
-    return result["data"].toArray();
+    QString saveDir = AppPaths::instance().thumbnailPath();
+
+    // 按百分比计算识别区域（相对图片尺寸），宽/高 <= 0 时识别整张图
+    cv::Rect roiRect(0, 0, winImg.cols, winImg.rows);
+    bool useRoi = false;
+    if (roiPercent.width() > 0.0 && roiPercent.height() > 0.0) {
+        const int x = static_cast<int>(std::round(winImg.cols * roiPercent.x() / 100.0));
+        const int y = static_cast<int>(std::round(winImg.rows * roiPercent.y() / 100.0));
+        const int w = static_cast<int>(std::round(winImg.cols * roiPercent.width() / 100.0));
+        const int h = static_cast<int>(std::round(winImg.rows * roiPercent.height() / 100.0));
+        cv::Rect wanted(x, y, w, h);
+        roiRect = wanted & cv::Rect(0, 0, winImg.cols, winImg.rows);
+        if (roiRect.width <= 0 || roiRect.height <= 0) {
+            Logger::log(QString("OCR识别区域无效: (%1%%,%2%%,%3%%,%4%%)，改为识别整张图片")
+                            .arg(roiPercent.x()).arg(roiPercent.y())
+                            .arg(roiPercent.width()).arg(roiPercent.height()));
+            roiRect = cv::Rect(0, 0, winImg.cols, winImg.rows);
+        } else if (roiRect.x != 0 || roiRect.y != 0 ||
+                   roiRect.width != winImg.cols || roiRect.height != winImg.rows) {
+            useRoi = true;
+        }
+    }
+
+    QString ocrImagePath;
+    if (useRoi) {
+        QDir dir(saveDir);
+        if (!dir.exists()) {
+            dir.mkpath(".");
+        }
+        ocrImagePath = saveDir + "ocr_roi_capture.png";
+        cv::imwrite(ocrImagePath.toStdString(), winImg(roiRect));
+        Logger::log(QString("OCR识别区域: 百分比(%1%%,%2%%,%3%%,%4%%) -> 像素(%5,%6,%7x%8)")
+                        .arg(roiPercent.x()).arg(roiPercent.y())
+                        .arg(roiPercent.width()).arg(roiPercent.height())
+                        .arg(roiRect.x).arg(roiRect.y)
+                        .arg(roiRect.width).arg(roiRect.height));
+    }
+
+    QJsonObject result = vision::runRapidOCR(ocrImagePath);
+    QJsonArray dataArray = result["data"].toArray();
+
+    if (useRoi) {
+        for (int i = 0; i < dataArray.size(); ++i) {
+            QJsonObject item = dataArray[i].toObject();
+            QJsonArray box = item["box"].toArray();
+            if (box.size() != 4) {
+                continue;
+            }
+
+            QJsonArray adjustedBox;
+            for (const QJsonValue& pointValue : box) {
+                QJsonArray point = pointValue.toArray();
+                if (point.size() < 2) {
+                    adjustedBox.append(pointValue);
+                    continue;
+                }
+
+                QJsonArray adjustedPoint;
+                adjustedPoint.append(point[0].toInt() + roiRect.x);
+                adjustedPoint.append(point[1].toInt() + roiRect.y);
+                for (int j = 2; j < point.size(); ++j) {
+                    adjustedPoint.append(point[j]);
+                }
+                adjustedBox.append(adjustedPoint);
+            }
+
+            item["box"] = adjustedBox;
+            dataArray[i] = item;
+        }
+    }
+
+    return dataArray;
 }
 
 QString ScriptActions::ocrRecognizesAndClick(const QString& ocrText, const double threshold, const bool randomClick,
