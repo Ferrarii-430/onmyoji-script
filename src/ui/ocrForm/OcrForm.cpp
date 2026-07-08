@@ -6,7 +6,9 @@
 
 #include "OcrForm.h"
 
+#include <QFileDialog>
 #include <QJsonObject>
+#include <QMessageBox>
 
 #include "src/core/Logger.h"
 #include "ui_OcrForm.h"
@@ -28,6 +30,12 @@ OcrForm::OcrForm(QWidget *parent) :
 
     ui->spinScoreBox->setValue(0.55);
 
+    connect(ui->btnUploadImage, &QToolButton::clicked, this, &OcrForm::onUploadImageClicked);
+    connect(ui->roiXBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &OcrForm::updateRoiPreview);
+    connect(ui->roiYBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &OcrForm::updateRoiPreview);
+    connect(ui->roiWBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &OcrForm::updateRoiPreview);
+    connect(ui->roiHBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &OcrForm::updateRoiPreview);
+
     connect(ui->opencvErrorHandle, &QComboBox::currentIndexChanged, this, [this](int index)
     {
         // 当值为1时显示stepInput，其他值隐藏
@@ -40,6 +48,8 @@ OcrForm::OcrForm(QWidget *parent) :
             ui->stepInputLabel->hide();
         }
     });
+
+    updateRoiPreview();
 }
 
 OcrForm::~OcrForm() {
@@ -60,6 +70,7 @@ void OcrForm::loadFromJson(const QString &configId, const QJsonObject &obj)
     ui->roiYBox->setValue(obj["ocrRoiY"].toDouble(0.0));
     ui->roiWBox->setValue(obj["ocrRoiW"].toDouble(100.0));
     ui->roiHBox->setValue(obj["ocrRoiH"].toDouble(100.0));
+    updateRoiPreview();
 
     QString currentIdentifyErrorHandle= obj["identifyErrorHandle"].toString();
     int identifyErrorHandleIndex = ui->opencvErrorHandle->findData(currentIdentifyErrorHandle);
@@ -73,6 +84,39 @@ void OcrForm::loadFromJson(const QString &configId, const QJsonObject &obj)
         // 如果配置值不在选项中，使用默认值
         ui->opencvErrorHandle->setCurrentIndex(0);
     }
+}
+
+void OcrForm::updateRoiPreview()
+{
+    if (!ui || !ui->roiPreview) {
+        return;
+    }
+
+    ui->roiPreview->setRoiPercent(ui->roiXBox->value(),
+                                  ui->roiYBox->value(),
+                                  ui->roiWBox->value(),
+                                  ui->roiHBox->value());
+}
+
+void OcrForm::onUploadImageClicked()
+{
+    const QString fileName = QFileDialog::getOpenFileName(
+        this,
+        tr("选择参考图片"),
+        QString(),
+        tr("图片文件 (*.png *.jpg *.jpeg *.bmp)"));
+    if (fileName.isEmpty()) {
+        return;
+    }
+
+    const QPixmap pix(fileName);
+    if (pix.isNull()) {
+        QMessageBox::warning(this, tr("打开失败"), tr("无法加载所选图片。"));
+        return;
+    }
+
+    ui->roiPreview->setImage(pix);
+    updateRoiPreview();
 }
 
 void OcrForm::initStepInputBoxSelect(QString configId, const QString &stepsId)

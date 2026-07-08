@@ -7,6 +7,7 @@
 
 #include <QJsonObject>
 #include <QWidget>
+#include <QPixmap>
 
 
 QT_BEGIN_NAMESPACE
@@ -22,6 +23,10 @@ public:
     void loadFromJson(const QString &configId, const QJsonObject& obj);
     void initStepInputBoxSelect(QString configId, const QString& stepsId);
     QJsonObject toJson() const;
+
+private slots:
+    void onUploadImageClicked();
+    void updateRoiPreview();
 
 private:
     Ui::OcrForm *ui;

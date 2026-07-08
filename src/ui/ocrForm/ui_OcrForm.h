@@ -10,6 +10,9 @@
 #define UI_OCRFORM_H
 
 #include <QtCore/QVariant>
+#include <QtCore/QCoreApplication>
+#include <QtCore/QRect>
+#include <QtCore/QSize>
 #include <QtWidgets/QApplication>
 #include <QtWidgets/QCheckBox>
 #include <QtWidgets/QComboBox>
@@ -18,7 +21,11 @@
 #include <QtWidgets/QHBoxLayout>
 #include <QtWidgets/QLabel>
 #include <QtWidgets/QLineEdit>
+#include <QtWidgets/QSizePolicy>
+#include <QtWidgets/QToolButton>
 #include <QtWidgets/QWidget>
+
+#include "src/ui/ocrForm/RoiPreviewWidget.h"
 
 QT_BEGIN_NAMESPACE
 
@@ -47,15 +54,18 @@ public:
     QLabel *label_6;
     QCheckBox *randomClickCheckBox;
     QDoubleSpinBox *spinScoreBox;
+    QLabel *label_5;
+    QToolButton *btnUploadImage;
+    RoiPreviewWidget *roiPreview;
 
     void setupUi(QWidget *OcrForm)
     {
         if (OcrForm->objectName().isEmpty())
             OcrForm->setObjectName(QString::fromUtf8("OcrForm"));
-        OcrForm->resize(291, 400);
+        OcrForm->resize(291, 560);
         formLayoutWidget = new QWidget(OcrForm);
         formLayoutWidget->setObjectName(QString::fromUtf8("formLayoutWidget"));
-        formLayoutWidget->setGeometry(QRect(0, 0, 291, 394));
+        formLayoutWidget->setGeometry(QRect(0, 0, 291, 554));
         formLayout = new QFormLayout(formLayoutWidget);
         formLayout->setObjectName(QString::fromUtf8("formLayout"));
         formLayout->setHorizontalSpacing(6);
@@ -173,6 +183,23 @@ public:
 
         formLayout->setWidget(2, QFormLayout::FieldRole, spinScoreBox);
 
+        label_5 = new QLabel(formLayoutWidget);
+        label_5->setObjectName(QString::fromUtf8("label_5"));
+
+        formLayout->setWidget(8, QFormLayout::LabelRole, label_5);
+
+        btnUploadImage = new QToolButton(formLayoutWidget);
+        btnUploadImage->setObjectName(QString::fromUtf8("btnUploadImage"));
+
+        formLayout->setWidget(8, QFormLayout::FieldRole, btnUploadImage);
+
+        roiPreview = new RoiPreviewWidget(formLayoutWidget);
+        roiPreview->setObjectName(QString::fromUtf8("roiPreview"));
+        roiPreview->setMinimumSize(QSize(260, 150));
+        roiPreview->setSizePolicy(QSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding));
+
+        formLayout->setWidget(9, QFormLayout::SpanningRole, roiPreview);
+
 
         retranslateUi(OcrForm);
 
@@ -198,6 +225,8 @@ public:
         roiWBox->setSuffix(QCoreApplication::translate("OcrForm", "%", nullptr));
         roiHBox->setSuffix(QCoreApplication::translate("OcrForm", "%", nullptr));
         label_4->setText(QCoreApplication::translate("OcrForm", "\350\257\206\345\210\253\345\244\261\350\264\245\345\244\204\347\220\206", nullptr));
+        label_5->setText(QCoreApplication::translate("OcrForm", "\351\242\204\350\247\206", nullptr));
+        btnUploadImage->setText(QCoreApplication::translate("OcrForm", "\344\270\212\344\274\240\345\233\276\347\211\207\346\237\245\347\234\213\345\214\272\345\237\237", nullptr));
         stepInputLabel->setText(QCoreApplication::translate("OcrForm", "\350\267\263\350\275\254\346\255\245\351\252\244", nullptr));
         label_6->setText(QCoreApplication::translate("OcrForm", "\346\230\257\345\220\246\351\232\217\346\234\272\347\202\271\345\207\273", nullptr));
         randomClickCheckBox->setText(QString());

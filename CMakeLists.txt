@@ -108,6 +108,8 @@ add_executable(qtTest WIN32
         src/ui/waitForm/waitform.ui
         src/ui/ocrForm/OcrForm.cpp
         src/ui/ocrForm/OcrForm.h
+        src/ui/ocrForm/RoiPreviewWidget.cpp
+        src/ui/ocrForm/RoiPreviewWidget.h
         src/ui/ocrForm/ui_OcrForm.h
         src/ui/yoloForm/YoloForm.cpp
         src/ui/yoloForm/YoloForm.h
