@@ -70,12 +70,11 @@ void executeBorderBreakthrough()
 
     //查看门票数量
     tickets = getNumberOfTickets();
+    Logger::log("门票剩余:" + std::to_string(tickets));
     if (tickets == 0)
     {
-        Logger::log(QString("门票已清空"));
         return;
     }
-    Logger::log("门票剩余:" + std::to_string(tickets));
 
     //开始进行投4
     Logger::log(QString("结界突破-开始进行投4"));
@@ -118,7 +117,7 @@ void executeBorderBreakthrough()
                     window.postKey(VK_ESCAPE);
                     waitWithEventProcessing(200);
                     window.postKey(VK_RETURN);
-                    waitWithEventProcessing(8000);
+                    waitWithEventProcessing(10000);
 
                     Logger::log(QString("识别失败并点击"));
                     //识别战斗失败 并点击，成功则退出等待循环，否则结束任务
@@ -143,19 +142,17 @@ void executeBorderBreakthrough()
             return;
         }
     }
-
+    waitWithEventProcessing(5000);
     Logger::log(QString("结界突破-开始进行清票操作"));
     for (const Detection det : vec)
     {
         //查看门票数量
         tickets = getNumberOfTickets();
+        Logger::log("门票剩余:" + std::to_string(tickets));
         if (tickets == 0)
         {
-            Logger::log(QString("门票已清空"));
             return;
         }
-        Logger::log("门票剩余:" + std::to_string(tickets));
-
 
         waitWithEventProcessing(3000);
 
