@@ -2,6 +2,7 @@
 
 #include <windows.h>
 #include <QDebug>
+#include <QJsonObject>
 #include <QString>
 #include <vector>
 
@@ -20,6 +21,7 @@ void executeBorderBreakthrough()
 {
     ScriptActions& actions = ScriptActions::instance();
     GameWindow& window = GameWindow::instance();
+    int tickets; //门票数量
 
     std::vector<Detection> vec;
     Logger::log(QString("开始执行结界突破"));
@@ -66,6 +68,14 @@ void executeBorderBreakthrough()
         return;
     }
 
+    //查看门票数量
+    tickets = getNumberOfTickets();
+    if (tickets == 0)
+    {
+        Logger::log(QString("门票已清空"));
+        return;
+    }
+
     //开始进行投4
     Logger::log(QString("结界突破-开始进行投4"));
     for (auto& det : detections) {
@@ -87,24 +97,32 @@ void executeBorderBreakthrough()
         //点击攻击
         if (actions.ocrRecognizesAndClick("进攻",0.55,true) != nullptr)
         {
-            Logger::log(QString("准备退出战斗"));
-            waitWithEventProcessing(5000);
+            //检查是否已经进入战斗 能否退出
+            if (actions.yoloContainsLabels(0.55, ["realm-realm_card-reward"], false))
+            {
+                Logger::log(QString("准备退出战斗"));
+                waitWithEventProcessing(5000);
 
-            //按下esc 再按下enter
-            window.postKey(VK_ESCAPE);
-            waitWithEventProcessing(200);
-            window.postKey(VK_RETURN);
-            waitWithEventProcessing(5000);
+                //按下esc 再按下enter
+                window.postKey(VK_ESCAPE);
+                waitWithEventProcessing(200);
+                window.postKey(VK_RETURN);
+                waitWithEventProcessing(5000);
 
-            Logger::log(QString("识别失败并点击"));
-            //识别战斗失败 并点击
-            QString savePath = actions.ocrRecognizesAndClick("失败", 0.5, true);
-            actions.processAndShowImage(savePath);
-            waitWithEventProcessing(5000);
+                Logger::log(QString("识别失败并点击"));
+                //识别战斗失败 并点击
+                QString savePath = actions.ocrRecognizesAndClick("失败", 0.5, true);
+                actions.processAndShowImage(savePath);
+                waitWithEventProcessing(5000);
+            }else
+            {
+                Logger::log(QString("未进入战斗，任务结束"));
+                return;
+            }
         }else
         {
-            //找不到 可按下的攻击按钮 话基本就是没有券了，直接结束
-            Logger::log(QString("找不到 可按下的攻击按钮，票已清空"));
+            //找不到 可按下的攻击按钮，直接结束
+            Logger::log(QString("找不到 可按下的攻击按钮"));
             return;
         }
     }
@@ -112,6 +130,14 @@ void executeBorderBreakthrough()
     Logger::log(QString("结界突破-开始进行清票操作"));
     for (const Detection det : vec)
     {
+        //查看门票数量
+        tickets = getNumberOfTickets();
+        if (tickets == 0)
+        {
+            Logger::log(QString("门票已清空"));
+            return;
+        }
+
         waitWithEventProcessing(3000);
 
         //点击突破框
@@ -151,13 +177,28 @@ void executeBorderBreakthrough()
             }
         }else
         {
-            //找不到 可按下的攻击按钮 话基本就是没有券了，直接结束
-            Logger::log(QString("找不到 可按下的攻击按钮，票已清空"));
+            //找不到 可按下的攻击按钮 ，直接结束
+            Logger::log(QString("找不到 可按下的攻击按钮"));
             return;
         }
     }
 
     Logger::log(QString("结界突破执行完成"));
+}
+
+int getNumberOfTickets()
+{
+    ScriptActions& actions = ScriptActions::instance();
+    QJsonArray ticketsData = actions.ocrRecognizes(QRectF(80, 0, 100, 10));
+    if (ticketsData.empty())
+    {
+        return 0;
+    }
+    //正常来说只会有一个文字
+    QJsonObject item = ticketsData[0].toObject();
+    const QString text = item["text"].toString();
+    const QString tickets = text.split("/")[0];
+    return tickets.toInt();
 }
 
 } // namespace scenarios
