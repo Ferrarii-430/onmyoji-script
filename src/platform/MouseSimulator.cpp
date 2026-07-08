@@ -65,9 +65,8 @@ bool MouseSimulator::ExecuteTrajectoryWithClick(POINT start, POINT end,
         Sleep(delayBetweenPoints);
     }
 
-    // 在终点执行点击
-    // return true;
-    return Click();
+    // 在终点执行点击（显式指定终点坐标，避免光标被外部移动后点错位置）
+    return ClickAt(end.x, end.y);
 }
 
 // 隐蔽点击
