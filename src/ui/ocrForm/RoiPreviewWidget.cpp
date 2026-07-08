@@ -46,20 +46,7 @@ QRectF RoiPreviewWidget::canvasRect() const
     if (bounds.width() <= 0.0 || bounds.height() <= 0.0) {
         return {};
     }
-
-    const qreal aspect = (!image_.isNull() && image_.height() > 0)
-                             ? qreal(image_.width()) / qreal(image_.height())
-                             : 16.0 / 9.0;
-
-    QRectF canvas = bounds;
-    const qreal boundsAspect = bounds.width() / bounds.height();
-    if (boundsAspect > aspect) {
-        canvas.setWidth(bounds.height() * aspect);
-    } else {
-        canvas.setHeight(bounds.width() / aspect);
-    }
-    canvas.moveCenter(bounds.center());
-    return canvas;
+    return bounds;
 }
 
 QRectF RoiPreviewWidget::roiRectIn(const QRectF &canvas) const
@@ -96,7 +83,7 @@ void RoiPreviewWidget::paintEvent(QPaintEvent *)
         painter.drawRect(canvas);
 
         painter.setPen(QColor("#b0b0b0"));
-        painter.drawText(canvas, Qt::AlignCenter, tr("未上传图片\n按 16:9 预览识别区域"));
+        painter.drawText(canvas, Qt::AlignCenter, tr("未上传图片"));
     }
 
     const QRectF roi = roiRectIn(canvas);
