@@ -91,9 +91,8 @@ void executeBorderBreakthrough()
     {
         cv::Rect matchRect = vec[i].bbox;
         cv::Point clickPt = vision::randomPointInRectExcludeWidth(matchRect, 0.0, 0.3, 10);
-        Logger::log(vec[i].className);
-        std::cout << vec[i].bbox << std::endl;
-        std::cout << matchRect << std::endl;
+        // Logger::log(vec[i].className);
+        // std::cout << matchRect << std::endl;
         window.clickInWindow(clickPt);
         waitWithEventProcessing(3000);
 
@@ -119,13 +118,13 @@ void executeBorderBreakthrough()
                     window.postKey(VK_ESCAPE);
                     waitWithEventProcessing(200);
                     window.postKey(VK_RETURN);
-                    waitWithEventProcessing(6000);
+                    waitWithEventProcessing(8000);
 
                     Logger::log(QString("识别失败并点击"));
                     //识别战斗失败 并点击，成功则退出等待循环，否则结束任务
                     QString savePath = actions.ocrRecognizesAndClick("失败", 0.5, true);
                     if (savePath.isEmpty()) {
-                        Logger::log(QString("未识别到\"失败\"字样，结束任务"));
+                        Logger::log(QString("未识别到目标字样，结束任务"));
                         return;
                     }
                     waitWithEventProcessing(8000);
