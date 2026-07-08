@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>291</width>
-    <height>307</height>
+    <height>400</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -19,7 +19,7 @@
      <x>0</x>
      <y>0</y>
      <width>291</width>
-     <height>301</height>
+     <height>394</height>
     </rect>
    </property>
    <layout class="QFormLayout" name="formLayout">
@@ -57,23 +57,109 @@
      </widget>
     </item>
     <item row="4" column="0">
+     <widget class="QLabel" name="roiPosLabel">
+      <property name="text">
+       <string>区域左/上(%)</string>
+      </property>
+      <property name="toolTip">
+       <string>识别区域左上角坐标，占图片宽/高的百分比</string>
+      </property>
+     </widget>
+    </item>
+    <item row="4" column="1">
+     <layout class="QHBoxLayout" name="roiPosLayout">
+      <item>
+       <widget class="QDoubleSpinBox" name="roiXBox">
+        <property name="maximum">
+         <double>100.000000000000000</double>
+        </property>
+        <property name="decimals">
+         <number>1</number>
+        </property>
+        <property name="suffix">
+         <string>%</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QDoubleSpinBox" name="roiYBox">
+        <property name="maximum">
+         <double>100.000000000000000</double>
+        </property>
+        <property name="decimals">
+         <number>1</number>
+        </property>
+        <property name="suffix">
+         <string>%</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+    <item row="5" column="0">
+     <widget class="QLabel" name="roiSizeLabel">
+      <property name="text">
+       <string>区域宽/高(%)</string>
+      </property>
+      <property name="toolTip">
+       <string>识别区域宽高，占图片宽/高的百分比；100%x100% 表示识别整张图片</string>
+      </property>
+     </widget>
+    </item>
+    <item row="5" column="1">
+     <layout class="QHBoxLayout" name="roiSizeLayout">
+      <item>
+       <widget class="QDoubleSpinBox" name="roiWBox">
+        <property name="maximum">
+         <double>100.000000000000000</double>
+        </property>
+        <property name="decimals">
+         <number>1</number>
+        </property>
+        <property name="suffix">
+         <string>%</string>
+        </property>
+        <property name="value">
+         <double>100.000000000000000</double>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QDoubleSpinBox" name="roiHBox">
+        <property name="maximum">
+         <double>100.000000000000000</double>
+        </property>
+        <property name="decimals">
+         <number>1</number>
+        </property>
+        <property name="suffix">
+         <string>%</string>
+        </property>
+        <property name="value">
+         <double>100.000000000000000</double>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+    <item row="6" column="0">
      <widget class="QLabel" name="label_4">
       <property name="text">
        <string>识别失败处理</string>
       </property>
      </widget>
     </item>
-    <item row="4" column="1">
+    <item row="6" column="1">
      <widget class="QComboBox" name="opencvErrorHandle"/>
     </item>
-    <item row="5" column="0">
+    <item row="7" column="0">
      <widget class="QLabel" name="stepInputLabel">
       <property name="text">
        <string>跳转步骤</string>
       </property>
      </widget>
     </item>
-    <item row="5" column="1">
+    <item row="7" column="1">
      <widget class="QComboBox" name="stepInputBox"/>
     </item>
     <item row="3" column="0">
