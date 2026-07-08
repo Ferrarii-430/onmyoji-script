@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>291</width>
-    <height>400</height>
+    <height>560</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -19,7 +19,7 @@
      <x>0</x>
      <y>0</y>
      <width>291</width>
-     <height>394</height>
+     <height>554</height>
     </rect>
    </property>
    <layout class="QFormLayout" name="formLayout">
@@ -186,9 +186,47 @@
       </property>
      </widget>
     </item>
+    <item row="8" column="0">
+     <widget class="QLabel" name="label_5">
+      <property name="text">
+       <string>预览</string>
+      </property>
+     </widget>
+    </item>
+    <item row="8" column="1">
+     <widget class="QToolButton" name="btnUploadImage">
+      <property name="text">
+       <string>上传图片查看区域</string>
+      </property>
+     </widget>
+    </item>
+    <item row="9" column="0" colspan="2">
+     <widget class="RoiPreviewWidget" name="roiPreview">
+      <property name="minimumSize">
+       <size>
+        <width>260</width>
+        <height>150</height>
+       </size>
+      </property>
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+     </widget>
+    </item>
    </layout>
   </widget>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>RoiPreviewWidget</class>
+   <extends>QWidget</extends>
+   <header>src/ui/ocrForm/RoiPreviewWidget.h</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections/>
 </ui>
