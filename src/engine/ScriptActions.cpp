@@ -2,6 +2,7 @@
 
 #include <windows.h>
 #include <cmath>
+#include <algorithm>
 #include <QDebug>
 #include <QDir>
 #include <QFileInfo>
@@ -464,6 +465,33 @@ std::vector<Detection> ScriptActions::yoloRecognizes(const double threshold, dou
     processAndShowImage(savePath);
 
     return final_detections;
+}
+
+/**
+ * @param threshold 得分
+ * @param targetLabels 需要包含的标签列表
+ * @param matchAll 是否需要全部标签都命中
+ */
+bool ScriptActions::yoloContainsLabels(const double threshold, const QStringList& targetLabels, const bool matchAll)
+{
+    if (targetLabels.isEmpty()) {
+        Logger::log(QString("YOLO标签为空"));
+        return false;
+    }
+
+    const auto detections = yoloRecognizes(threshold, 0.0, 0.0);
+    const auto matchesLabel = [&detections](const QString& label) {
+        return hasDetectionWithLabel(detections, label);
+    };
+
+    const bool matched = matchAll
+        ? std::all_of(targetLabels.cbegin(), targetLabels.cend(), matchesLabel)
+        : std::any_of(targetLabels.cbegin(), targetLabels.cend(), matchesLabel);
+
+    Logger::log(QString("YOLO标签%1: %2")
+                    .arg(matched ? "命中" : "未命中")
+                    .arg(targetLabels.join(", ")));
+    return matched;
 }
 
 bool ScriptActions::hasDetectionWithLabel(const std::vector<Detection>& detections, const QString& targetLabel)
