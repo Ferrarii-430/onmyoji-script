@@ -64,9 +64,13 @@ void GameWindow::clickInWindow(const cv::Point& clickPoint)
         return;
     }
 
-    const cv::Point clientPoint = mapCapturePointToClient(clickPoint);
     RECT mapClientRect{};
     GetClientRect(hwnd_, &mapClientRect);
+    const bool isDegenerateClientRect = IsIconic(hwnd_)
+        || mapClientRect.right <= 0
+        || mapClientRect.bottom <= 0;
+
+    const cv::Point clientPoint = mapCapturePointToClient(clickPoint);
     Logger::log(QString("点击坐标映射: 捕获(%1,%2) -> 客户区(%3,%4), 捕获尺寸: %5x%6, 客户区尺寸: %7x%8")
                .arg(clickPoint.x).arg(clickPoint.y)
                .arg(clientPoint.x).arg(clientPoint.y)
@@ -75,7 +79,12 @@ void GameWindow::clickInWindow(const cv::Point& clickPoint)
                .arg(mapClientRect.right)
                .arg(mapClientRect.bottom));
 
-    if (!DPIHelper::IsPointInClientRect(hwnd_, clientPoint)) {
+    if (isDegenerateClientRect) {
+        if (lastCaptureSize_.width <= 0 || lastCaptureSize_.height <= 0) {
+            Logger::log(QString("错误: 点击坐标 (%1, %2) 超出客户区范围").arg(clientPoint.x).arg(clientPoint.y));
+            return;
+        }
+    } else if (!DPIHelper::IsPointInClientRect(hwnd_, clientPoint)) {
         Logger::log(QString("错误: 点击坐标 (%1, %2) 超出客户区范围").arg(clientPoint.x).arg(clientPoint.y));
         return;
     }
@@ -95,7 +104,9 @@ void GameWindow::clickInWindow(const cv::Point& clickPoint)
                .arg(DPIHelper::GetWindowDPIScaling(hwnd_)));
 
     POINT screenPoint = { clientPoint.x, clientPoint.y };
-    ClientToScreen(hwnd_, &screenPoint);
+    if (!isDegenerateClientRect) {
+        ClientToScreen(hwnd_, &screenPoint);
+    }
 
     Logger::log(QString("坐标转换 - 客户区: (%1, %2) -> 屏幕: (%3, %4)")
                .arg(clientPoint.x).arg(clientPoint.y)
@@ -104,7 +115,10 @@ void GameWindow::clickInWindow(const cv::Point& clickPoint)
     bool success = false;
     QString mouseClickMode = SETTING_CONFIG.getMouseClickMode();
 
-    if (mouseClickMode == "PostMessage") {
+    if (isDegenerateClientRect) {
+        Logger::log(QString("窗口最小化或客户区为0，使用后台消息点击(PostMessage)"));
+        success = simulator.StealthMessageClick(hwnd_, clientPoint.x, clientPoint.y);
+    } else if (mouseClickMode == "PostMessage") {
         success = simulator.StealthMessageClick(hwnd_, clientPoint.x, clientPoint.y);
     } else if (mouseClickMode == "InputMouse") {
         POINT start = MouseSimulator::GetCurrentPosition();
@@ -142,9 +156,18 @@ cv::Point GameWindow::mapCapturePointToClient(const cv::Point& capturePoint)
     const int windowHeight = windowRect.bottom - windowRect.top;
     const int captureWidth = lastCaptureSize_.width;
     const int captureHeight = lastCaptureSize_.height;
+    const bool isDegenerateClientRect = IsIconic(hwnd_)
+        || clientWidth <= 0
+        || clientHeight <= 0;
 
     cv::Point mapped = capturePoint;
     constexpr int tolerance = 2;
+
+    if (isDegenerateClientRect) {
+        mapped.x = std::clamp(mapped.x, 0, std::max(0, captureWidth - 1));
+        mapped.y = std::clamp(mapped.y, 0, std::max(0, captureHeight - 1));
+        return mapped;
+    }
 
     if (std::abs(captureWidth - windowWidth) <= tolerance
         && std::abs(captureHeight - windowHeight) <= tolerance) {
