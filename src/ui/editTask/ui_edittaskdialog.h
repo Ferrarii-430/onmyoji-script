@@ -32,7 +32,7 @@ public:
     {
         if (EditTaskDialog->objectName().isEmpty())
             EditTaskDialog->setObjectName("EditTaskDialog");
-        EditTaskDialog->resize(479, 496);
+        EditTaskDialog->resize(479, 700);
         label = new QLabel(EditTaskDialog);
         label->setObjectName("label");
         label->setGeometry(QRect(80, 30, 61, 16));
@@ -41,10 +41,10 @@ public:
         comboBox->setGeometry(QRect(165, 30, 211, 23));
         stackedWidget = new QStackedWidget(EditTaskDialog);
         stackedWidget->setObjectName("stackedWidget");
-        stackedWidget->setGeometry(QRect(80, 80, 291, 350));
+        stackedWidget->setGeometry(QRect(80, 80, 291, 560));
         buttonBox = new QDialogButtonBox(EditTaskDialog);
         buttonBox->setObjectName("buttonBox");
-        buttonBox->setGeometry(QRect(130, 450, 221, 23));
+        buttonBox->setGeometry(QRect(130, 660, 221, 23));
         QSizePolicy sizePolicy(QSizePolicy::Policy::Fixed, QSizePolicy::Policy::Fixed);
         sizePolicy.setHorizontalStretch(0);
         sizePolicy.setVerticalStretch(0);
