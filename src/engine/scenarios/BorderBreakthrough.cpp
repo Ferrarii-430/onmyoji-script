@@ -97,27 +97,37 @@ void executeBorderBreakthrough()
         //点击攻击
         if (actions.ocrRecognizesAndClick("进攻",0.55,true) != nullptr)
         {
-            //检查是否已经进入战斗 能否退出
-            if (actions.yoloContainsLabels(0.55, ["realm-realm_card-reward"], false))
+            const int MAX_ATTEMPTS = 5;  // 5次 * 1秒 = 5秒
+            int attempts = 0;
+            //进入10秒的等待，未进入战斗则结束任务
+            while (attempts < MAX_ATTEMPTS)
             {
-                Logger::log(QString("准备退出战斗"));
-                waitWithEventProcessing(5000);
+                waitWithEventProcessing(1000);  // 每次循环前等待1秒
+                attempts++;
 
-                //按下esc 再按下enter
-                window.postKey(VK_ESCAPE);
-                waitWithEventProcessing(200);
-                window.postKey(VK_RETURN);
-                waitWithEventProcessing(5000);
+                //检查是否已经进入战斗 能否退出
+                if (actions.yoloContainsLabels(0.55, {"common-exit-battle"}, false))
+                {
+                    Logger::log(QString("准备退出战斗"));
+                    waitWithEventProcessing(500);
 
-                Logger::log(QString("识别失败并点击"));
-                //识别战斗失败 并点击
-                QString savePath = actions.ocrRecognizesAndClick("失败", 0.5, true);
-                actions.processAndShowImage(savePath);
-                waitWithEventProcessing(5000);
-            }else
-            {
-                Logger::log(QString("未进入战斗，任务结束"));
-                return;
+                    //按下esc 再按下enter
+                    window.postKey(VK_ESCAPE);
+                    waitWithEventProcessing(200);
+                    window.postKey(VK_RETURN);
+                    waitWithEventProcessing(3000);
+
+                    Logger::log(QString("识别失败并点击"));
+                    //识别战斗失败 并点击
+                    QString savePath = actions.ocrRecognizesAndClick("失败", 0.5, true);
+                    actions.processAndShowImage(savePath);
+                    waitWithEventProcessing(4000);
+                }
+
+                if (attempts >= MAX_ATTEMPTS) {
+                    qWarning() << "达到最大尝试次数" << MAX_ATTEMPTS << "，未找进入战斗，结束任务";
+                    return;
+                }
             }
         }else
         {
