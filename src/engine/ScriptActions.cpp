@@ -23,14 +23,14 @@
 
 namespace {
 
-// 在结果图上绘制醒目的点击标记：白色描边 + 大号红点 + 十字线
+// 在结果图上绘制点击标记：白色描边 + 红点 + 十字线
 void drawClickMarker(cv::Mat& img, const cv::Point& clickPt)
 {
-    constexpr int radius = 12;
-    cv::circle(img, clickPt, radius + 3, cv::Scalar(255, 255, 255), 3);
+    constexpr int radius = 7;
+    cv::circle(img, clickPt, radius + 2, cv::Scalar(255, 255, 255), 2);
     cv::circle(img, clickPt, radius, cv::Scalar(0, 0, 255), -1);
     cv::drawMarker(img, clickPt, cv::Scalar(255, 255, 255),
-                   cv::MARKER_CROSS, radius * 2, 2);
+                   cv::MARKER_CROSS, radius * 2, 1);
 }
 
 } // namespace

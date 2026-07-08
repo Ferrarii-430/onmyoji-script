@@ -122,10 +122,14 @@ void executeBorderBreakthrough()
                     waitWithEventProcessing(6000);
 
                     Logger::log(QString("识别失败并点击"));
-                    //识别战斗失败 并点击
+                    //识别战斗失败 并点击，成功则退出等待循环，否则结束任务
                     QString savePath = actions.ocrRecognizesAndClick("失败", 0.5, true);
-                    actions.processAndShowImage(savePath);
+                    if (savePath.isEmpty()) {
+                        Logger::log(QString("未识别到\"失败\"字样，结束任务"));
+                        return;
+                    }
                     waitWithEventProcessing(8000);
+                    break;
                 }
 
                 if (attempts >= MAX_ATTEMPTS) {
