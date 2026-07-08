@@ -515,12 +515,16 @@ bool ScriptActions::clickDetectionByLabel(const QString& targetLabel, double thr
             QString matchPath = AppPaths::instance().matchResultPath();
             cv::Mat captureImg = cv::imread(capturePath.toStdString());
             QString labelName = ClassNameCache::getClassName(det_.class_id);
-            cv::rectangle(captureImg, det_.bbox, cv::Scalar(0, 255, 0), 2);
-            std::string label = labelName.toStdString();
-            cv::putText(captureImg, label, cv::Point(det_.bbox.x, det_.bbox.y - 10),
-                       cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 0), 1);
-            cv::imwrite(matchPath.toStdString(), captureImg);
-            processAndShowImage(matchPath);
+            if (!captureImg.empty()) {
+                cv::rectangle(captureImg, det_.bbox, cv::Scalar(0, 255, 0), 2);
+                std::string label = labelName.toStdString();
+                cv::putText(captureImg, label, cv::Point(det_.bbox.x, det_.bbox.y - 10),
+                           cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 0), 1);
+                cv::imwrite(matchPath.toStdString(), captureImg);
+                processAndShowImage(matchPath);
+            } else {
+                Logger::log(QString("共享内存截图缺失，跳过调试图保存"));
+            }
 
             GameWindow::instance().clickInWindow(physicalClickPt);
             return true;
