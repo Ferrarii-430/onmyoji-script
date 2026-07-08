@@ -156,7 +156,7 @@ QJsonArray ScriptActions::ocrRecognizes(const QRectF& roiPercent)
         }
         ocrImagePath = saveDir + "ocr_roi_capture.png";
         cv::imwrite(ocrImagePath.toStdString(), winImg(roiRect));
-        Logger::log(QString("OCR识别区域: 百分比(%1%%,%2%%,%3%%,%4%%) -> 像素(%5,%6,%7x%8)")
+        Logger::log(QString("OCR识别区域: 百分比(%1%,%2%,%3%,%4%) -> 像素(%5,%6,%7x%8)")
                         .arg(roiPercent.x()).arg(roiPercent.y())
                         .arg(roiPercent.width()).arg(roiPercent.height())
                         .arg(roiRect.x).arg(roiRect.y)
@@ -509,7 +509,7 @@ bool ScriptActions::clickDetectionByLabel(const QString& targetLabel, double thr
 
     for (auto& det_ : detections_) {
         if (comparesEqual(det_.className, targetLabel)) {
-            cv::Point physicalClickPt = vision::randomPointInRectExcludeWidth(det_.bbox, 0.0, 0.0, 10);
+            cv::Point physicalClickPt = vision::randomPointInRectExcludeWidth(det_.bbox, 0.0, 0.0, 3);
 
             QString capturePath = AppPaths::instance().dx11CapturePath();
             QString matchPath = AppPaths::instance().matchResultPath();

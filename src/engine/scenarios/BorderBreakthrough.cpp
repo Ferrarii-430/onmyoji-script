@@ -49,12 +49,12 @@ void executeBorderBreakthrough()
 
         // 点击刷新按钮
         if (actions.clickDetectionByLabel("common-btn-yellow_confirm", 0.5, 0.0, 0.0)) {
-            waitWithEventProcessing(1500); // 等待刷新确认界面出现
+            waitWithEventProcessing(3000); // 等待刷新确认界面出现
 
             // 点击确认刷新
             if (actions.clickDetectionByLabel("common-btn-yellow_confirm", 0.5, 0.0, 0.0)) {
                 Logger::log(QString("刷新成功"));
-                waitWithEventProcessing(3000); // 等待刷新完成
+                waitWithEventProcessing(4000); // 等待刷新完成
 
                 // 刷新后重新执行
                 executeBorderBreakthrough(); //此时会进入投4逻辑
@@ -75,6 +75,7 @@ void executeBorderBreakthrough()
         Logger::log(QString("门票已清空"));
         return;
     }
+    Logger::log("门票剩余:" + std::to_string(tickets));
 
     //开始进行投4
     Logger::log(QString("结界突破-开始进行投4"));
@@ -90,6 +91,9 @@ void executeBorderBreakthrough()
     {
         cv::Rect matchRect = vec[i].bbox;
         cv::Point clickPt = vision::randomPointInRectExcludeWidth(matchRect, 0.0, 0.3, 10);
+        Logger::log(vec[i].className);
+        std::cout << vec[i].bbox << std::endl;
+        std::cout << matchRect << std::endl;
         window.clickInWindow(clickPt);
         waitWithEventProcessing(3000);
 
@@ -115,13 +119,13 @@ void executeBorderBreakthrough()
                     window.postKey(VK_ESCAPE);
                     waitWithEventProcessing(200);
                     window.postKey(VK_RETURN);
-                    waitWithEventProcessing(3000);
+                    waitWithEventProcessing(6000);
 
                     Logger::log(QString("识别失败并点击"));
                     //识别战斗失败 并点击
                     QString savePath = actions.ocrRecognizesAndClick("失败", 0.5, true);
                     actions.processAndShowImage(savePath);
-                    waitWithEventProcessing(4000);
+                    waitWithEventProcessing(8000);
                 }
 
                 if (attempts >= MAX_ATTEMPTS) {
@@ -147,6 +151,8 @@ void executeBorderBreakthrough()
             Logger::log(QString("门票已清空"));
             return;
         }
+        Logger::log("门票剩余:" + std::to_string(tickets));
+
 
         waitWithEventProcessing(3000);
 
