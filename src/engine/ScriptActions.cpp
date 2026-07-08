@@ -21,6 +21,20 @@
 #include "src/vision/OcrEngine.h"
 #include "src/vision/TemplateMatcher.h"
 
+namespace {
+
+// 在结果图上绘制醒目的点击标记：白色描边 + 大号红点 + 十字线
+void drawClickMarker(cv::Mat& img, const cv::Point& clickPt)
+{
+    constexpr int radius = 12;
+    cv::circle(img, clickPt, radius + 3, cv::Scalar(255, 255, 255), 3);
+    cv::circle(img, clickPt, radius, cv::Scalar(0, 0, 255), -1);
+    cv::drawMarker(img, clickPt, cv::Scalar(255, 255, 255),
+                   cv::MARKER_CROSS, radius * 2, 2);
+}
+
+} // namespace
+
 ScriptActions& ScriptActions::instance()
 {
     static ScriptActions instance;
@@ -105,13 +119,14 @@ QString ScriptActions::opencvRecognizesAndClick(const QString& templPath, const 
     // 保存带识别框和点击位置的图片
     cv::Mat resultImg = winImg.clone();
     cv::rectangle(resultImg, matchRect, cv::Scalar(0, 255, 0), 2);
-    cv::circle(resultImg, clickPt, 5, cv::Scalar(0, 0, 255), -1);
+    drawClickMarker(resultImg, clickPt);
 
     QString savePath = AppPaths::instance().matchResultPath();
     cv::imwrite(savePath.toStdString(), resultImg);
 
     Logger::log(QString("转换后点击点: (%1, %2)").arg(clickPt.x).arg(clickPt.y));
     GameWindow::instance().clickInWindow(clickPt);
+    processAndShowImage(savePath);
 
     return savePath;
 }
@@ -310,7 +325,7 @@ QString ScriptActions::ocrRecognizesAndClick(const QString& ocrText, const doubl
                         cv::rectangle(resultImg, roiRect, cv::Scalar(255, 128, 0), 2);
                     }
                     cv::rectangle(resultImg, matchRect, cv::Scalar(0, 255, 0), 2);
-                    cv::circle(resultImg, clickPt, 5, cv::Scalar(0, 0, 255), -1);
+                    drawClickMarker(resultImg, clickPt);
 
                     QDir dir(saveDir);
                     if (!dir.exists()) {
@@ -321,6 +336,7 @@ QString ScriptActions::ocrRecognizesAndClick(const QString& ocrText, const doubl
                     cv::imwrite(savePath.toStdString(), resultImg);
 
                     GameWindow::instance().clickInWindow(clickPt);
+                    processAndShowImage(savePath);
                     break;
                 }else
                 {
@@ -389,8 +405,8 @@ QString ScriptActions::yoloRecognizesAndClick(const double threshold, const bool
                                matchRect.y + matchRect.height / 2);
         }
 
-        // 在图像上标记点击点（红色圆点）
-        cv::circle(captureImg, clickPt, 5, cv::Scalar(0, 0, 255), -1);
+        // 在图像上标记点击点
+        drawClickMarker(captureImg, clickPt);
 
         GameWindow::instance().clickInWindow(clickPt);
     }else
@@ -410,6 +426,7 @@ QString ScriptActions::yoloRecognizesAndClick(const double threshold, const bool
 
     QString savePath = AppPaths::instance().matchResultPath();
     cv::imwrite(savePath.toStdString(), captureImg);
+    processAndShowImage(savePath);
 
     if (matchRect.empty())
     {
@@ -520,6 +537,7 @@ bool ScriptActions::clickDetectionByLabel(const QString& targetLabel, double thr
                 std::string label = labelName.toStdString();
                 cv::putText(captureImg, label, cv::Point(det_.bbox.x, det_.bbox.y - 10),
                            cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 0), 1);
+                drawClickMarker(captureImg, physicalClickPt);
                 cv::imwrite(matchPath.toStdString(), captureImg);
                 processAndShowImage(matchPath);
             } else {
