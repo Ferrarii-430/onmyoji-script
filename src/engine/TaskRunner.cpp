@@ -11,6 +11,7 @@
 #include "src/core/EventLoopUtils.h"
 #include "src/core/Logger.h"
 #include "src/engine/ScriptActions.h"
+#include "src/engine/scenarios/Arena.h"
 #include "src/engine/scenarios/BorderBreakthrough.h"
 #include "src/game/GameWindow.h"
 #include "src/game/capture/CaptureService.h"
@@ -116,6 +117,11 @@ QString TaskRunner::executeStep(const QJsonObject& step)
 
         case ConfigTypeEnum::SYSTEM_BORDER_BREAKTHROUGH: {
                 scenarios::executeBorderBreakthrough();
+                break;
+        }
+
+        case ConfigTypeEnum::SYSTEM_ARENA: {
+                scenarios::executeArena();
                 break;
         }
 

@@ -94,6 +94,8 @@ add_executable(qtTest WIN32
         src/engine/ScriptActions.h
         src/engine/TaskRunner.cpp
         src/engine/TaskRunner.h
+        src/engine/scenarios/Arena.cpp
+        src/engine/scenarios/Arena.h
         src/engine/scenarios/BorderBreakthrough.cpp
         src/engine/scenarios/BorderBreakthrough.h
 
