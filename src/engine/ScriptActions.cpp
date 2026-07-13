@@ -224,6 +224,68 @@ QJsonArray ScriptActions::ocrRecognizes(const QRectF& roiPercent)
     return dataArray;
 }
 
+QString ScriptActions::ocrClickMatchedItem(const cv::Mat& winImg, const QJsonObject& item, const cv::Rect& roiRect,
+                                           const bool useRoi, const bool randomClick, const QString& saveDir)
+{
+    QJsonArray box = item["box"].toArray();
+    if (box.size() != 4) {
+        qWarning() << "box数组大小不正确，期望4个点，实际:" << box.size();
+        return QString();
+    }
+
+    // 提取四个点的坐标
+    QJsonArray point1 = box[0].toArray();
+    QJsonArray point2 = box[1].toArray();
+    QJsonArray point3 = box[2].toArray();
+    QJsonArray point4 = box[3].toArray();
+
+    int x1 = point1[0].toInt();
+    int y1 = point1[1].toInt();
+    int x2 = point2[0].toInt();
+    int y2 = point2[1].toInt();
+    int x3 = point3[0].toInt();
+    int y3 = point3[1].toInt();
+    int x4 = point4[0].toInt();
+    int y4 = point4[1].toInt();
+
+    // 计算矩形的最小外接矩形
+    int minX = std::min({x1, x2, x3, x4});
+    int minY = std::min({y1, y2, y3, y4});
+    int maxX = std::max({x1, x2, x3, x4});
+    int maxY = std::max({y1, y2, y3, y4});
+
+    // OCR 坐标相对于裁剪区域，换算回全图坐标
+    cv::Rect matchRect(minX + roiRect.x, minY + roiRect.y, maxX - minX, maxY - minY);
+
+    cv::Point clickPt;
+    if (randomClick) {
+        clickPt = vision::randomPointInRect(matchRect);
+    } else {
+        clickPt = cv::Point(matchRect.x + matchRect.width / 2,
+                           matchRect.y + matchRect.height / 2);
+    }
+
+    // 保存带识别框和点击位置的图片
+    cv::Mat resultImg = winImg.clone();
+    if (useRoi) {
+        cv::rectangle(resultImg, roiRect, cv::Scalar(255, 128, 0), 2);
+    }
+    cv::rectangle(resultImg, matchRect, cv::Scalar(0, 255, 0), 2);
+    drawClickMarker(resultImg, clickPt);
+
+    QDir dir(saveDir);
+    if (!dir.exists()) {
+        dir.mkpath(".");
+    }
+
+    QString savePath = AppPaths::instance().matchResultPath();
+    cv::imwrite(savePath.toStdString(), resultImg);
+
+    GameWindow::instance().clickInWindow(clickPt);
+    processAndShowImage(savePath);
+    return savePath;
+}
+
 QString ScriptActions::ocrRecognizesAndClick(const QString& ocrText, const double threshold, const bool randomClick,
                                              const QRectF& roiPercent)
 {
@@ -250,7 +312,6 @@ QString ScriptActions::ocrRecognizesAndClick(const QString& ocrText, const doubl
         for (int i = 0; i < dataArray.size(); ++i) {
             QJsonObject item = dataArray[i].toObject();
             QString text = item["text"].toString();
-            QJsonArray box = item["box"].toArray();
             double score = item["score"].toDouble();
 
             if (comparesEqual(text,ocrText))
@@ -258,64 +319,10 @@ QString ScriptActions::ocrRecognizesAndClick(const QString& ocrText, const doubl
                 hasOcrText = true;
                 if (score >= threshold)
                 {
-                    cv::Rect matchRect;
-                    cv::Point clickPt;
-                    if (box.size() == 4) {
-                        // 提取四个点的坐标
-                        QJsonArray point1 = box[0].toArray();
-                        QJsonArray point2 = box[1].toArray();
-                        QJsonArray point3 = box[2].toArray();
-                        QJsonArray point4 = box[3].toArray();
-
-                        int x1 = point1[0].toInt();
-                        int y1 = point1[1].toInt();
-                        int x2 = point2[0].toInt();
-                        int y2 = point2[1].toInt();
-                        int x3 = point3[0].toInt();
-                        int y3 = point3[1].toInt();
-                        int x4 = point4[0].toInt();
-                        int y4 = point4[1].toInt();
-
-                        // 计算矩形的最小外接矩形
-                        int minX = std::min({x1, x2, x3, x4});
-                        int minY = std::min({y1, y2, y3, y4});
-                        int maxX = std::max({x1, x2, x3, x4});
-                        int maxY = std::max({y1, y2, y3, y4});
-
-                        // OCR 坐标相对于裁剪区域，换算回全图坐标
-                        matchRect = cv::Rect(minX + roiRect.x, minY + roiRect.y,
-                                             maxX - minX, maxY - minY);
-                    } else {
-                        qWarning() << "box数组大小不正确，期望4个点，实际:" << box.size();
-                        continue;
+                    savePath = ocrClickMatchedItem(winImg, item, roiRect, useRoi, randomClick, saveDir);
+                    if (!savePath.isEmpty()) {
+                        break;
                     }
-
-                    if (randomClick) {
-                        clickPt = vision::randomPointInRect(matchRect);
-                    } else {
-                        clickPt = cv::Point(matchRect.x + matchRect.width / 2,
-                                           matchRect.y + matchRect.height / 2);
-                    }
-
-                    // 保存带识别框和点击位置的图片
-                    cv::Mat resultImg = winImg.clone();
-                    if (useRoi) {
-                        cv::rectangle(resultImg, roiRect, cv::Scalar(255, 128, 0), 2);
-                    }
-                    cv::rectangle(resultImg, matchRect, cv::Scalar(0, 255, 0), 2);
-                    drawClickMarker(resultImg, clickPt);
-
-                    QDir dir(saveDir);
-                    if (!dir.exists()) {
-                        dir.mkpath(".");
-                    }
-
-                    savePath = AppPaths::instance().matchResultPath();
-                    cv::imwrite(savePath.toStdString(), resultImg);
-
-                    GameWindow::instance().clickInWindow(clickPt);
-                    processAndShowImage(savePath);
-                    break;
                 }else
                 {
                     Logger::log(QString("[OCR] 已识别到:" + text + " 但分数过低"));
@@ -331,6 +338,51 @@ QString ScriptActions::ocrRecognizesAndClick(const QString& ocrText, const doubl
     }
 
     return savePath;
+}
+
+QString ScriptActions::ocrRecognizesAndClickAny(const QStringList& ocrTexts, const double threshold,
+                                                const bool randomClick, const QRectF& roiPercent)
+{
+    cv::Mat winImg = capture::captureGameWindow();
+
+    if (winImg.empty())
+    {
+        return QString();
+    }
+
+    const QString saveDir = AppPaths::instance().thumbnailPath();
+
+    QString ocrImagePath;
+    const cv::Rect roiRect = computeOcrRoi(winImg, roiPercent, saveDir, ocrImagePath);
+    const bool useRoi = !ocrImagePath.isEmpty();
+
+    // 只做一次 OCR，多个文字按填入顺序作为优先级，命中首个即点击并返回命中的文字
+    QJsonObject result = vision::runRapidOCR(ocrImagePath);
+    if (result.isEmpty()) {
+        return QString();
+    }
+
+    QJsonArray dataArray = result["data"].toArray();
+
+    for (const QString& ocrText : ocrTexts) {
+        for (int i = 0; i < dataArray.size(); ++i) {
+            QJsonObject item = dataArray[i].toObject();
+            if (!comparesEqual(item["text"].toString(), ocrText)) {
+                continue;
+            }
+            if (item["score"].toDouble() < threshold) {
+                Logger::log(QString("[OCR] 已识别到:" + item["text"].toString() + " 但分数过低"));
+                continue;
+            }
+            if (!ocrClickMatchedItem(winImg, item, roiRect, useRoi, randomClick, saveDir).isEmpty()) {
+                return ocrText;
+            }
+        }
+    }
+
+    Logger::log(QString("[OCR] 未识别到文字：" + ocrTexts.join("/")));
+    qDebug() << result;
+    return QString();
 }
 
 /**
@@ -497,37 +549,51 @@ bool ScriptActions::hasDetectionWithLabel(const std::vector<Detection>& detectio
         });
 }
 
-bool ScriptActions::clickDetectionByLabel(const QString& targetLabel, double threshold,
-                                          double excludeStart, double excludeEnd)
+void ScriptActions::clickDetection(const Detection& det)
 {
-    const auto detections_ = yoloRecognizes(threshold, excludeStart, excludeEnd);
+    cv::Point physicalClickPt = vision::randomPointInRectExcludeWidth(det.bbox, 0.0, 0.0, 3);
 
-    for (auto& det_ : detections_) {
-        if (comparesEqual(det_.className, targetLabel)) {
-            cv::Point physicalClickPt = vision::randomPointInRectExcludeWidth(det_.bbox, 0.0, 0.0, 3);
+    QString capturePath = AppPaths::instance().dx11CapturePath();
+    QString matchPath = AppPaths::instance().matchResultPath();
+    cv::Mat captureImg = cv::imread(capturePath.toStdString());
+    QString labelName = ClassNameCache::getClassName(det.class_id);
+    if (!captureImg.empty()) {
+        cv::rectangle(captureImg, det.bbox, cv::Scalar(0, 255, 0), 2);
+        std::string label = labelName.toStdString();
+        cv::putText(captureImg, label, cv::Point(det.bbox.x, det.bbox.y - 10),
+                   cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 0), 1);
+        drawClickMarker(captureImg, physicalClickPt);
+        cv::imwrite(matchPath.toStdString(), captureImg);
+        processAndShowImage(matchPath);
+    } else {
+        Logger::log(QString("共享内存截图缺失，跳过调试图保存"));
+    }
 
-            QString capturePath = AppPaths::instance().dx11CapturePath();
-            QString matchPath = AppPaths::instance().matchResultPath();
-            cv::Mat captureImg = cv::imread(capturePath.toStdString());
-            QString labelName = ClassNameCache::getClassName(det_.class_id);
-            if (!captureImg.empty()) {
-                cv::rectangle(captureImg, det_.bbox, cv::Scalar(0, 255, 0), 2);
-                std::string label = labelName.toStdString();
-                cv::putText(captureImg, label, cv::Point(det_.bbox.x, det_.bbox.y - 10),
-                           cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 0), 1);
-                drawClickMarker(captureImg, physicalClickPt);
-                cv::imwrite(matchPath.toStdString(), captureImg);
-                processAndShowImage(matchPath);
-            } else {
-                Logger::log(QString("共享内存截图缺失，跳过调试图保存"));
+    GameWindow::instance().clickInWindow(physicalClickPt);
+}
+
+QString ScriptActions::clickFirstDetectionByLabels(const QStringList& targetLabels, double threshold,
+                                                   double excludeStart, double excludeEnd)
+{
+    // 只截图/识别一次，按 targetLabels 的填入顺序作为优先级，命中哪个就点哪个（只点一次）
+    const auto detections = yoloRecognizes(threshold, excludeStart, excludeEnd);
+
+    for (const QString& targetLabel : targetLabels) {
+        for (const auto& det : detections) {
+            if (comparesEqual(det.className, targetLabel)) {
+                clickDetection(det);
+                return targetLabel;
             }
-
-            GameWindow::instance().clickInWindow(physicalClickPt);
-            return true;
         }
     }
 
-    return false;
+    return QString();
+}
+
+bool ScriptActions::clickDetectionByLabel(const QString& targetLabel, double threshold,
+                                          double excludeStart, double excludeEnd)
+{
+    return !clickFirstDetectionByLabels(QStringList{targetLabel}, threshold, excludeStart, excludeEnd).isEmpty();
 }
 
 // 智能路径处理：绝对路径直接使用，相对路径拼接基础路径

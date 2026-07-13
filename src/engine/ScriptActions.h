@@ -33,6 +33,10 @@ public:
     QJsonArray ocrRecognizes(const QRectF& roiPercent = QRectF());
     QString ocrRecognizesAndClick(const QString& ocrText, double threshold, bool randomClick,
                                   const QRectF& roiPercent = QRectF());
+    // 单次 OCR 识别，多个文字按填入顺序作为优先级，命中首个即点击并返回命中的文字，
+    // 全部未命中返回空。用于「只识别一次、多关键字择一点击」的场景。
+    QString ocrRecognizesAndClickAny(const QStringList& ocrTexts, double threshold, bool randomClick,
+                                     const QRectF& roiPercent = QRectF());
 
     // YOLO 识别
     std::vector<Detection> yoloRecognizes(double threshold, double excludeStartWidth, double excludeEndWidth);
@@ -44,6 +48,10 @@ public:
     // 在 YOLO 识别结果中点击指定标签，成功返回 true
     bool clickDetectionByLabel(const QString& targetLabel, double threshold,
                                double excludeStart, double excludeEnd);
+    // 单次 YOLO 识别，多个标签按填入顺序作为优先级，命中首个即点击并返回命中的标签，
+    // 全部未命中返回空。用于「只识别一次、多标签择一点击」的场景。
+    QString clickFirstDetectionByLabels(const QStringList& targetLabels, double threshold,
+                                        double excludeStart, double excludeEnd);
     static bool hasDetectionWithLabel(const std::vector<Detection>& detections, const QString& targetLabel);
 
     // 发射信号让 UI 显示识别结果图
@@ -57,6 +65,12 @@ private:
 
     static QString resolveTemplatePath(const QString& templatePath, const QString& basePath);
     static double dpiScalingFactor();
+
+    // 命中某个 YOLO 检测框后：画框、保存调试图、回显并点击
+    void clickDetection(const Detection& det);
+    // 命中某条 OCR 文字后：换算坐标、画框、保存调试图、回显并点击，返回结果图路径
+    QString ocrClickMatchedItem(const cv::Mat& winImg, const QJsonObject& item, const cv::Rect& roiRect,
+                                bool useRoi, bool randomClick, const QString& saveDir);
 };
 
 #endif // SCRIPTACTIONS_H
