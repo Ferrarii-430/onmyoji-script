@@ -1,5 +1,7 @@
 #include "src/engine/TaskRunner.h"
 
+#include <functional>
+
 #include <QJsonObject>
 #include <QMap>
 #include <QRandomGenerator>
@@ -32,27 +34,32 @@ QString TaskRunner::executeStep(const QJsonObject& step)
     ConfigTypeEnum type = stringToConfigType(typeStr);
     QString savePath;
 
+    // 识别类步骤统一的重试逻辑：最多尝试 3 次，成功即回显结果图并返回。
+    auto recognizeWithRetry = [this](const std::function<QString()>& recognize) -> QString {
+        constexpr int maxAttempts = 3;
+        for (int attempt = 1; attempt <= maxAttempts; ++attempt) {
+            QString path = recognize();
+            if (!path.isNull()) {
+                emit showImage(path);
+                return path;
+            }
+            if (attempt < maxAttempts) {
+                Logger::log(QString("截图失败，第%1次重试").arg(attempt));
+                core::waitWithEventProcessing(1000);
+            }
+        }
+        return QString();
+    };
+
     switch (type) {
         case ConfigTypeEnum::OPENCV: {
                 Logger::log(QString("开始进行OpenCV识图"));
                 QString imagePath = step["imagePath"].toString();
                 const double score = step["score"].toDouble();
                 const bool randomClick = step["randomClick"].toBool();
-                int retryCount = 0;
-
-                while (retryCount < 3) {
-                    savePath = actions.opencvRecognizesAndClick(imagePath, score, randomClick);
-                    if (!savePath.isNull()) {
-                        emit showImage(savePath);
-                        break; // 成功
-                    }
-
-                    retryCount++;
-                    if (retryCount < 3) {
-                        Logger::log(QString("截图失败，第%1次重试").arg(retryCount));
-                        core::waitWithEventProcessing(1000);
-                    }
-                }
+                savePath = recognizeWithRetry([&]() {
+                    return actions.opencvRecognizesAndClick(imagePath, score, randomClick);
+                });
                 break;
         }
 
@@ -63,21 +70,9 @@ QString TaskRunner::executeStep(const QJsonObject& step)
                 const bool randomClick = step["randomClick"].toBool();
                 const QRectF roiPercent(step["ocrRoiX"].toDouble(), step["ocrRoiY"].toDouble(),
                                         step["ocrRoiW"].toDouble(), step["ocrRoiH"].toDouble());
-                int retryCount = 0;
-
-                while (retryCount < 3) {
-                    savePath = actions.ocrRecognizesAndClick(ocrText, score, randomClick, roiPercent);
-                    if (!savePath.isNull()) {
-                        emit showImage(savePath);
-                        break; // 成功
-                    }
-
-                    retryCount++;
-                    if (retryCount < 3) {
-                        Logger::log(QString("截图失败，第%1次重试").arg(retryCount));
-                        core::waitWithEventProcessing(1000);
-                    }
-                }
+                savePath = recognizeWithRetry([&]() {
+                    return actions.ocrRecognizesAndClick(ocrText, score, randomClick, roiPercent);
+                });
                 break;
         }
 
@@ -91,21 +86,9 @@ QString TaskRunner::executeStep(const QJsonObject& step)
                     yoloLabel = "common-btn-yellow_confirm";
                 }
                 Logger::log(QString("YOLO目标标签: %1").arg(yoloLabel));
-                int retryCount = 0;
-
-                while (retryCount < 3) {
-                    savePath = actions.yoloRecognizesAndClick(score, randomClick, yoloLabel, 0.0, 0.0);
-                    if (!savePath.isNull()) {
-                        emit showImage(savePath);
-                        break; // 成功
-                    }
-
-                    retryCount++;
-                    if (retryCount < 3) {
-                        Logger::log(QString("截图失败，第%1次重试").arg(retryCount));
-                        core::waitWithEventProcessing(1000);
-                    }
-                }
+                savePath = recognizeWithRetry([&]() {
+                    return actions.yoloRecognizesAndClick(score, randomClick, yoloLabel, 0.0, 0.0);
+                });
                 break;
         }
 
