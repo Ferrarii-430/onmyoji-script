@@ -12,6 +12,7 @@ enum class ConfigTypeEnum {
     OCR,
     YOLO,
     SYSTEM_BORDER_BREAKTHROUGH,
+    SYSTEM_ARENA,
     UNKNOWN
 };
 
