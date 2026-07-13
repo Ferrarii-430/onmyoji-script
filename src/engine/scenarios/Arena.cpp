@@ -1,8 +1,7 @@
 #include "src/engine/scenarios/Arena.h"
 
-#include <initializer_list>
-
 #include <QString>
+#include <QStringList>
 
 #include "src/core/EventLoopUtils.h"
 #include "src/core/Logger.h"
@@ -33,16 +32,6 @@ void executeArena()
     ScriptActions& actions = ScriptActions::instance();
     Logger::log(QString("开始执行自动挂机斗技"));
 
-    // 依次尝试候选标签，命中哪个就点哪个，返回被点击的标签（都没命中则返回空）。
-    auto clickFirstPresentLabel = [&actions](std::initializer_list<const char*> labels) -> QString {
-        for (const char* label : labels) {
-            if (actions.clickDetectionByLabel(QString::fromLatin1(label), kYoloScore, 0.0, 0.0)) {
-                return QString::fromLatin1(label);
-            }
-        }
-        return QString();
-    };
-
     // 1. 点击「开始匹配」（部分界面按钮文案仅为「匹配」，两者都尝试）
     QString matchClick = actions.ocrRecognizesAndClick("战", kOcrScore, true, QRectF(80, 65, 100, 100));
     if (matchClick.isEmpty()) {
@@ -57,8 +46,8 @@ void executeArena()
     for (int i = 0; i < kMatchPollCount; ++i) {
         waitWithEventProcessing(kMatchPollInterval);
 
-        // 优先用 YOLO 标签识别准备/结算按钮，命中哪个就点哪个；回退到 OCR 文字「自动」
-        if (!clickFirstPresentLabel({"battle-ready"}).isEmpty()) {
+        // 优先用 YOLO 标签识别准备按钮（一次识别，多标签按优先级择一点击）；回退到 OCR 文字「自动」
+        if (!actions.clickFirstDetectionByLabels(QStringList{"battle-ready"}, kYoloScore, 0.0, 0.0).isEmpty()) {
             readied = true;
             break;
         }
@@ -83,18 +72,12 @@ void executeArena()
     for (int i = 0; i < kBattlePollCount; ++i) {
         waitWithEventProcessing(kBattlePollInterval);
 
-        // 战斗结束结算：命中 生利 点击继续
-        if (!actions.ocrRecognizesAndClick("生利", kOcrScore, true, QRectF(80, 65, 100, 100)).isEmpty()) {
+        // 战斗结束结算：一次 OCR 识别，命中「生利(胜利)」或「失败」哪个就点哪个
+        const QString settled = actions.ocrRecognizesAndClickAny(QStringList{"生利", "失败"}, kOcrScore, true,
+                                                                 QRectF(80, 65, 100, 100));
+        if (!settled.isEmpty()) {
             waitWithEventProcessing(2000);
-            Logger::log(QString("斗技本轮完成（结算：胜利）"));
-            isEnd = true;
-            break;
-        }
-
-        // 战斗结束结算：命中 失败 点击继续
-        if (!actions.ocrRecognizesAndClick("失败", kOcrScore, true, QRectF(80, 65, 100, 100)).isEmpty()) {
-            waitWithEventProcessing(2000);
-            Logger::log(QString("斗技本轮完成（结算：失败）"));
+            Logger::log(QString("斗技本轮完成（结算：%1）").arg(settled == QStringLiteral("生利") ? "胜利" : "失败"));
             isEnd = true;
             break;
         }
