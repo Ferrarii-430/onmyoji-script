@@ -1,5 +1,6 @@
 #include "src/engine/scenarios/Arena.h"
 
+#include <QJsonObject>
 #include <QString>
 #include <QStringList>
 
@@ -31,6 +32,10 @@ void executeArena()
 {
     ScriptActions& actions = ScriptActions::instance();
     Logger::log(QString("开始执行自动挂机斗技"));
+
+    // 0. 判断斗技荣誉值是否已刷满
+    // actions.ocrRecognizes(QRectF(80, 0, 100, 10));
+    // bool fraction = getNumberOfFraction();
 
     // 1. 点击「开始匹配」（部分界面按钮文案仅为「匹配」，两者都尝试）
     QString matchClick = actions.ocrRecognizesAndClick("战", kOcrScore, true, QRectF(80, 65, 100, 100));
@@ -73,11 +78,11 @@ void executeArena()
         waitWithEventProcessing(kBattlePollInterval);
 
         // 战斗结束结算：一次 OCR 识别，命中「生利(胜利)」或「失败」哪个就点哪个
-        const QString settled = actions.ocrRecognizesAndClickAny(QStringList{"生利", "失败"}, kOcrScore, true,
-                                                                 QRectF(80, 65, 100, 100));
+        const QString settled = actions.ocrRecognizesAndClickAny(QStringList{"胜利", "失败"}, kOcrScore, true,
+                                                                 QRectF(16, 0, 69, 37));
         if (!settled.isEmpty()) {
             waitWithEventProcessing(2000);
-            Logger::log(QString("斗技本轮完成（结算：%1）").arg(settled == QStringLiteral("生利") ? "胜利" : "失败"));
+            Logger::log(QString("斗技本轮完成（结算：%1）").arg(settled == QStringLiteral("胜利") ? "胜利" : "失败"));
             isEnd = true;
             break;
         }
@@ -87,6 +92,24 @@ void executeArena()
     }
 
     Logger::log(QString("等待战斗结束超时，结束本次执行"));
+}
+
+bool getNumberOfFraction()
+{
+    ScriptActions& actions = ScriptActions::instance();
+    QJsonArray fractionData = actions.ocrRecognizes(QRectF(8, 87, 10, 5));
+    if (fractionData.empty())
+    {
+        return 0;
+    }
+    //正常来说只会有一个文字
+    QJsonObject item = fractionData[0].toObject();
+    const QString text = item["text"].toString();
+    Logger::log(QString("当前斗技荣誉值：") + text);
+    const QString fraction = text.split("/")[0];
+    const QString total = text.split("/")[1];
+    return comparesEqual(fraction, total);
+    // return fraction.toInt();
 }
 
 } // namespace scenarios
