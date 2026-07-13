@@ -19,12 +19,12 @@ constexpr double kOcrScore = 0.6;   // OCR 命中阈值
 constexpr double kYoloScore = 0.55; // YOLO 命中阈值
 
 // 匹配对手最长等待：kMatchPollCount 次，每次 kMatchPollInterval 毫秒
-constexpr int kMatchPollInterval = 2000;
+constexpr int kMatchPollInterval = 3000;
 constexpr int kMatchPollCount = 15;
 
 // 战斗结束最长等待：kBattlePollCount 次，每次 kBattlePollInterval 毫秒
-constexpr int kBattlePollInterval = 5000;
-constexpr int kBattlePollCount = 24;
+constexpr int kBattlePollInterval = 30000;
+constexpr int kBattlePollCount = 40;
 
 } // namespace
 
@@ -58,11 +58,11 @@ void executeArena()
         waitWithEventProcessing(kMatchPollInterval);
 
         // 优先用 YOLO 标签识别准备/结算按钮，命中哪个就点哪个；回退到 OCR 文字「自动」
-        if (!clickFirstPresentLabel({"battle-ready", "battle-victory"}).isEmpty()) {
+        if (!clickFirstPresentLabel({"battle-ready"}).isEmpty()) {
             readied = true;
             break;
         }
-        if (!actions.ocrRecognizesAndClick("自动", kOcrScore, true).isEmpty()) {
+        if (!actions.ocrRecognizesAndClick("自动", kOcrScore, true, QRectF(0, 13, 13, 28)).isEmpty()) {
             readied = true;
             break;
         }
@@ -72,23 +72,35 @@ void executeArena()
         return;
     }
 
-    // 3. 进入战斗后确保开启「自动」
+    // 3. 进入战斗后确保开启「自动」,如果对面是手动上场，那就不管了，挂满30s会开自动的
     waitWithEventProcessing(8000);
     if (actions.yoloContainsLabels(kYoloScore, {"battle-auto"}, false)) {
         actions.clickDetectionByLabel("battle-auto", kYoloScore, 0.0, 0.0);
     }
 
     // 4. 轮询等待战斗结束（胜利/失败结算界面），出现后点击结算继续
+    bool isEnd = false;
     for (int i = 0; i < kBattlePollCount; ++i) {
         waitWithEventProcessing(kBattlePollInterval);
 
-        // 战斗结束结算：命中 battle-victory 或 battle-loss 都点击继续
-        const QString settled = clickFirstPresentLabel({"battle-victory", "battle-loss"});
-        if (!settled.isEmpty()) {
+        // 战斗结束结算：命中 生利 点击继续
+        if (!actions.ocrRecognizesAndClick("生利", kOcrScore, true, QRectF(80, 65, 100, 100)).isEmpty()) {
             waitWithEventProcessing(2000);
-            Logger::log(QString("斗技本轮完成（结算：%1）").arg(settled));
-            return;
+            Logger::log(QString("斗技本轮完成（结算：胜利）"));
+            isEnd = true;
+            break;
         }
+
+        // 战斗结束结算：命中 失败 点击继续
+        if (!actions.ocrRecognizesAndClick("失败", kOcrScore, true, QRectF(80, 65, 100, 100)).isEmpty()) {
+            waitWithEventProcessing(2000);
+            Logger::log(QString("斗技本轮完成（结算：失败）"));
+            isEnd = true;
+            break;
+        }
+    }
+    if (!isEnd) {
+        return;
     }
 
     Logger::log(QString("等待战斗结束超时，结束本次执行"));
