@@ -1,5 +1,7 @@
 #include "src/engine/scenarios/Arena.h"
 
+#include <initializer_list>
+
 #include <QString>
 
 #include "src/core/EventLoopUtils.h"
@@ -31,6 +33,16 @@ void executeArena()
     ScriptActions& actions = ScriptActions::instance();
     Logger::log(QString("开始执行自动挂机斗技"));
 
+    // 依次尝试候选标签，命中哪个就点哪个，返回被点击的标签（都没命中则返回空）。
+    auto clickFirstPresentLabel = [&actions](std::initializer_list<const char*> labels) -> QString {
+        for (const char* label : labels) {
+            if (actions.clickDetectionByLabel(QString::fromLatin1(label), kYoloScore, 0.0, 0.0)) {
+                return QString::fromLatin1(label);
+            }
+        }
+        return QString();
+    };
+
     // 1. 点击「开始匹配」（部分界面按钮文案仅为「匹配」，两者都尝试）
     QString matchClick = actions.ocrRecognizesAndClick("战", kOcrScore, true, QRectF(80, 65, 100, 100));
     if (matchClick.isEmpty()) {
@@ -45,12 +57,10 @@ void executeArena()
     for (int i = 0; i < kMatchPollCount; ++i) {
         waitWithEventProcessing(kMatchPollInterval);
 
-        // 优先用 YOLO 标签识别准备按钮，回退到 OCR 文字「准备」
-        if (actions.yoloContainsLabels(kYoloScore, {"battle-ready", "battle-victory"}, false)) {
-            if (actions.clickDetectionByLabel("battle-ready", kYoloScore, 0.0, 0.0)) {
-                readied = true;
-                break;
-            }
+        // 优先用 YOLO 标签识别准备/结算按钮，命中哪个就点哪个；回退到 OCR 文字「自动」
+        if (!clickFirstPresentLabel({"battle-ready", "battle-victory"}).isEmpty()) {
+            readied = true;
+            break;
         }
         if (!actions.ocrRecognizesAndClick("自动", kOcrScore, true).isEmpty()) {
             readied = true;
@@ -72,11 +82,11 @@ void executeArena()
     for (int i = 0; i < kBattlePollCount; ++i) {
         waitWithEventProcessing(kBattlePollInterval);
 
-        // 战斗胜利结算：YOLO 标签 battle-victory，battle-loss
-        if (actions.yoloContainsLabels(kYoloScore, {"battle-victory", "battle-loss"}, false)) {
-            actions.clickDetectionByLabel("battle-victory", kYoloScore, 0.0, 0.0);
+        // 战斗结束结算：命中 battle-victory 或 battle-loss 都点击继续
+        const QString settled = clickFirstPresentLabel({"battle-victory", "battle-loss"});
+        if (!settled.isEmpty()) {
             waitWithEventProcessing(2000);
-            Logger::log(QString("斗技本轮完成（胜利）"));
+            Logger::log(QString("斗技本轮完成（结算：%1）").arg(settled));
             return;
         }
     }
