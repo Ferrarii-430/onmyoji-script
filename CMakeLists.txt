@@ -132,6 +132,9 @@ if(WIN32)
     target_sources(qtTest PRIVATE img/logo.rc)
 endif()
 
+# 构建产物（exe）名称，与内部 target 名解耦
+set_target_properties(qtTest PROPERTIES OUTPUT_NAME "yys-script")
+
 # ------------------------------
 # 宏定义 & 包含目录
 # ------------------------------
