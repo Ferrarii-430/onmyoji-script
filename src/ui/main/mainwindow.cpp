@@ -258,7 +258,7 @@ void mainwindow::showSystemConfigForm(const QString &configId)
     form->setLabelAlignment(Qt::AlignRight | Qt::AlignVCenter);
 
     // 区域标题
-    auto *title = new QLabel(QStringLiteral("方案自定义配置"), m_systemConfigForm);
+    auto *title = new QLabel(QStringLiteral("方案配置"), m_systemConfigForm);
     title->setStyleSheet("font-weight: bold; font-size: 12pt; color: #333; padding-bottom: 4px;");
     form->addRow(title);
 

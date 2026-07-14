@@ -10,6 +10,14 @@
     "id": "D942C888-2449-41D2-A794-055586E39P13",
     "name": "系统方案-结界突破",
     "type": "system",
+    "systemConfig": [
+      {
+        "key": "retentionLevel",
+        "label": "保留当前等级(退4)",
+        "control": "switch",
+        "value": true
+      }
+    ],
     "steps": [
       {
         "identifyErrorHandle": "next",

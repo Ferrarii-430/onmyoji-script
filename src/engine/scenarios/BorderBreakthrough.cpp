@@ -9,6 +9,7 @@
 #include "src/core/AppPaths.h"
 #include "src/core/EventLoopUtils.h"
 #include "src/core/Logger.h"
+#include "src/core/ProfileStore.h"
 #include "src/engine/ScriptActions.h"
 #include "src/game/GameWindow.h"
 #include "src/vision/Geometry.h"
@@ -25,6 +26,10 @@ void executeBorderBreakthrough()
 
     std::vector<Detection> vec;
     Logger::log(QString("开始执行结界突破"));
+
+    const QString configId = currentItem.id;
+    const bool retentionLevel = getSystemConfigValue(configId, "retentionLevel", true).toBool(true);
+    Logger::log(QString("结界突破运行配置: 保留当前等级=%1").arg(retentionLevel));
 
     // 识别当前界面状态
     auto detections = actions.yoloRecognizes(0.5, 0.0, 0.3);
@@ -76,73 +81,79 @@ void executeBorderBreakthrough()
         return;
     }
 
-    //开始进行投4
-    Logger::log(QString("结界突破-开始进行投4"));
-    for (auto& det : detections) {
-        if (comparesEqual(det.className, "realm_raid-realm-normal"))
-        {
-            //正常会有9个
-            vec.push_back(det);
-        }
-    }
-    int surrenderIndex[4] = {1,3,5,7};
-    for (int i : surrenderIndex)
+    //判断是否需要进入保留等级
+    if (retentionLevel)
     {
-        cv::Rect matchRect = vec[i].bbox;
-        cv::Point clickPt = vision::randomPointInRectExcludeWidth(matchRect, 0.0, 0.3, 10);
-        // Logger::log(vec[i].className);
-        // std::cout << matchRect << std::endl;
-        window.clickInWindow(clickPt);
-        waitWithEventProcessing(3000);
-
-        Logger::log(QString("开始点击进攻"));
-        //点击攻击
-        if (actions.ocrRecognizesAndClick("进攻",0.55,true) != nullptr)
-        {
-            const int MAX_ATTEMPTS = 5;  // 5次 * 1秒 = 5秒
-            int attempts = 0;
-            //进入10秒的等待，未进入战斗则结束任务
-            while (attempts < MAX_ATTEMPTS)
+        //开始进行投4
+        Logger::log(QString("结界突破-等级保留-开始进行投4"));
+        for (auto& det : detections) {
+            if (comparesEqual(det.className, "realm_raid-realm-normal"))
             {
-                waitWithEventProcessing(1000);  // 每次循环前等待1秒
-                attempts++;
+                //正常会有9个
+                vec.push_back(det);
+            }
+        }
+        int surrenderIndex[4] = {1,3,5,7};
+        for (int i : surrenderIndex)
+        {
+            cv::Rect matchRect = vec[i].bbox;
+            cv::Point clickPt = vision::randomPointInRectExcludeWidth(matchRect, 0.0, 0.3, 10);
+            // Logger::log(vec[i].className);
+            // std::cout << matchRect << std::endl;
+            window.clickInWindow(clickPt);
+            waitWithEventProcessing(3000);
 
-                //检查是否已经进入战斗 能否退出
-                if (actions.yoloContainsLabels(0.55, {"common-exit-battle"}, false))
+            Logger::log(QString("开始点击进攻"));
+            //点击攻击
+            if (actions.ocrRecognizesAndClick("进攻",0.55,true) != nullptr)
+            {
+                const int MAX_ATTEMPTS = 5;  // 5次 * 1秒 = 5秒
+                int attempts = 0;
+                //进入10秒的等待，未进入战斗则结束任务
+                while (attempts < MAX_ATTEMPTS)
                 {
-                    Logger::log(QString("准备退出战斗"));
-                    waitWithEventProcessing(500);
+                    waitWithEventProcessing(1000);  // 每次循环前等待1秒
+                    attempts++;
 
-                    //按下esc 再按下enter
-                    window.postKey(VK_ESCAPE);
-                    waitWithEventProcessing(200);
-                    window.postKey(VK_RETURN);
-                    waitWithEventProcessing(10000);
+                    //检查是否已经进入战斗 能否退出
+                    if (actions.yoloContainsLabels(0.55, {"common-exit-battle"}, false))
+                    {
+                        Logger::log(QString("准备退出战斗"));
+                        waitWithEventProcessing(500);
 
-                    Logger::log(QString("识别失败并点击"));
-                    //识别战斗失败 并点击，成功则退出等待循环，否则结束任务
-                    QString savePath = actions.ocrRecognizesAndClick("失败", 0.5, true);
-                    if (savePath.isEmpty()) {
-                        Logger::log(QString("未识别到目标字样，结束任务"));
+                        //按下esc 再按下enter
+                        window.postKey(VK_ESCAPE);
+                        waitWithEventProcessing(200);
+                        window.postKey(VK_RETURN);
+                        waitWithEventProcessing(10000);
+
+                        Logger::log(QString("识别失败并点击"));
+                        //识别战斗失败 并点击，成功则退出等待循环，否则结束任务
+                        QString savePath = actions.ocrRecognizesAndClick("失败", 0.5, true);
+                        if (savePath.isEmpty()) {
+                            Logger::log(QString("未识别到目标字样，结束任务"));
+                            return;
+                        }
+                        waitWithEventProcessing(8000);
+                        break;
+                    }
+
+                    if (attempts >= MAX_ATTEMPTS) {
+                        qWarning() << "达到最大尝试次数" << MAX_ATTEMPTS << "，未找进入战斗，结束任务";
                         return;
                     }
-                    waitWithEventProcessing(8000);
-                    break;
                 }
-
-                if (attempts >= MAX_ATTEMPTS) {
-                    qWarning() << "达到最大尝试次数" << MAX_ATTEMPTS << "，未找进入战斗，结束任务";
-                    return;
-                }
+            }else
+            {
+                //找不到 可按下的攻击按钮，直接结束
+                Logger::log(QString("找不到 可按下的攻击按钮"));
+                return;
             }
-        }else
-        {
-            //找不到 可按下的攻击按钮，直接结束
-            Logger::log(QString("找不到 可按下的攻击按钮"));
-            return;
         }
     }
+
     waitWithEventProcessing(5000);
+
     Logger::log(QString("结界突破-开始进行清票操作"));
     for (const Detection det : vec)
     {
