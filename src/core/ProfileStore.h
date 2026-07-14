@@ -31,4 +31,18 @@ QJsonArray getConfigJSON();
 QJsonArray getLastConfigJSON();
 void commonSetCurrentItem(const QString &id, const QString &taskName);
 QMap<QString,QString> getStepsSelect(const QString &configId, const QString &currentStepsId);
+
+// ------------------------------
+// 系统方案自定义配置 systemConfig 的读写
+// 每个系统方案(config.json 里 type=="system")可带一个 systemConfig 数组，
+// 数组每项既描述控件(control/label/min/max/...)又存当前值(value)，key 为唯一标识。
+// ------------------------------
+// 读取某方案完整的 systemConfig 数组(含控件描述)，无则返回空数组，用于 UI 渲染表单
+QJsonArray getSystemConfig(const QString &configId);
+// 按 key 读取某方案的配置值(只取 value)，找不到时返回 defaultValue，用于场景运行时取值
+QJsonValue getSystemConfigValue(const QString &configId, const QString &key,
+                                const QJsonValue &defaultValue = QJsonValue());
+// 更新某方案某 key 的配置值并写回文件(只改 value，不动控件描述)
+void updateSystemConfigValue(const QString &filePath, const QString &configId,
+                             const QString &key, const QJsonValue &value);
 #endif //COMMON_H

@@ -32,6 +32,10 @@ public:
     void onProgrammeDownBtnClicked();
 
 private:
+    // 系统方案的动态配置表单容器(按 systemConfig 描述生成，改动即持久化)
+    QWidget *m_systemConfigForm = nullptr;
+    void showSystemConfigForm(const QString &configId);
+
     void loadListWidgetData();
     void onItemClicked(QListWidgetItem *item);
     void showStepsInTable(const QJsonArray &steps);

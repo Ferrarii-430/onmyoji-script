@@ -15,6 +15,11 @@
 #include <QTimer>
 #include <QDebug>
 #include <QInputDialog>
+#include <QCheckBox>
+#include <QComboBox>
+#include <QDoubleSpinBox>
+#include <QFormLayout>
+#include <QSpinBox>
 #include "QMessageBox"
 
 #include "src/core/AppPaths.h"
@@ -206,8 +211,9 @@ void mainwindow::onItemClicked(QListWidgetItem *item) {
         ui->tableWidget->clear(); // 清空表格
         ui->tableWidget->setRowCount(0);
         ui->tableWidget->setColumnCount(0);
-        ui->systemConfigTips->show();
         ui->programmeContentAddBtn->setDisabled(true);
+        // 按该系统方案的 systemConfig 生成可编辑表单(无自定义配置则退回原提示)
+        showSystemConfigForm(id);
     }else
     {
         ui->programmeContentAddBtn->setDisabled(false);
@@ -215,9 +221,96 @@ void mainwindow::onItemClicked(QListWidgetItem *item) {
     }
 }
 
+// 按系统方案的 systemConfig 描述动态生成可编辑表单，控件变更即写回 config.json
+void mainwindow::showSystemConfigForm(const QString &configId)
+{
+    // 懒创建表单容器，位置对齐任务表格区域
+    if (!m_systemConfigForm) {
+        m_systemConfigForm = new QWidget(ui->tableWidget->parentWidget());
+        m_systemConfigForm->setGeometry(ui->tableWidget->geometry());
+    }
+
+    // 清空上一次生成的控件与布局
+    if (QLayout *oldLayout = m_systemConfigForm->layout()) {
+        QLayoutItem *child;
+        while ((child = oldLayout->takeAt(0)) != nullptr) {
+            if (child->widget()) {
+                child->widget()->deleteLater();
+            }
+            delete child;
+        }
+        delete oldLayout;
+    }
+
+    const QJsonArray systemConfig = getSystemConfig(configId);
+    if (systemConfig.isEmpty()) {
+        // 该系统方案没有自定义配置，退回原来的静态提示
+        m_systemConfigForm->hide();
+        ui->systemConfigTips->show();
+        return;
+    }
+    ui->systemConfigTips->hide();
+
+    auto *form = new QFormLayout(m_systemConfigForm);
+    const QString configPath = AppPaths::instance().configPath();
+
+    for (const QJsonValue &val : systemConfig) {
+        const QJsonObject field = val.toObject();
+        const QString key = field["key"].toString();
+        const QString label = field["label"].toString();
+        const QString control = field["control"].toString();
+
+        if (control == "number") {
+            if (field.value("decimals").toInt(0) <= 0) {
+                // 整数：QSpinBox
+                auto *spin = new QSpinBox(m_systemConfigForm);
+                spin->setRange(field.value("min").toInt(0), field.value("max").toInt(100));
+                spin->setSingleStep(field.value("step").toInt(1));
+                spin->setValue(field.value("value").toInt());
+                connect(spin, qOverload<int>(&QSpinBox::valueChanged), this,
+                        [=](int v) { updateSystemConfigValue(configPath, configId, key, v); });
+                form->addRow(label, spin);
+            } else {
+                // 小数：QDoubleSpinBox
+                auto *spin = new QDoubleSpinBox(m_systemConfigForm);
+                spin->setDecimals(field.value("decimals").toInt(2));
+                spin->setRange(field.value("min").toDouble(0.0), field.value("max").toDouble(1.0));
+                spin->setSingleStep(field.value("step").toDouble(0.1));
+                spin->setValue(field.value("value").toDouble());
+                connect(spin, qOverload<double>(&QDoubleSpinBox::valueChanged), this,
+                        [=](double v) { updateSystemConfigValue(configPath, configId, key, v); });
+                form->addRow(label, spin);
+            }
+        } else if (control == "switch") {
+            // 开关：QCheckBox
+            auto *check = new QCheckBox(m_systemConfigForm);
+            check->setChecked(field.value("value").toBool());
+            connect(check, &QCheckBox::toggled, this,
+                    [=](bool v) { updateSystemConfigValue(configPath, configId, key, v); });
+            form->addRow(label, check);
+        } else if (control == "select") {
+            // 下拉：QComboBox
+            auto *combo = new QComboBox(m_systemConfigForm);
+            for (const QJsonValue &opt : field.value("options").toArray()) {
+                combo->addItem(opt.toString());
+            }
+            combo->setCurrentText(field.value("value").toString());
+            connect(combo, &QComboBox::currentTextChanged, this,
+                    [=](const QString &v) { updateSystemConfigValue(configPath, configId, key, v); });
+            form->addRow(label, combo);
+        }
+    }
+
+    m_systemConfigForm->show();
+    m_systemConfigForm->raise();
+}
+
 //加载数据到任务表格
 void mainwindow::showStepsInTable(const QJsonArray &steps) {
     ui->systemConfigTips->hide();
+    if (m_systemConfigForm) {
+        m_systemConfigForm->hide();
+    }
     ui->tableWidget->clear(); // 清空表格
     ui->tableWidget->setRowCount(steps.size());
     ui->tableWidget->setColumnCount(5); // 新增序号列
