@@ -19,6 +19,7 @@
 #include <QComboBox>
 #include <QDoubleSpinBox>
 #include <QFormLayout>
+#include <QLabel>
 #include <QSpinBox>
 #include "QMessageBox"
 
@@ -241,7 +242,26 @@ void mainwindow::showSystemConfigForm(const QString &configId)
     // 表单容器，位置对齐任务表格区域
     m_systemConfigForm = new QWidget(ui->tableWidget->parentWidget());
     m_systemConfigForm->setGeometry(ui->tableWidget->geometry());
+    // 边框 + 背景色，营造独立配置区域的分隔感（用 #objectName 限定，避免影响内部控件）
+    m_systemConfigForm->setObjectName("systemConfigForm");
+    m_systemConfigForm->setStyleSheet(
+        "#systemConfigForm {"
+        "  background-color: #f7f9fc;"
+        "  border: 1px solid #d0d7e2;"
+        "  border-radius: 8px;"
+        "}");
+
     auto *form = new QFormLayout(m_systemConfigForm);
+    form->setContentsMargins(16, 16, 16, 16);
+    form->setHorizontalSpacing(16);
+    form->setVerticalSpacing(12);
+    form->setLabelAlignment(Qt::AlignRight | Qt::AlignVCenter);
+
+    // 区域标题
+    auto *title = new QLabel(QStringLiteral("方案自定义配置"), m_systemConfigForm);
+    title->setStyleSheet("font-weight: bold; font-size: 12pt; color: #333; padding-bottom: 4px;");
+    form->addRow(title);
+
     const QString configPath = AppPaths::instance().configPath();
 
     for (const QJsonValue &val : systemConfig) {
