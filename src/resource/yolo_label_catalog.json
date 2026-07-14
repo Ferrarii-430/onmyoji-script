@@ -169,7 +169,6 @@
     {"className": "exploration-area_boss", "function": "地域", "scenes": []},
     {"className": "exploration-six_realms_gate", "function": "六道", "scenes": []},
     {"className": "exploration-chapter", "function": "1-28单个副本", "scenes": []},
-    {"className": "exploration-chapter-hard", "function": "困难难度", "scenes": []},
     {"className": "exploration-buff", "function": "buff灯笼", "scenes": []}
   ],
   "realm": [
@@ -181,20 +180,20 @@
   "battle": [
     {"className": "battle-auto", "function": "自动", "scenes": ["战斗"]},
     {"className": "battle-ready", "function": "准备", "scenes": ["战斗"]},
-    {"className": "battle-readied", "function": "已准备", "scenes": ["战斗"]},
     {"className": "battle-victory", "function": "战斗胜利", "scenes": ["战斗"]},
-    {"className": "battle-loss", "function": "失败", "scenes": ["战斗"]},
-    {"className": "battle-preset", "function": "预设", "scenes": ["战斗"]},
-    {"className": "battle-challenge-active", "function": "挑战按钮（可点击）", "scenes": ["进入战斗"]},
-    {"className": "battle-challenge-disabled", "function": "挑战按钮（灰色）", "scenes": ["进入战斗"]}
+    {"className": "battle-preset", "function": "预设", "scenes": ["战斗"]}
   ],
   "mail": [
     {"className": "mail-read", "function": "已读邮件", "scenes": ["邮件"]},
     {"className": "mail-unread", "function": "未读邮件", "scenes": ["邮件"]},
     {"className": "mail-receive_all", "function": "全部领取", "scenes": ["邮件"]}
   ],
-  "chapter": [
-    {"className": "chapter-challenge-enemy", "function": "挑战", "scenes": ["小怪"]},
-    {"className": "chapter-challenge-boss", "function": "Boss", "scenes": ["章节Boss"]}
+  "realm_raid": [
+    {"className": "realm_raid-realm-normal", "function": "结界突破-普通结界（未破）", "scenes": ["突破"]},
+    {"className": "realm_raid-realm-penetrated", "function": "结界突破-已突破结界", "scenes": ["突破"]},
+    {"className": "realm_raid-challenge_ticket", "function": "结界突破-突破券", "scenes": ["突破"]}
+  ],
+  "soul": [
+    {"className": "soul-drop", "function": "御魂掉落", "scenes": ["御魂"]}
   ]
 }
