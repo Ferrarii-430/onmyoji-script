@@ -2,6 +2,10 @@
 
 仅适用于《阴阳师》桌面版游戏的自动化脚本工具。
 
+### **注：新版桌面模拟器未测试过，旧桌面版正常**
+
+### 主要在Github更新 [Ferrarii-430/onmyoji-script](https://github.com/Ferrarii-430/onmyoji-script)
+
 > ⚠️ 本工具仅供学习交流使用，请勿用于商业用途，使用风险自负。
 
 ## 目录
