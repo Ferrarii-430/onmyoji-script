@@ -7,6 +7,7 @@
 ### 主要在Github更新 [Ferrarii-430/onmyoji-script](https://github.com/Ferrarii-430/onmyoji-script)
 
 > ⚠️ 本工具仅供学习交流使用，请勿用于商业用途，使用风险自负。
+> ⚠️ 重要风险提醒 因为支持桌面版的最小化运行，需要进行注入操作，风险系数较高。
 
 ## 目录
 

@@ -44,25 +44,29 @@ if not defined CMAKE_BUILD_DIR (
 echo [信息] 构建目录: !CMAKE_BUILD_DIR!
 
 if not exist "%BUILD%" mkdir "%BUILD%"
-echo [步骤 1/4] 复制 yys-script.exe
+echo [步骤 1/5] 复制 yys-script.exe
 copy /y "!CMAKE_BUILD_DIR!\yys-script.exe" "%BUILD%\yys-script.exe" >nul
 if errorlevel 1 ( echo [错误] 复制 yys-script.exe 失败 & exit /b 1 )
 
 REM ---------- 2. 复制 hook DLL ----------
-echo [步骤 2/4] 复制 libdx11_hook.dll
+echo [步骤 2/5] 复制 libdx11_hook.dll
 if not exist "%BUILD%\src\resource\hook" mkdir "%BUILD%\src\resource\hook"
 copy /y "%ROOT%src\resource\hook\libdx11_hook.dll" "%BUILD%\src\resource\hook\libdx11_hook.dll" >nul
 if errorlevel 1 ( echo [错误] 复制 libdx11_hook.dll 失败 & exit /b 1 )
 
 REM ---------- 3. 复制 screenshot 目录 ----------
-echo [步骤 3/4] 复制 screenshot 目录
+echo [步骤 3/5] 复制 screenshot 目录
 if not exist "%BUILD%\src\resource\screenshot" mkdir "%BUILD%\src\resource\screenshot"
 xcopy "%ROOT%src\resource\screenshot\*" "%BUILD%\src\resource\screenshot\" /y /i /e >nul
 if errorlevel 1 ( echo [错误] 复制 screenshot 失败 & exit /b 1 )
 
-REM ---------- 4. 压缩 build 目录 ----------
+REM ---------- 4. 复制 config.json ----------
+echo [步骤 4/5] 复制 config.json
+
+
+REM ---------- 5. 压缩 build 目录 ----------
 set "ZIP=%ROOT%yys-script-%VERSION%-release.zip"
-echo [步骤 4/4] 压缩为 %ZIP%
+echo [步骤 5/5] 压缩为 %ZIP%
 if exist "%ZIP%" del /f /q "%ZIP%"
 powershell -NoProfile -Command "Compress-Archive -Path '%BUILD%\*' -DestinationPath '%ZIP%' -Force"
 if errorlevel 1 ( echo [错误] 压缩失败 & exit /b 1 )
