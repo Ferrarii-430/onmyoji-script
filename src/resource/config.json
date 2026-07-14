@@ -218,6 +218,41 @@
     "id": "A1B2C3D4-2449-41D2-A794-055586E3ARENA",
     "name": "系统方案-自动挂机斗技",
     "type": "system",
+    "systemConfig": [
+      {
+        "key": "ocrScore",
+        "label": "OCR识别阈值",
+        "control": "number",
+        "min": 0,
+        "max": 1,
+        "step": 0.05,
+        "decimals": 2,
+        "value": 0.6
+      },
+      {
+        "key": "matchPollCount",
+        "label": "匹配等待轮数",
+        "control": "number",
+        "min": 1,
+        "max": 60,
+        "step": 1,
+        "decimals": 0,
+        "value": 15
+      },
+      {
+        "key": "randomClick",
+        "label": "随机点击",
+        "control": "switch",
+        "value": true
+      },
+      {
+        "key": "arenaType",
+        "label": "斗技类型",
+        "control": "select",
+        "options": ["个人斗技", "巅峰赛"],
+        "value": "个人斗技"
+      }
+    ],
     "steps": [
       {
         "identifyErrorHandle": "next",

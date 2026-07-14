@@ -245,6 +245,83 @@ void updateConfigInJsonFile(const QString &filePath, const QString &configId, co
 }
 
 
+// 读取某方案完整的 systemConfig 数组(含控件描述)
+QJsonArray getSystemConfig(const QString &configId)
+{
+    const QString target = cleanString(configId);
+    for (const QJsonValue &val : m_configArray) {
+        if (!val.isObject()) {
+            continue;
+        }
+        QJsonObject obj = val.toObject();
+        if (cleanString(obj["id"].toString()).compare(target, Qt::CaseInsensitive) == 0) {
+            return obj.value("systemConfig").toArray();
+        }
+    }
+    return QJsonArray();
+}
+
+// 按 key 读取某方案的配置值(只取 value)，找不到返回 defaultValue
+QJsonValue getSystemConfigValue(const QString &configId, const QString &key,
+                                const QJsonValue &defaultValue)
+{
+    const QJsonArray systemConfig = getSystemConfig(configId);
+    for (const QJsonValue &item : systemConfig) {
+        QJsonObject field = item.toObject();
+        if (field["key"].toString() == key) {
+            return field.value("value");
+        }
+    }
+    return defaultValue;
+}
+
+// 更新某方案某 key 的配置值并写回文件(只改 value)
+void updateSystemConfigValue(const QString &filePath, const QString &configId,
+                             const QString &key, const QJsonValue &value)
+{
+    QJsonArray rootArray = m_configArray;
+    const QString target = cleanString(configId);
+
+    bool updated = false;
+    for (int i = 0; i < rootArray.size(); ++i) {
+        QJsonObject obj = rootArray[i].toObject();
+        if (cleanString(obj["id"].toString()).compare(target, Qt::CaseInsensitive) != 0) {
+            continue;
+        }
+
+        QJsonArray systemConfig = obj.value("systemConfig").toArray();
+        for (int j = 0; j < systemConfig.size(); ++j) {
+            QJsonObject field = systemConfig[j].toObject();
+            if (field["key"].toString() == key) {
+                field["value"] = value;
+                systemConfig[j] = field;
+                updated = true;
+                break;
+            }
+        }
+        obj["systemConfig"] = systemConfig;
+        rootArray[i] = obj;
+        break;
+    }
+
+    if (!updated) {
+        Logger::log("未找到 systemConfig 项: " + configId + " / " + key);
+        return;
+    }
+
+    // 同步内存并写回文件
+    m_configArray = rootArray;
+    QFile file(filePath);
+    if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QJsonDocument newDoc(rootArray);
+        file.write(newDoc.toJson(QJsonDocument::Indented));
+        file.close();
+        Logger::log("已更新系统方案配置: " + key);
+    } else {
+        Logger::log("写入 JSON 文件失败: " + filePath);
+    }
+}
+
 QJsonValue safeValue(const QJsonObject &obj, const QString &key) {
     if (!obj.contains(key) || obj.value(key).isNull()) {
         return QJsonValue::Null;
