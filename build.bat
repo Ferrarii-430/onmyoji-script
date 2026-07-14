@@ -1,23 +1,25 @@
 @echo off
+chcp 936 >nul
 REM ============================================================
-REM  yys-script æ‰“åŒ…è„šæœ¬
-REM  ç”¨æ³•:
-REM     build.bat            ç‰ˆæœ¬å·è‡ªåŠ¨ä» README.md çš„ã€Œ### vX.Yã€è¯»å–
-REM     build.bat v1.5       æ‰‹åŠ¨æŒ‡å®šç‰ˆæœ¬å·
-REM  æµç¨‹:
-REM     1) å®šä½ CMake æ„å»ºç›®å½•(åç§°å¯èƒ½å˜åŒ–, åŒ¹é… cmake-build*)ä¸‹çš„ yys-script.exe
-REM        å¤åˆ¶è¦†ç›–åˆ° build\yys-script.exe
-REM     2) src\resource\hook\libdx11_hook.dll è¦†ç›–åˆ° build\src\resource\hook\
-REM     3) src\resource\screenshot\ ä¸‹æ‰€æœ‰æ–‡ä»¶è¦†ç›–åˆ° build\src\resource\screenshot\
-REM     4) å°† build\ å†…çš„æ–‡ä»¶å‹ç¼©ä¸º yys-script-[ç‰ˆæœ¬]-release.zip
+REM  yys-script ´ò°ü½Å±¾
+REM  ÓÃ·¨:
+REM     build.bat            °æ±¾ºÅ×Ô¶¯´Ó README.md µÄ¡¸### vX.Y¡¹¶ÁÈ¡
+REM     build.bat v1.5       ÊÖ¶¯Ö¸¶¨°æ±¾ºÅ
+REM  Á÷³Ì:
+REM     1) ¶¨Î» CMake ¹¹½¨Ä¿Â¼(Ãû³Æ¿ÉÄÜ±ä»¯, Æ¥Åä cmake-build*)ÏÂµÄ yys-script.exe
+REM        ¸´ÖÆ¸²¸Çµ½ build\yys-script.exe
+REM     2) src\resource\hook\libdx11_hook.dll ¸²¸Çµ½ build\src\resource\hook\
+REM     3) src\resource\screenshot\ ÏÂËùÓĞÎÄ¼ş¸²¸Çµ½ build\src\resource\screenshot\
+REM     4) src\resource\config.json ¸²¸Çµ½ build\src\resource\config.json
+REM     5) ½« build\ ÄÚµÄÎÄ¼şÑ¹ËõÎª yys-script-[°æ±¾]-release.zip
 REM ============================================================
 setlocal enabledelayedexpansion
 
-REM é¡¹ç›®æ ¹ç›®å½• = æœ¬è„šæœ¬æ‰€åœ¨ç›®å½•(å¸¦ç»“å°¾åæ–œæ )
+REM ÏîÄ¿¸ùÄ¿Â¼ = ±¾½Å±¾ËùÔÚÄ¿Â¼(´ø½áÎ²·´Ğ±¸Ü)
 set "ROOT=%~dp0"
 set "BUILD=%ROOT%build"
 
-REM ---------- ç‰ˆæœ¬å· ----------
+REM ---------- °æ±¾ºÅ ----------
 set "VERSION=%~1"
 if "%VERSION%"=="" (
     for /f "tokens=2 delims= " %%v in ('findstr /r /c:"^### v[0-9]" "%ROOT%README.md"') do (
@@ -27,50 +29,52 @@ if "%VERSION%"=="" (
 )
 :got_version
 if "%VERSION%"=="" (
-    echo [é”™è¯¯] æœªèƒ½ç¡®å®šç‰ˆæœ¬å·, è¯·æ‰‹åŠ¨ä¼ å…¥, ä¾‹å¦‚:  build.bat v1.5
+    echo [´íÎó] Î´ÄÜÈ·¶¨°æ±¾ºÅ, ÇëÊÖ¶¯´«Èë, ÀıÈç:  build.bat v1.5
     exit /b 1
 )
-echo [ä¿¡æ¯] ç‰ˆæœ¬å·: %VERSION%
+echo [ĞÅÏ¢] °æ±¾ºÅ: %VERSION%
 
-REM ---------- 1. å®šä½å¹¶å¤åˆ¶ yys-script.exe ----------
+REM ---------- 1. ¶¨Î»²¢¸´ÖÆ yys-script.exe ----------
 set "CMAKE_BUILD_DIR="
 for /d %%D in ("%ROOT%cmake-build*") do (
     if exist "%%D\yys-script.exe" set "CMAKE_BUILD_DIR=%%D"
 )
 if not defined CMAKE_BUILD_DIR (
-    echo [é”™è¯¯] æœªæ‰¾åˆ°å« yys-script.exe çš„ CMake æ„å»ºç›®å½• ^(cmake-build*^), è¯·å…ˆå®Œæˆæ„å»º
+    echo [´íÎó] Î´ÕÒµ½º¬ yys-script.exe µÄ CMake ¹¹½¨Ä¿Â¼ ^(cmake-build*^), ÇëÏÈÍê³É¹¹½¨
     exit /b 1
 )
-echo [ä¿¡æ¯] æ„å»ºç›®å½•: !CMAKE_BUILD_DIR!
+echo [ĞÅÏ¢] ¹¹½¨Ä¿Â¼: !CMAKE_BUILD_DIR!
 
 if not exist "%BUILD%" mkdir "%BUILD%"
-echo [æ­¥éª¤ 1/5] å¤åˆ¶ yys-script.exe
+echo [²½Öè 1/5] ¸´ÖÆ yys-script.exe
 copy /y "!CMAKE_BUILD_DIR!\yys-script.exe" "%BUILD%\yys-script.exe" >nul
-if errorlevel 1 ( echo [é”™è¯¯] å¤åˆ¶ yys-script.exe å¤±è´¥ & exit /b 1 )
+if errorlevel 1 ( echo [´íÎó] ¸´ÖÆ yys-script.exe Ê§°Ü & exit /b 1 )
 
-REM ---------- 2. å¤åˆ¶ hook DLL ----------
-echo [æ­¥éª¤ 2/5] å¤åˆ¶ libdx11_hook.dll
+REM ---------- 2. ¸´ÖÆ hook DLL ----------
+echo [²½Öè 2/5] ¸´ÖÆ libdx11_hook.dll
 if not exist "%BUILD%\src\resource\hook" mkdir "%BUILD%\src\resource\hook"
 copy /y "%ROOT%src\resource\hook\libdx11_hook.dll" "%BUILD%\src\resource\hook\libdx11_hook.dll" >nul
-if errorlevel 1 ( echo [é”™è¯¯] å¤åˆ¶ libdx11_hook.dll å¤±è´¥ & exit /b 1 )
+if errorlevel 1 ( echo [´íÎó] ¸´ÖÆ libdx11_hook.dll Ê§°Ü & exit /b 1 )
 
-REM ---------- 3. å¤åˆ¶ screenshot ç›®å½• ----------
-echo [æ­¥éª¤ 3/5] å¤åˆ¶ screenshot ç›®å½•
+REM ---------- 3. ¸´ÖÆ screenshot Ä¿Â¼ ----------
+echo [²½Öè 3/5] ¸´ÖÆ screenshot Ä¿Â¼
 if not exist "%BUILD%\src\resource\screenshot" mkdir "%BUILD%\src\resource\screenshot"
 xcopy "%ROOT%src\resource\screenshot\*" "%BUILD%\src\resource\screenshot\" /y /i /e >nul
-if errorlevel 1 ( echo [é”™è¯¯] å¤åˆ¶ screenshot å¤±è´¥ & exit /b 1 )
+if errorlevel 1 ( echo [´íÎó] ¸´ÖÆ screenshot Ê§°Ü & exit /b 1 )
 
-REM ---------- 4. å¤åˆ¶ config.json ----------
-echo [æ­¥éª¤ 4/5] å¤åˆ¶ config.json
+REM ---------- 4. ¸´ÖÆ config.json ----------
+echo [²½Öè 4/5] ¸´ÖÆ config.json
+if not exist "%BUILD%\src\resource" mkdir "%BUILD%\src\resource"
+copy /y "%ROOT%src\resource\config.json" "%BUILD%\src\resource\config.json" >nul
+if errorlevel 1 ( echo [´íÎó] ¸´ÖÆ config.json Ê§°Ü & exit /b 1 )
 
-
-REM ---------- 5. å‹ç¼© build ç›®å½• ----------
+REM ---------- 5. Ñ¹Ëõ build Ä¿Â¼ ----------
 set "ZIP=%ROOT%yys-script-%VERSION%-release.zip"
-echo [æ­¥éª¤ 5/5] å‹ç¼©ä¸º %ZIP%
+echo [²½Öè 5/5] Ñ¹ËõÎª %ZIP%
 if exist "%ZIP%" del /f /q "%ZIP%"
 powershell -NoProfile -Command "Compress-Archive -Path '%BUILD%\*' -DestinationPath '%ZIP%' -Force"
-if errorlevel 1 ( echo [é”™è¯¯] å‹ç¼©å¤±è´¥ & exit /b 1 )
+if errorlevel 1 ( echo [´íÎó] Ñ¹ËõÊ§°Ü & exit /b 1 )
 
 echo.
-echo [å®Œæˆ] å·²ç”Ÿæˆ: %ZIP%
+echo [Íê³É] ÒÑÉú³É: %ZIP%
 endlocal
