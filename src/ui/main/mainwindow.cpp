@@ -224,33 +224,23 @@ void mainwindow::onItemClicked(QListWidgetItem *item) {
 // 按系统方案的 systemConfig 描述动态生成可编辑表单，控件变更即写回 config.json
 void mainwindow::showSystemConfigForm(const QString &configId)
 {
-    // 懒创建表单容器，位置对齐任务表格区域
-    if (!m_systemConfigForm) {
-        m_systemConfigForm = new QWidget(ui->tableWidget->parentWidget());
-        m_systemConfigForm->setGeometry(ui->tableWidget->geometry());
-    }
-
-    // 清空上一次生成的控件与布局
-    if (QLayout *oldLayout = m_systemConfigForm->layout()) {
-        QLayoutItem *child;
-        while ((child = oldLayout->takeAt(0)) != nullptr) {
-            if (child->widget()) {
-                child->widget()->deleteLater();
-            }
-            delete child;
-        }
-        delete oldLayout;
+    // 每次销毁并重建容器：避免复用旧 QFormLayout 清理时的 takeAt 告警
+    if (m_systemConfigForm) {
+        m_systemConfigForm->deleteLater();
+        m_systemConfigForm = nullptr;
     }
 
     const QJsonArray systemConfig = getSystemConfig(configId);
     if (systemConfig.isEmpty()) {
         // 该系统方案没有自定义配置，退回原来的静态提示
-        m_systemConfigForm->hide();
         ui->systemConfigTips->show();
         return;
     }
     ui->systemConfigTips->hide();
 
+    // 表单容器，位置对齐任务表格区域
+    m_systemConfigForm = new QWidget(ui->tableWidget->parentWidget());
+    m_systemConfigForm->setGeometry(ui->tableWidget->geometry());
     auto *form = new QFormLayout(m_systemConfigForm);
     const QString configPath = AppPaths::instance().configPath();
 
