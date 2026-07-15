@@ -193,16 +193,13 @@ void executeBorderBreakthrough()
                 if (!savePath.isEmpty())
                 {
                     qDebug() << "成功找到识别目标，退出循环";
-                    actions.processAndShowImage(savePath);
 
                     waitWithEventProcessing(6000);
 
                     //此时需要再次判断一下，应为可能会出现 3 6 9次拿到的额外奖励
                     QString savePathAdditional = actions.opencvRecognizesAndClick(screenshotPath + "battle_end.png", 0.6, true);
-                    if (!savePath.isEmpty())
+                    if (!savePathAdditional.isEmpty())
                     {
-                        //有则展示，没有则不用管，因为不一定有
-                        actions.processAndShowImage(savePathAdditional);
                         waitWithEventProcessing(3000);
                     }
                     break;  // 找到目标后跳出外层循环

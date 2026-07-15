@@ -201,20 +201,20 @@ bool captureWindowToMat(HWND hwnd, cv::Mat& outBGR)
 
 bool captureByPrintWindow(HWND hwnd, cv::Mat& winImg)
 {
-    bool ok = false;
     for (int i = 0; i < 5; ++i)
     {
-        ok = captureWindowToMat(hwnd, winImg);
-        if (!ok || winImg.empty()) {
+        if (captureWindowToMat(hwnd, winImg) && !winImg.empty()) {
+            return true;
+        }
+
+        if (i < 4) {
             Logger::log(QString("未能捕获窗口。它是最小化的还是受保护的？1秒内重试..."));
             core::waitWithEventProcessing(1000);
         }
     }
-    if (!ok)
-    {
-        Logger::log(QString("5次重试未能捕获窗口。任务结束"));
-    }
-    return ok;
+
+    Logger::log(QString("5次重试未能捕获窗口。任务结束"));
+    return false;
 }
 
 } // namespace capture

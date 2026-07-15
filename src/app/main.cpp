@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <QApplication>
 #include <QIcon>
 #include <iostream>
@@ -28,8 +29,9 @@ static void myMessageHandler(QtMsgType type, const QMessageLogContext &context, 
 
 int main(int argc, char* argv[])
 {
-    // 禁用OpenCV的优化（包括SIMD指令）
+    // 开启 SIMD，并限制并行线程，避免识图时占满 CPU 导致界面无响应
     cv::setUseOptimized(true);
+    cv::setNumThreads(std::clamp(cv::getNumberOfCPUs() / 2, 1, 4));
 
     // 设置OpenCV日志级别
     cv::utils::logging::setLogLevel(cv::utils::logging::LOG_LEVEL_ERROR);

@@ -4,8 +4,10 @@
 #include <cmath>
 #include <algorithm>
 #include <QDebug>
+#include <QDateTime>
 #include <QDir>
 #include <QFileInfo>
+#include <QHash>
 #include <QJsonObject>
 #include <QTemporaryFile>
 #include <opencv2/imgcodecs.hpp>
@@ -22,6 +24,44 @@
 #include "src/vision/TemplateMatcher.h"
 
 namespace {
+
+struct CachedTemplate {
+    qint64 fileSize = 0;
+    qint64 modifiedTime = 0;
+    cv::Mat image;
+};
+
+cv::Mat loadTemplateGrayscale(const QString& templatePath, bool& cacheHit)
+{
+    static QHash<QString, CachedTemplate> cache;
+
+    const QFileInfo fileInfo(templatePath);
+    const QString canonicalPath = fileInfo.canonicalFilePath();
+    const QString cacheKey = canonicalPath.isEmpty() ? fileInfo.absoluteFilePath() : canonicalPath;
+    const qint64 fileSize = fileInfo.size();
+    const qint64 modifiedTime = fileInfo.lastModified().toMSecsSinceEpoch();
+
+    const auto cached = cache.constFind(cacheKey);
+    if (cached != cache.cend()
+        && cached->fileSize == fileSize
+        && cached->modifiedTime == modifiedTime
+        && !cached->image.empty()) {
+        cacheHit = true;
+        return cached->image;
+    }
+
+    cacheHit = false;
+    cv::Mat image = cv::imread(templatePath.toStdString(), cv::IMREAD_GRAYSCALE);
+    if (image.empty()) {
+        return image;
+    }
+
+    if (cache.size() >= 64 && !cache.contains(cacheKey)) {
+        cache.clear();
+    }
+    cache.insert(cacheKey, CachedTemplate{fileSize, modifiedTime, image});
+    return image;
+}
 
 // 在结果图上绘制点击标记：白色描边 + 红点 + 十字线
 void drawClickMarker(cv::Mat& img, const cv::Point& clickPt)
@@ -126,11 +166,13 @@ QString ScriptActions::opencvRecognizesAndClick(const QString& templPath, const 
 
     //加载模板文件
     QString tempSavePath = resolveTemplatePath(templPath, AppPaths::instance().screenshotPath());
-    cv::Mat templ = cv::imread(tempSavePath.toStdString());
+    bool templateCacheHit = false;
+    cv::Mat templ = loadTemplateGrayscale(tempSavePath, templateCacheHit);
     if (templ.empty()) {
         Logger::log("模板图片加载失败: " + tempSavePath);
         return nullptr;
-    }else {
+    }
+    if (!templateCacheHit) {
         Logger::log("已加载模板图片: " + tempSavePath);
     }
 

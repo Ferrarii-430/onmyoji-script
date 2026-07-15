@@ -1,6 +1,9 @@
 #include "src/vision/TemplateMatcher.h"
 
 #include <algorithm>
+#include <QCoreApplication>
+#include <QElapsedTimer>
+#include <QEventLoop>
 #include <opencv2/imgproc.hpp>
 
 #include "src/core/Logger.h"
@@ -25,22 +28,19 @@ bool findTemplateMultiScale(const cv::Mat& haystack, const cv::Mat& needle,
         return false;
     }
 
-    // 强制禁用所有优化
-    cv::setUseOptimized(true);
-
     cv::Mat gHay, gNeedle;
 
     try {
         if (haystack.channels() == 3) {
             cv::cvtColor(haystack, gHay, cv::COLOR_BGR2GRAY);
         } else {
-            gHay = haystack.clone();
+            gHay = haystack;
         }
 
         if (needle.channels() == 3) {
             cv::cvtColor(needle, gNeedle, cv::COLOR_BGR2GRAY);
         } else {
-            gNeedle = needle.clone();
+            gNeedle = needle;
         }
     } catch (const cv::Exception& e) {
         Logger::log(QString("[ERROR] 图像转换失败: %1").arg(e.what()));
@@ -52,8 +52,10 @@ bool findTemplateMultiScale(const cv::Mat& haystack, const cv::Mat& needle,
         return false;
     }
 
-    std::vector<cv::Rect> candidateRects;
-    std::vector<double> candidateScores;
+    cv::Rect bestRect;
+    QElapsedTimer timer;
+    timer.start();
+    const double earlyExitScore = std::max(threshold, 0.95);
 
     for (double s = scaleMin; s <= scaleMax + scaleStep/2; s += scaleStep) {
         try {
@@ -99,76 +101,37 @@ bool findTemplateMultiScale(const cv::Mat& haystack, const cv::Mat& needle,
                 continue;
             }
 
-            Logger::log(QString("[OpenCV] 缩放=%1 得分=%2 pos=(%3,%4) size=%5x%6")
-                .arg(s).arg(maxVal).arg(maxLoc.x).arg(maxLoc.y)
-                .arg(resizedNeedle.cols).arg(resizedNeedle.rows));
+            if (maxVal > outScore) {
+                outScore = maxVal;
+                bestRect = cv::Rect(maxLoc.x, maxLoc.y, resizedNeedle.cols, resizedNeedle.rows);
+            }
 
-            if (maxVal >= threshold) {
-                cv::Rect r(maxLoc.x, maxLoc.y, resizedNeedle.cols, resizedNeedle.rows);
-                candidateRects.push_back(r);
-                candidateScores.push_back(maxVal);
+            if (maxVal >= earlyExitScore) {
+                break;
             }
 
         } catch (const std::exception& e) {
             Logger::log(QString("[WARN] 尺度 %1 处理异常: %2").arg(s).arg(e.what()));
-            continue;
         }
+
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
     }
 
-    if (candidateRects.empty()) {
-        Logger::log(QString("[WARN] 没有找到任何匹配 >= %1").arg(threshold));
+    if (outScore < threshold) {
+        Logger::log(QString("[WARN] 没有找到匹配，bestScore=%1 threshold=%2 耗时=%3ms")
+                        .arg(outScore).arg(threshold).arg(timer.elapsed()));
         return false;
     }
 
-    // NMS：重叠候选框仅保留分数更高的
-    std::vector<bool> keep(candidateRects.size(), true);
+    outRect = bestRect;
 
-    for (size_t i = 0; i < candidateRects.size(); ++i) {
-        if (!keep[i]) continue;
-
-        for (size_t j = i + 1; j < candidateRects.size(); ++j) {
-            if (!keep[j]) continue;
-
-            cv::Rect intersection = candidateRects[i] & candidateRects[j];
-            double overlap = intersection.area() / (double)std::min(candidateRects[i].area(), candidateRects[j].area());
-
-            if (overlap > 0.3) {
-                if (candidateScores[j] > candidateScores[i]) {
-                    keep[i] = false;
-                } else {
-                    keep[j] = false;
-                }
-            }
-        }
-    }
-
-    std::vector<cv::Rect> keptRects;
-    std::vector<double> keptScores;
-
-    for (size_t i = 0; i < candidateRects.size(); ++i) {
-        if (keep[i]) {
-            keptRects.push_back(candidateRects[i]);
-            keptScores.push_back(candidateScores[i]);
-        }
-    }
-
-    if (keptScores.empty()) {
-        Logger::log(QString("[WARN] NMS后无候选框"));
-        return false;
-    }
-
-    auto maxIt = std::max_element(keptScores.begin(), keptScores.end());
-    int idx = std::distance(keptScores.begin(), maxIt);
-
-    outRect = keptRects[idx];
-    outScore = keptScores[idx];
-
-    Logger::log(QString("[RESULT] bestScore=%1 rect=(%2,%3,%4x%5)")
+    Logger::log(QString("[RESULT] bestScore=%1 rect=(%2,%3,%4x%5) 耗时=%6ms")
             .arg(outScore)
             .arg(outRect.x)
             .arg(outRect.y)
             .arg(outRect.width)
-            .arg(outRect.height));
+            .arg(outRect.height)
+            .arg(timer.elapsed()));
 
     return true;
 }

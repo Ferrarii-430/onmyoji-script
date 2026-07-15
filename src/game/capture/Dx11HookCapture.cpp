@@ -1,9 +1,11 @@
 #include "src/game/capture/Dx11HookCapture.h"
 
 #include <windows.h>
+#include <algorithm>
 #include <QCoreApplication>
 #include <QDebug>
 #include <QDir>
+#include <QElapsedTimer>
 #include <QEventLoop>
 #include <QFile>
 #include <QFileInfo>
@@ -21,6 +23,23 @@
 namespace capture {
 
 namespace {
+
+bool waitForProcessResponsive(QProcess& process, int timeoutMs)
+{
+    QElapsedTimer timer;
+    timer.start();
+
+    while (process.state() != QProcess::NotRunning) {
+        const int remaining = timeoutMs - static_cast<int>(timer.elapsed());
+        if (remaining <= 0) {
+            return false;
+        }
+
+        process.waitForFinished(std::min(50, remaining));
+        QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+    }
+    return true;
+}
 
 // 读取共享内存中当前帧的序号（共享内存不可用时返回 0）
 uint32_t readDx11SharedSequence()
@@ -180,11 +199,11 @@ bool captureByDllInjection(const QString& targetPid, cv::Mat& winImg)
 
     // 首次注入需依次等待 LoadLibrary 远程线程、模块出现、CaptureFrame 等待渲染
     // 线程出帧，最坏情况可达 ~13 秒；3 秒过短会在首次注入时误判超时并杀死注入器。
-    if (!process.waitForFinished(20000)) {
+    if (!waitForProcessResponsive(process, 20000)) {
         qWarning() << "截图命令执行超时，注入器已被终止；已有输出:"
                    << process.readAll();
         process.kill();
-        process.waitForFinished(1000);
+        waitForProcessResponsive(process, 1000);
         return false;
     }
 
