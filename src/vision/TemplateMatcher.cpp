@@ -26,7 +26,7 @@ bool findTemplateMultiScale(const cv::Mat& haystack, const cv::Mat& needle,
     }
 
     // 强制禁用所有优化
-    cv::setUseOptimized(false);
+    cv::setUseOptimized(true);
 
     cv::Mat gHay, gNeedle;
 

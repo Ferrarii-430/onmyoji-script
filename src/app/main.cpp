@@ -29,7 +29,7 @@ static void myMessageHandler(QtMsgType type, const QMessageLogContext &context, 
 int main(int argc, char* argv[])
 {
     // 禁用OpenCV的优化（包括SIMD指令）
-    cv::setUseOptimized(false);
+    cv::setUseOptimized(true);
 
     // 设置OpenCV日志级别
     cv::utils::logging::setLogLevel(cv::utils::logging::LOG_LEVEL_ERROR);
