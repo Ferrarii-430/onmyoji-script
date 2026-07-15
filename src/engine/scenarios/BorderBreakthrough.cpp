@@ -55,6 +55,12 @@ void executeBorderBreakthrough()
         // 点击刷新按钮
         if (actions.clickDetectionByLabel("common-btn-yellow_confirm", 0.5, 0.0, 0.0)) {
             waitWithEventProcessing(3000); // 等待刷新确认界面出现
+            qWarning() << "等待3秒";
+            for (int i = 3 - 1; i >= 0; --i)
+            {
+                waitWithEventProcessing(1000);
+                qWarning() << "等待中：" << i;
+            }
 
             // 点击确认刷新
             if (actions.clickDetectionByLabel("common-btn-yellow_confirm", 0.5, 0.0, 0.0)) {
@@ -81,18 +87,20 @@ void executeBorderBreakthrough()
         return;
     }
 
+    //构建需要挑战点击的突破位置
+    for (auto& det : detections) {
+        if (comparesEqual(det.className, "realm_raid-realm-normal"))
+        {
+            //正常会有9个
+            vec.push_back(det);
+        }
+    }
+
     //判断是否需要进入保留等级
     if (retentionLevel)
     {
         //开始进行投4
         Logger::log(QString("结界突破-等级保留-开始进行投4"));
-        for (auto& det : detections) {
-            if (comparesEqual(det.className, "realm_raid-realm-normal"))
-            {
-                //正常会有9个
-                vec.push_back(det);
-            }
-        }
         int surrenderIndex[4] = {1,3,5,7};
         for (int i : surrenderIndex)
         {
@@ -189,7 +197,7 @@ void executeBorderBreakthrough()
                 qDebug() << "第" << attempts << "次尝试OpenCV识别...";
 
                 QString screenshotPath = AppPaths::instance().screenshotPath();
-                QString savePath = actions.opencvRecognizesAndClick(screenshotPath + "battle_end.png", 0.6, true);
+                QString savePath = actions.opencvRecognizesAndClick(screenshotPath + "battle_end.png", 0.65, true);
                 if (!savePath.isEmpty())
                 {
                     qDebug() << "成功找到识别目标，退出循环";
@@ -197,7 +205,7 @@ void executeBorderBreakthrough()
                     waitWithEventProcessing(6000);
 
                     //此时需要再次判断一下，应为可能会出现 3 6 9次拿到的额外奖励
-                    QString savePathAdditional = actions.opencvRecognizesAndClick(screenshotPath + "battle_end.png", 0.6, true);
+                    QString savePathAdditional = actions.opencvRecognizesAndClick(screenshotPath + "battle_end.png", 0.65, true);
                     if (!savePathAdditional.isEmpty())
                     {
                         waitWithEventProcessing(3000);
@@ -224,7 +232,7 @@ void executeBorderBreakthrough()
 int getNumberOfTickets()
 {
     ScriptActions& actions = ScriptActions::instance();
-    QJsonArray ticketsData = actions.ocrRecognizes(QRectF(80, 0, 100, 10));
+    QJsonArray ticketsData = actions.ocrRecognizes(QRectF(70, 1, 100, 15));
     if (ticketsData.empty())
     {
         return 0;
