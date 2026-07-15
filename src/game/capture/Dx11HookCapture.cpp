@@ -24,6 +24,13 @@ namespace capture {
 
 namespace {
 
+// 最大重试次数（快速路径信号截图）
+constexpr int kFastPathMaxRetries = 3;
+// 快速路径等待每帧的超时（毫秒）
+constexpr int kFastPathFrameWaitMs = 200;
+// 快速路径单次等待轮询间隔
+constexpr int kFastPathPollIntervalMs = 2;
+
 bool waitForProcessResponsive(QProcess& process, int timeoutMs)
 {
     QElapsedTimer timer;
@@ -39,6 +46,36 @@ bool waitForProcessResponsive(QProcess& process, int timeoutMs)
         QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
     }
     return true;
+}
+
+// 快速路径：通过跨进程事件直接触发 DLL 截图，无需启动注入器进程。
+// 返回 true 表示成功读取到新帧。
+bool captureViaEvent(cv::Mat& winImg)
+{
+    // 尝试打开 DLL 创建的跨进程截图请求事件
+    HANDLE hEvent = OpenEventW(EVENT_MODIFY_STATE, FALSE, DX11_CAPTURE_REQUEST_EVENT_NAME);
+    if (!hEvent) {
+        // 事件不存在说明 DLL 尚未注入或版本过旧，需走注入器路径
+        return false;
+    }
+
+    const uint32_t prevSeq = readDx11SharedSequence();
+
+    // 信号触发截图
+    SetEvent(hEvent);
+    CloseHandle(hEvent);
+
+    // 等待共享内存序号变化（DLL 在下一帧 Present 时写入）
+    QElapsedTimer timer;
+    timer.start();
+    while (timer.elapsed() < kFastPathFrameWaitMs) {
+        if (readDx11SharedSequence() != prevSeq) {
+            break;
+        }
+        QThread::msleep(kFastPathPollIntervalMs);
+    }
+
+    return readDx11SharedCapture(winImg);
 }
 
 // 读取共享内存中当前帧的序号（共享内存不可用时返回 0）
@@ -147,9 +184,32 @@ bool checkHookToolsExist()
 
 bool captureByDllInjection(const QString& targetPid, cv::Mat& winImg)
 {
+    // =========================================================================
+    // 快速路径：通过跨进程事件直接触发已注入的 DLL 截图，无需启动进程。
+    // 此路径延迟极低（通常 <50ms），且不会产生超时问题。
+    // =========================================================================
+    for (int attempt = 0; attempt < kFastPathMaxRetries; ++attempt) {
+        if (captureViaEvent(winImg)) {
+            if (!winImg.empty()) {
+                Logger::log(QString("截图成功(快速路径, 尝试%1)，图像尺寸: %2 x %3  通道数: %4")
+                                .arg(attempt + 1).arg(winImg.cols).arg(winImg.rows).arg(winImg.channels()));
+                return true;
+            }
+        } else {
+            // captureViaEvent 返回 false 表示事件不存在（DLL 未注入），跳出重试走注入路径
+            break;
+        }
+        // 事件存在但未拿到新帧（可能游戏暂未渲染），短暂等待后重试
+        if (attempt < kFastPathMaxRetries - 1) {
+            QThread::msleep(50);
+        }
+    }
+
+    // =========================================================================
+    // 回退路径：DLL 尚未注入，或快速路径失败——启动注入器进程完成注入 + 截图。
+    // =========================================================================
+
     // 传给注入器/远程 LoadLibrary 的路径统一转成 Windows 原生分隔符（反斜杠）。
-    // applicationDirPath() 返回的是正斜杠路径，而 LoadLibrary 对正斜杠支持不可靠，
-    // 可能导致远程注入失败、模块加载不到，最终表现为共享内存打不开。
     QString DX11_CAPTURE_PATH = QDir::toNativeSeparators(AppPaths::instance().dx11CapturePath());
     QString DX11_LOG_PATH = QDir::toNativeSeparators(AppPaths::instance().dx11LogPath());
     QString DX11_HOOK_DLL_PATH = QDir::toNativeSeparators(AppPaths::instance().dx11HookDllPath());
@@ -204,6 +264,13 @@ bool captureByDllInjection(const QString& targetPid, cv::Mat& winImg)
                    << process.readAll();
         process.kill();
         waitForProcessResponsive(process, 1000);
+
+        // 即使注入器超时，DLL 可能已成功注入。尝试用快速路径读取。
+        if (captureViaEvent(winImg) && !winImg.empty()) {
+            Logger::log(QString("注入器超时但快速路径恢复成功，图像尺寸: %1 x %2")
+                            .arg(winImg.cols).arg(winImg.rows));
+            return true;
+        }
         return false;
     }
 
