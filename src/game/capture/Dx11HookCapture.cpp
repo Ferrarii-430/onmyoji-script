@@ -26,8 +26,8 @@ namespace {
 
 // 最大重试次数（快速路径信号截图）
 constexpr int kFastPathMaxRetries = 3;
-// 快速路径等待每帧的超时（毫秒）
-constexpr int kFastPathFrameWaitMs = 200;
+// 快速路径等待新帧的超时（毫秒）——需覆盖低帧率场景（如加载画面 ~10FPS）
+constexpr int kFastPathFrameWaitMs = 500;
 // 快速路径单次等待轮询间隔
 constexpr int kFastPathPollIntervalMs = 2;
 
@@ -150,8 +150,20 @@ bool checkHookToolsExist()
     return true;
 }
 
+// 检查 DLL 的跨进程截图事件是否存在（即 DLL 是否已注入且支持快速路径）
+bool isDllEventAvailable()
+{
+    HANDLE hEvent = OpenEventW(EVENT_MODIFY_STATE, FALSE, DX11_CAPTURE_REQUEST_EVENT_NAME);
+    if (!hEvent) {
+        return false;
+    }
+    CloseHandle(hEvent);
+    return true;
+}
+
 // 快速路径：通过跨进程事件直接触发 DLL 截图，无需启动注入器进程。
-// 返回 true 表示成功读取到新帧。
+// 返回 true 表示确认拿到新帧；false 表示未在超时内收到新帧。
+// 调用前应先通过 isDllEventAvailable() 确认事件存在。
 bool captureViaEvent(cv::Mat& winImg)
 {
     HANDLE hEvent = OpenEventW(EVENT_MODIFY_STATE, FALSE, DX11_CAPTURE_REQUEST_EVENT_NAME);
@@ -164,13 +176,20 @@ bool captureViaEvent(cv::Mat& winImg)
     SetEvent(hEvent);
     CloseHandle(hEvent);
 
+    // 等待共享内存序号变化，确认 DLL 在渲染线程写入了新帧
     QElapsedTimer timer;
     timer.start();
+    bool gotNewFrame = false;
     while (timer.elapsed() < kFastPathFrameWaitMs) {
         if (readDx11SharedSequence() != prevSeq) {
+            gotNewFrame = true;
             break;
         }
         QThread::msleep(kFastPathPollIntervalMs);
+    }
+
+    if (!gotNewFrame) {
+        return false;
     }
 
     return readDx11SharedCapture(winImg);
@@ -184,21 +203,20 @@ bool captureByDllInjection(const QString& targetPid, cv::Mat& winImg)
     // 快速路径：通过跨进程事件直接触发已注入的 DLL 截图，无需启动进程。
     // 此路径延迟极低（通常 <50ms），且不会产生超时问题。
     // =========================================================================
-    for (int attempt = 0; attempt < kFastPathMaxRetries; ++attempt) {
-        if (captureViaEvent(winImg)) {
-            if (!winImg.empty()) {
+    if (isDllEventAvailable()) {
+        for (int attempt = 0; attempt < kFastPathMaxRetries; ++attempt) {
+            if (captureViaEvent(winImg) && !winImg.empty()) {
                 Logger::log(QString("截图成功(快速路径, 尝试%1)，图像尺寸: %2 x %3  通道数: %4")
                                 .arg(attempt + 1).arg(winImg.cols).arg(winImg.rows).arg(winImg.channels()));
                 return true;
             }
-        } else {
-            // captureViaEvent 返回 false 表示事件不存在（DLL 未注入），跳出重试走注入路径
-            break;
+            // 未拿到新帧（游戏可能帧率低），等待后重试
+            if (attempt < kFastPathMaxRetries - 1) {
+                QThread::msleep(100);
+            }
         }
-        // 事件存在但未拿到新帧（可能游戏暂未渲染），短暂等待后重试
-        if (attempt < kFastPathMaxRetries - 1) {
-            QThread::msleep(50);
-        }
+        // 快速路径重试均失败，回退到注入器路径
+        qDebug() << "快速路径重试耗尽，回退到注入器路径";
     }
 
     // =========================================================================
