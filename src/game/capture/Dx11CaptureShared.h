@@ -12,6 +12,10 @@
 // 命名 file mapping 的名称（同一会话内跨进程可见）
 #define DX11_SHARED_NAME L"OnmyojiDx11CaptureShared"
 
+// 跨进程截图请求事件名称（auto-reset）。script 进程通过 OpenEvent/SetEvent
+// 直接触发 DLL 截图，无需每次都启动 remote_capture_call.exe。
+#define DX11_CAPTURE_REQUEST_EVENT_NAME L"OnmyojiDx11CaptureRequest"
+
 static const uint32_t DX11_SHARED_MAGIC = 0x31315844; // 'DX11'
 static const uint32_t DX11_SHARED_VERSION = 1;
 
