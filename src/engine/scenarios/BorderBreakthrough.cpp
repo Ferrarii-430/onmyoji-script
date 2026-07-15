@@ -178,8 +178,8 @@ void executeBorderBreakthrough()
         Logger::log(QString("开始点击进攻"));
         if (actions.ocrRecognizesAndClick("进攻",0.55,true) != nullptr)
         {
-            // 循环等待直到找到战斗结束框，最多等待1分钟
-            const int MAX_ATTEMPTS = 6;  // 6次 * 10秒 = 1分钟
+            // 循环等待直到找到战斗结束框，最多等待3分钟
+            const int MAX_ATTEMPTS = 18;  // 18次 * 10秒 = 3分钟
             int attempts = 0;
 
             while (attempts < MAX_ATTEMPTS) {
@@ -192,8 +192,19 @@ void executeBorderBreakthrough()
                 QString savePath = actions.opencvRecognizesAndClick(screenshotPath + "battle_end.png", 0.6, true);
                 if (!savePath.isEmpty())
                 {
-                    qDebug() << "成功找到目标文本，退出循环";
+                    qDebug() << "成功找到识别目标，退出循环";
                     actions.processAndShowImage(savePath);
+
+                    waitWithEventProcessing(6000);
+
+                    //此时需要再次判断一下，应为可能会出现 3 6 9次拿到的额外奖励
+                    QString savePathAdditional = actions.opencvRecognizesAndClick(screenshotPath + "battle_end.png", 0.6, true);
+                    if (!savePath.isEmpty())
+                    {
+                        //有则展示，没有则不用管，因为不一定有
+                        actions.processAndShowImage(savePathAdditional);
+                        waitWithEventProcessing(3000);
+                    }
                     break;  // 找到目标后跳出外层循环
                 }
 

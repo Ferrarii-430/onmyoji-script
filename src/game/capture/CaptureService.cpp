@@ -20,6 +20,7 @@ cv::Mat captureGameWindow()
     // 首先尝试提升权限
     if (!platform::enableDebugPrivilege()) {
         Logger::log(QString("提升调试权限失败!"));
+        Logger::log(QString("【请用管理员权限启动!】"));
     }
 
     GameWindow& window = GameWindow::instance();
