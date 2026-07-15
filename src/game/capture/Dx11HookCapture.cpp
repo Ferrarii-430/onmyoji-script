@@ -206,7 +206,7 @@ bool captureByDllInjection(const QString& targetPid, cv::Mat& winImg)
     if (isDllEventAvailable()) {
         for (int attempt = 0; attempt < kFastPathMaxRetries; ++attempt) {
             if (captureViaEvent(winImg) && !winImg.empty()) {
-                Logger::log(QString("截图成功(快速路径, 尝试%1)，图像尺寸: %2 x %3  通道数: %4")
+                Logger::log(QString("截图成功(快速路径, 尝试次数：%1)，图像尺寸: %2 x %3  通道数: %4")
                                 .arg(attempt + 1).arg(winImg.cols).arg(winImg.rows).arg(winImg.channels()));
                 return true;
             }

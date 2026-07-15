@@ -139,7 +139,7 @@ void executeBorderBreakthrough()
                         //识别战斗失败 并点击，成功则退出等待循环，否则结束任务
                         QString savePath = actions.ocrRecognizesAndClick("失败", 0.5, true);
                         if (savePath.isEmpty()) {
-                            Logger::log(QString("未识别到目标字样，结束任务"));
+                            Logger::log(QString("未识别到目标字段，结束任务"));
                             return;
                         }
                         waitWithEventProcessing(8000);
@@ -200,7 +200,7 @@ void executeBorderBreakthrough()
                 QString savePath = actions.opencvRecognizesAndClick(screenshotPath + "battle_end.png", 0.65, true);
                 if (!savePath.isEmpty())
                 {
-                    qDebug() << "成功找到识别目标，退出循环";
+                    qDebug() << "成功找到识别目标，完成战斗";
 
                     waitWithEventProcessing(6000);
 
@@ -214,7 +214,7 @@ void executeBorderBreakthrough()
                 }
 
                 if (attempts >= MAX_ATTEMPTS) {
-                    qWarning() << "达到最大尝试次数" << MAX_ATTEMPTS << "，未找到目标文本，退出循环";
+                    qWarning() << "达到最大尝试次数" << MAX_ATTEMPTS << "，未找到识别目标，结束任务";
                     break;
                 }
             }
