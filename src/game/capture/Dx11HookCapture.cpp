@@ -48,36 +48,6 @@ bool waitForProcessResponsive(QProcess& process, int timeoutMs)
     return true;
 }
 
-// 快速路径：通过跨进程事件直接触发 DLL 截图，无需启动注入器进程。
-// 返回 true 表示成功读取到新帧。
-bool captureViaEvent(cv::Mat& winImg)
-{
-    // 尝试打开 DLL 创建的跨进程截图请求事件
-    HANDLE hEvent = OpenEventW(EVENT_MODIFY_STATE, FALSE, DX11_CAPTURE_REQUEST_EVENT_NAME);
-    if (!hEvent) {
-        // 事件不存在说明 DLL 尚未注入或版本过旧，需走注入器路径
-        return false;
-    }
-
-    const uint32_t prevSeq = readDx11SharedSequence();
-
-    // 信号触发截图
-    SetEvent(hEvent);
-    CloseHandle(hEvent);
-
-    // 等待共享内存序号变化（DLL 在下一帧 Present 时写入）
-    QElapsedTimer timer;
-    timer.start();
-    while (timer.elapsed() < kFastPathFrameWaitMs) {
-        if (readDx11SharedSequence() != prevSeq) {
-            break;
-        }
-        QThread::msleep(kFastPathPollIntervalMs);
-    }
-
-    return readDx11SharedCapture(winImg);
-}
-
 // 读取共享内存中当前帧的序号（共享内存不可用时返回 0）
 uint32_t readDx11SharedSequence()
 {
@@ -178,6 +148,32 @@ bool checkHookToolsExist()
         return false;
     }
     return true;
+}
+
+// 快速路径：通过跨进程事件直接触发 DLL 截图，无需启动注入器进程。
+// 返回 true 表示成功读取到新帧。
+bool captureViaEvent(cv::Mat& winImg)
+{
+    HANDLE hEvent = OpenEventW(EVENT_MODIFY_STATE, FALSE, DX11_CAPTURE_REQUEST_EVENT_NAME);
+    if (!hEvent) {
+        return false;
+    }
+
+    const uint32_t prevSeq = readDx11SharedSequence();
+
+    SetEvent(hEvent);
+    CloseHandle(hEvent);
+
+    QElapsedTimer timer;
+    timer.start();
+    while (timer.elapsed() < kFastPathFrameWaitMs) {
+        if (readDx11SharedSequence() != prevSeq) {
+            break;
+        }
+        QThread::msleep(kFastPathPollIntervalMs);
+    }
+
+    return readDx11SharedCapture(winImg);
 }
 
 } // namespace
