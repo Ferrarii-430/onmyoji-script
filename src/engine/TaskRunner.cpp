@@ -35,19 +35,12 @@ QString TaskRunner::executeStep(const QJsonObject& step)
     ConfigTypeEnum type = stringToConfigType(typeStr);
     QString savePath;
 
-    // 识别类步骤统一的重试逻辑：最多尝试 3 次，成功即回显结果图并返回。
+    // 识别类步骤：直接执行一次，不做重试。
     auto recognizeWithRetry = [this](const std::function<QString()>& recognize) -> QString {
-        constexpr int maxAttempts = 3;
-        for (int attempt = 1; attempt <= maxAttempts; ++attempt) {
-            QString path = recognize();
-            if (!path.isNull()) {
-                emit showImage(path);
-                return path;
-            }
-            if (attempt < maxAttempts) {
-                Logger::log(QString("截图失败，第%1次重试").arg(attempt));
-                core::waitWithEventProcessing(1000);
-            }
+        QString path = recognize();
+        if (!path.isNull()) {
+            emit showImage(path);
+            return path;
         }
         return QString();
     };
