@@ -195,6 +195,62 @@ bool captureViaEvent(cv::Mat& winImg)
     return readDx11SharedCapture(winImg);
 }
 
+// 检查 DLL 的跨进程点击事件是否存在（即 DLL 是否已注入且支持点击快速路径）
+bool isClickEventAvailable()
+{
+    HANDLE hEvent = OpenEventW(EVENT_MODIFY_STATE, FALSE, DX11_CLICK_REQUEST_EVENT_NAME);
+    if (!hEvent) return false;
+    CloseHandle(hEvent);
+    return true;
+}
+
+// 快速路径：把 (x,y) 写入点击共享内存并 SetEvent，轮询 doneSeq 确认 DLL 已投递。
+// 返回 true 表示 DLL 点击工作线程已确认完成投递。
+bool clickViaEvent(int x, int y)
+{
+    HANDLE mapping = OpenFileMappingW(FILE_MAP_READ | FILE_MAP_WRITE,
+                                      FALSE, DX11_CLICK_SHARED_NAME);
+    if (!mapping) return false;
+
+    void* view = MapViewOfFile(mapping, FILE_MAP_READ | FILE_MAP_WRITE,
+                               0, 0, sizeof(Dx11ClickCommand));
+    if (!view) {
+        CloseHandle(mapping);
+        return false;
+    }
+
+    Dx11ClickCommand* cmd = static_cast<Dx11ClickCommand*>(view);
+    const uint32_t mySeq = cmd->sequence + 1;
+    cmd->magic = DX11_CLICK_MAGIC;
+    cmd->version = DX11_CLICK_VERSION;
+    cmd->x = x;
+    cmd->y = y;
+    cmd->sequence = mySeq;
+    cmd->doneSeq = 0;
+
+    HANDLE hEvent = OpenEventW(EVENT_MODIFY_STATE, FALSE, DX11_CLICK_REQUEST_EVENT_NAME);
+    if (!hEvent) {
+        UnmapViewOfFile(view);
+        CloseHandle(mapping);
+        return false;
+    }
+    SetEvent(hEvent);
+    CloseHandle(hEvent);
+
+    // 轮询确认 DLL 工作线程已投递鼠标消息（DLL 侧投递含 ~60ms 延时）
+    bool done = false;
+    QElapsedTimer timer;
+    timer.start();
+    while (timer.elapsed() < 1000) {
+        if (cmd->doneSeq == mySeq) { done = true; break; }
+        QThread::msleep(2);
+    }
+
+    UnmapViewOfFile(view);
+    CloseHandle(mapping);
+    return done;
+}
+
 } // namespace
 
 bool captureByDllInjection(const QString& targetPid, cv::Mat& winImg)
@@ -450,6 +506,63 @@ bool dllStopHook(const QString& targetPid)
     }
 
     qDebug() << "停止dx11_hook命令输出:" << output;
+    return true;
+}
+
+bool clickByDllInjection(const QString& targetPid, int x, int y)
+{
+    // =========================================================================
+    // 快速路径：DLL 已注入时直接通过跨进程事件触发点击，延迟低、无需启动进程。
+    // =========================================================================
+    if (isClickEventAvailable() && clickViaEvent(x, y)) {
+        Logger::log(QString("点击成功(快速路径) (%1, %2)").arg(x).arg(y));
+        return true;
+    }
+
+    // =========================================================================
+    // 回退路径：启动注入器 -click 完成注入 + 点击。
+    // =========================================================================
+    const QString remoteCaptureExe = AppPaths::instance().remoteCaptureExePath();
+    const QString dllPath = QDir::toNativeSeparators(AppPaths::instance().dx11HookDllPath());
+    const QString dllName = AppPaths::instance().dx11HookDllName();
+
+    if (targetPid.isEmpty()) {
+        qWarning() << "点击失败：无法获取目标进程ID";
+        return false;
+    }
+    if (!QFile::exists(remoteCaptureExe) || !QFile::exists(dllPath)) {
+        qWarning() << "点击失败：注入器或 DLL 不存在" << remoteCaptureExe << dllPath;
+        return false;
+    }
+
+    QProcess process;
+    process.setProcessChannelMode(QProcess::MergedChannels);
+    QStringList arguments;
+    arguments << "-click"
+              << targetPid
+              << dllPath
+              << dllName
+              << QString::number(x)
+              << QString::number(y);
+
+    process.start(remoteCaptureExe, arguments);
+
+    if (!waitForProcessResponsive(process, 20000)) {
+        qWarning() << "点击命令执行超时，注入器已被终止；已有输出:"
+                   << process.readAll();
+        process.kill();
+        waitForProcessResponsive(process, 1000);
+        return false;
+    }
+
+    const int exitCode = process.exitCode();
+    const QByteArray output = process.readAll();
+    if (exitCode != 0) {
+        qWarning() << "注入器 -click 失败，退出码:" << exitCode << "输出:" << output;
+        return false;
+    }
+
+    Logger::log(QString("点击成功(注入器) (%1, %2)").arg(x).arg(y));
     return true;
 }
 

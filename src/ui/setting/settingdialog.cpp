@@ -47,6 +47,7 @@ void SettingDialog::initSetting() const
 
     ui->mouseClickMode->addItem("PostMessage", "PostMessage");
     ui->mouseClickMode->addItem("InputMouse", "InputMouse");
+    ui->mouseClickMode->addItem("Hook注入(后台)", "Hook");
 
     //初始化值
     ui->mouseControlMode->setCurrentText(SETTING_CONFIG.getMouseControlMode());
