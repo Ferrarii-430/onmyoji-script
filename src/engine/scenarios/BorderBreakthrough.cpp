@@ -232,9 +232,10 @@ void executeBorderBreakthrough()
 int getNumberOfTickets()
 {
     ScriptActions& actions = ScriptActions::instance();
-    QJsonArray ticketsData = actions.ocrRecognizes(QRectF(70, 1, 100, 15));
+    QJsonArray ticketsData = actions.ocrRecognizes(QRectF(60, 0, 100, 8));
     if (ticketsData.empty())
     {
+        qWarning() << "门票检测异常：" << ticketsData;
         return 0;
     }
     //正常来说只会有一个文字

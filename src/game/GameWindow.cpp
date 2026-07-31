@@ -157,6 +157,11 @@ void GameWindow::clickInWindow(const cv::Point& clickPoint)
     } else if (mouseClickMode == "PostMessage") {
         success = simulator.StealthMessageClick(messageTarget, messagePoint.x, messagePoint.y);
     } else if (mouseClickMode == "InputMouse") {
+        // InputMouse 模式使用 SendInput 模拟硬件点击，该 API 只将输入路由到前台窗口，
+        // 因此必须先将目标窗口带到前台，否则点击会发到当前前台窗口导致无效
+        BringWindowToTop(hwnd_);
+        SetForegroundWindow(hwnd_);
+
         POINT start = MouseSimulator::GetCurrentPosition();
         POINT targetScreen = { screenPoint.x, screenPoint.y };
         success = simulator.ExecuteTrajectoryWithClick(start, targetScreen,

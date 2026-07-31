@@ -18,7 +18,7 @@
 #include "ui_EditTaskDialog.h"
 
 EditTaskDialog::EditTaskDialog(EditMode mode, const QJsonObject &stepData, const QString &configId, QWidget *parent) :
-    QDialog(parent), ui(new Ui::EditTaskDialog) {
+    QDialog(parent), ui(new Ui::EditTaskDialog), m_mode(mode), m_stepData(stepData) {
     setWindowTitle(mode == EditMode::Add ? "新增任务" : "编辑任务");
     ui->setupUi(this);
 
@@ -104,11 +104,18 @@ EditTaskDialog::EditTaskDialog(EditMode mode, const QJsonObject &stepData, const
 
 QJsonObject EditTaskDialog::collectData() const {
     const QString type = currentType();
-    if (type == "OPENCV") return typeForm->toJson();
-    if (type == "OCR") return ocrForm->toJson();
-    if (type == "YOLO") return yoloForm->toJson();
-    if (type == "WAIT") return waitForm->toJson();
-    return QJsonObject();
+    QJsonObject obj;
+    if (type == "OPENCV") obj = typeForm->toJson();
+    else if (type == "OCR") obj = ocrForm->toJson();
+    else if (type == "YOLO") obj = yoloForm->toJson();
+    else if (type == "WAIT") obj = waitForm->toJson();
+
+    // 编辑模式下保留原始 stepsId，防止切换类型后各表单 stepDataCopy 为空而生成新 UUID
+    if (m_mode == EditMode::Edit && m_stepData.contains("stepsId")) {
+        obj["stepsId"] = m_stepData["stepsId"];
+    }
+
+    return obj;
 }
 
 QString EditTaskDialog::currentType() const {

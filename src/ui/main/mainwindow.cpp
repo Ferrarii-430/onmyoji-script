@@ -364,7 +364,9 @@ void mainwindow::showStepsInTable(const QJsonArray &steps) {
                 }
 
                 // 保存回 JSON 文件 & 刷新表格
-                saveBase64ImageToFile(data);
+                if (data["type"].toString() == "OPENCV") {
+                    saveBase64ImageToFile(data);
+                }
                 updateConfigInJsonFile(AppPaths::instance().configPath(), currentItem.id, data);
                 QTimer::singleShot(0, dlg, &QObject::deleteLater); // 延迟一拍
                 showCurrentSelectStepsInTable();
@@ -555,7 +557,9 @@ void mainwindow::onProgrammeContentAddBtnClicked()
             return;
         }
 
-        saveBase64ImageToFile(data);
+        if (data["type"].toString() == "OPENCV") {
+            saveBase64ImageToFile(data);
+        }
         addConfigToJsonFile(AppPaths::instance().configPath(),currentItem.id,data);
         QTimer::singleShot(0, dlg, &QObject::deleteLater);  // 延迟一拍
         showCurrentSelectStepsInTable();

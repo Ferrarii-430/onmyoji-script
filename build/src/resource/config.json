@@ -2,9 +2,28 @@
   {
     "id": "DC42C888-2449-41D2-A894-095606E38D12",
     "name": "空的配置",
-    "type": "normal",
     "steps": [
-    ]
+      {
+        "identifyErrorHandle": "next",
+        "imagePath": "battle_end.png",
+        "jumpStepsId": null,
+        "ocrRoiH": null,
+        "ocrRoiW": null,
+        "ocrRoiX": null,
+        "ocrRoiY": null,
+        "ocrText": null,
+        "offsetTime": null,
+        "randomClick": false,
+        "randomWait": null,
+        "score": 0.6,
+        "stepsId": "941ad4c7-2181-4a2c-93f5-15e20fbe5ea5",
+        "taskName": "识别奖励",
+        "time": null,
+        "type": "OPENCV",
+        "yoloLabel": null
+      }
+    ],
+    "type": "normal"
   },
   {
     "id": "D942C888-2449-41D2-A794-055586E39P13",
