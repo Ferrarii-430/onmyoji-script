@@ -23,6 +23,13 @@ cv::Point randomPointInRectExcludeWidth(const cv::Rect& r,
                                         double excludeStartWidth, double excludeEndWidth,
                                         int maxAttempts = 10);
 
+// 在矩形内随机取一点，同时排除宽度方向 [excludeStartWidth, excludeEndWidth] 对应的垂直区域
+// 和高度方向 [excludeStartHeight, excludeEndHeight] 对应的水平区域
+cv::Point randomPointInRectExcludeWidthAndHeight(const cv::Rect& r,
+                                                 double excludeStartWidth, double excludeEndWidth,
+                                                 double excludeStartHeight, double excludeEndHeight,
+                                                 int maxAttempts = 10);
+
 } // namespace vision
 
 #endif // VISION_GEOMETRY_H

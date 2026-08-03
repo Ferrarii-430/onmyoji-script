@@ -104,4 +104,47 @@ cv::Point randomPointInRectExcludeWidth(const cv::Rect& r,
     return cv::Point(r.x + r.width / 2, r.y + r.height / 2);
 }
 
+cv::Point randomPointInRectExcludeWidthAndHeight(const cv::Rect& r,
+                                                 double excludeStartWidth, double excludeEndWidth,
+                                                 double excludeStartHeight, double excludeEndHeight,
+                                                 int maxAttempts)
+{
+    // 宽度方向无效时退化为仅排除高度
+    const bool widthValid = excludeStartWidth < excludeEndWidth;
+    // 高度方向无效时退化为仅排除宽度
+    const bool heightValid = excludeStartHeight < excludeEndHeight;
+
+    if (!widthValid && !heightValid) {
+        return randomPointInRect(r);
+    }
+
+    cv::Rect excludeWidthRect;
+    if (widthValid) {
+        int excludeX = r.x + r.width * excludeStartWidth;
+        int excludeW = r.width * (excludeEndWidth - excludeStartWidth);
+        excludeWidthRect = cv::Rect(excludeX, r.y, excludeW, r.height);
+    }
+
+    cv::Rect excludeHeightRect;
+    if (heightValid) {
+        int excludeY = r.y + r.height * excludeStartHeight;
+        int excludeH = r.height * (excludeEndHeight - excludeStartHeight);
+        excludeHeightRect = cv::Rect(r.x, excludeY, r.width, excludeH);
+    }
+
+    int attempts = 0;
+    while (attempts < maxAttempts) {
+        cv::Point candidate = randomPointInRect(r);
+        bool inWidth = widthValid && excludeWidthRect.contains(candidate);
+        bool inHeight = heightValid && excludeHeightRect.contains(candidate);
+        if (!inWidth && !inHeight) {
+            return candidate;
+        }
+        attempts++;
+    }
+
+    Logger::log(QString("达到最大尝试次数，使用备选中心点"));
+    return cv::Point(r.x + r.width / 2, r.y + r.height / 2);
+}
+
 } // namespace vision
