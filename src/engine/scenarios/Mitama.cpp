@@ -31,8 +31,12 @@ namespace scenarios
 
         //先判断目前在哪一个场景
         //1.御魂副本选择界面 2.队伍界面 3.战斗界面 4.奖励领取界面 5.其他界面(直接停止任务)
-        QJsonArray fractionData = actions.ocrRecognizes(QRectF(0, 0, 0, 0));
-        qWarning() << fractionData;
+        QJsonArray interfaceData = actions.ocrRecognizes(QRectF(0, 0, 0, 0));
+        for (int i = 0; i < interfaceData.size(); ++i)
+        {
+            QJsonObject item = interfaceData[i].toObject();
+            QString text = item["text"].toString();
+        }
     }
 
 } // namespace scenarios
