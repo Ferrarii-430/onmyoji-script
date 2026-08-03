@@ -32,7 +32,9 @@ public:
     bool initialize(const std::wstring& model_path);
 
     // 检测方法
-    std::vector<Detection> detect(const cv::Mat& image, double nms_threshold = 0.55f);
+    // confidence_threshold: 置信度过滤阈值，低于该分数的检测框会被丢弃
+    // nms_threshold: 非极大值抑制（NMS）的 IoU 阈值，用于去除重叠框
+    std::vector<Detection> detect(const cv::Mat& image, double confidence_threshold = 0.4, double nms_threshold = 0.55);
     std::vector<Detection> nonMaximumSuppression(const std::vector<Detection>& detections, double iou_threshold);
 
 private:

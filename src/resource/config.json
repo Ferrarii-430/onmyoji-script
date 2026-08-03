@@ -39,7 +39,7 @@
     ],
     "steps": [
       {
-        "identifyErrorHandle": "next",
+        "identifyErrorHandle": "end",
         "imagePath": null,
         "jumpStepsId": null,
         "ocrText": null,
@@ -68,7 +68,7 @@
     ],
     "steps": [
       {
-        "identifyErrorHandle": "next",
+        "identifyErrorHandle": "end",
         "imagePath": null,
         "jumpStepsId": null,
         "ocrText": null,
@@ -80,6 +80,35 @@
         "taskName": "自动挂机斗技",
         "time": null,
         "type": "SYSTEM_ARENA"
+      }
+    ]
+  },
+  {
+    "id": "D942C666-2449-41P2-A484-044486E39P13",
+    "name": "系统方案-自动御魂",
+    "type": "system",
+    "systemConfig": [
+      {
+        "key": "teamPlay",
+        "label": "组队模式",
+        "control": "switch",
+        "value": true
+      }
+    ],
+    "steps": [
+      {
+        "identifyErrorHandle": "end",
+        "imagePath": null,
+        "jumpStepsId": null,
+        "ocrText": null,
+        "offsetTime": null,
+        "randomClick": true,
+        "randomWait": null,
+        "score": 0.55,
+        "stepsId": "98959147-b290-9645-5876-58995ub7e4e8",
+        "taskName": "自动御魂副本",
+        "time": null,
+        "type": "SYSTEM_MITAMA"
       }
     ]
   }

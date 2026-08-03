@@ -126,6 +126,8 @@ add_executable(qtTest WIN32
         src/ui/setting/settingdialog.cpp
         src/ui/setting/settingdialog.h
         src/ui/setting/settingdialog.ui
+        src/engine/scenarios/Mitama.cpp
+        src/engine/scenarios/Mitama.h
 )
 
 if(WIN32)

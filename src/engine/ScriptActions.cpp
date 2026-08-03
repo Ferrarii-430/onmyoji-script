@@ -539,6 +539,18 @@ std::vector<Detection> ScriptActions::yoloRecognizes(const double threshold, dou
         det.className = labelName;
     }
 
+    // 输出识别结果日志（置信度阈值=threshold，低于该分数的已在检测阶段过滤）
+    Logger::log(QString("YOLO 识别完成：共 %1 个目标（置信度阈值=%2）")
+                    .arg(final_detections.size())
+                    .arg(threshold, 0, 'f', 2));
+    for (const auto& det : final_detections) {
+        Logger::log(QString("  - %1  置信度=%2  位置=[%3,%4,%5x%6]")
+                        .arg(det.className)
+                        .arg(det.confidence, 0, 'f', 4)
+                        .arg(det.bbox.x).arg(det.bbox.y)
+                        .arg(det.bbox.width).arg(det.bbox.height));
+    }
+
     // 如果指定了排除区域，也在图像上标记出来（蓝色矩形）
     if (excludeStartWidth < excludeEndWidth && matchRect.width > 0) {
         int excludeX = matchRect.x + matchRect.width * excludeStartWidth;

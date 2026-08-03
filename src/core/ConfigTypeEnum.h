@@ -13,6 +13,7 @@ enum class ConfigTypeEnum {
     YOLO,
     SYSTEM_BORDER_BREAKTHROUGH,
     SYSTEM_ARENA,
+    SYSTEM_MITAMA,
     UNKNOWN
 };
 

@@ -13,6 +13,7 @@
 #include "src/engine/ScriptActions.h"
 #include "src/engine/scenarios/Arena.h"
 #include "src/engine/scenarios/BorderBreakthrough.h"
+#include "src/engine/scenarios/Mitama.h"
 #include "src/game/GameWindow.h"
 #include "src/game/capture/CaptureService.h"
 
@@ -115,6 +116,11 @@ QString TaskRunner::executeStep(const QJsonObject& step)
 
         case ConfigTypeEnum::SYSTEM_ARENA: {
                 scenarios::executeArena();
+                break;
+        }
+
+        case ConfigTypeEnum::SYSTEM_MITAMA: {
+                scenarios::executeMitama();
                 break;
         }
 
@@ -233,6 +239,8 @@ void TaskRunner::run(const QJsonArray& steps, int cycleCount)
                         Logger::log(QString("识别失败，重试次数用尽，继续下一个步骤"));
                         // 默认为next
                     }
+                } if (identifyErrorHandle == "end") {
+                    Logger::log(QString("任务结束"));
                 } else {
                     Logger::log(QString("未知的错误处理选项: %1，使用默认next处理").arg(identifyErrorHandle));
                     // 默认为next

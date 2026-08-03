@@ -51,7 +51,7 @@ void executeArena()
     Logger::log(QString("自动斗技运行配置: 刷满信誉值自动停止=%1").arg(automaticStop));
 
     // 0. 判断斗技荣誉值是否已刷满
-    actions.ocrRecognizes(QRectF(80, 0, 100, 10));
+    // actions.ocrRecognizes(QRectF(80, 0, 100, 10));
     bool fraction = getNumberOfFraction();
     if (fraction && automaticStop)
     {

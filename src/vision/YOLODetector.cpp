@@ -47,7 +47,7 @@ bool YOLODetector::initialize(const std::wstring& model_path) {
 }
 
 // 检测方法
-std::vector<Detection> YOLODetector::detect(const cv::Mat& image, double nms_threshold) {
+std::vector<Detection> YOLODetector::detect(const cv::Mat& image, double confidence_threshold, double nms_threshold) {
     std::vector<Detection> final_detections;
 
     if (!is_initialized) {
@@ -66,8 +66,6 @@ std::vector<Detection> YOLODetector::detect(const cv::Mat& image, double nms_thr
         // 图像预处理参数
         const int input_width = 640;
         const int input_height = 640;
-        const float confidence_threshold = 0.4f;
-        // const float nms_threshold = 0.55f;
 
         cv::Mat original_image = image.clone();
         cv::Mat resized_image, float_image;

@@ -14,6 +14,7 @@ QString getConfigTypeEnumToQStringName(ConfigTypeEnum type) {
         case ConfigTypeEnum::YOLO: return "YOLO";
         case ConfigTypeEnum::SYSTEM_BORDER_BREAKTHROUGH: return "SYSTEM_BORDER_BREAKTHROUGH";
         case ConfigTypeEnum::SYSTEM_ARENA: return "SYSTEM_ARENA";
+        case ConfigTypeEnum::SYSTEM_MITAMA: return "SYSTEM_MITAMA";
         default: return "未知";
     }
 }
@@ -43,6 +44,9 @@ ConfigTypeEnum stringToConfigType(const QString& typeStr) {
     if (typeStr.compare("SYSTEM_ARENA", Qt::CaseInsensitive) == 0) {
         return ConfigTypeEnum::SYSTEM_ARENA;
     }
+    if (typeStr.compare("SYSTEM_MITAMA", Qt::CaseInsensitive) == 0) {
+        return ConfigTypeEnum::SYSTEM_MITAMA;
+    }
     return ConfigTypeEnum::UNKNOWN;
 }
 
@@ -55,6 +59,7 @@ QString configTypeToQString(ConfigTypeEnum type) {
         case ConfigTypeEnum::YOLO: return "YOLO";
         case ConfigTypeEnum::SYSTEM_BORDER_BREAKTHROUGH: return "SYSTEM_BORDER_BREAKTHROUGH";
         case ConfigTypeEnum::SYSTEM_ARENA: return "SYSTEM_ARENA";
+        case ConfigTypeEnum::SYSTEM_MITAMA: return "SYSTEM_MITAMA";
         default: return "UNKNOWN";
     }
 }

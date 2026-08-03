@@ -151,7 +151,7 @@ public:
 
     void retranslateUi(QWidget *mainwindow)
     {
-        mainwindow->setWindowTitle(QCoreApplication::translate("mainwindow", "onmyoji-script v1.5", nullptr));
+        mainwindow->setWindowTitle(QCoreApplication::translate("mainwindow", "onmyoji-script v1.5.2", nullptr));
         label->setText(QCoreApplication::translate("mainwindow", "\346\226\271\346\241\210", nullptr));
         label_3->setText(QCoreApplication::translate("mainwindow", "\346\227\245\345\277\227\350\276\223\345\207\272", nullptr));
         label_4->setText(QCoreApplication::translate("mainwindow", "\345\233\276\345\203\217\350\257\206\345\210\253\347\274\251\347\225\245\345\233\276", nullptr));

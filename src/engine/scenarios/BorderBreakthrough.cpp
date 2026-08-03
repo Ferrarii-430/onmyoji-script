@@ -53,7 +53,7 @@ void executeBorderBreakthrough()
         Logger::log(QString("检测到已挑战结界，执行刷新"));
 
         // 点击刷新按钮
-        if (actions.clickDetectionByLabel("common-btn-yellow_confirm", 0.5, 0.0, 0.0)) {
+        if (actions.clickDetectionByLabel("common-btn-yellow_confirm", 0.5, 0.0, 0.0, false)) {
             waitWithEventProcessing(3000); // 等待刷新确认界面出现
             qWarning() << "等待3秒";
             for (int i = 3 - 1; i >= 0; --i)
@@ -63,7 +63,7 @@ void executeBorderBreakthrough()
             }
 
             // 点击确认刷新
-            if (actions.clickDetectionByLabel("common-btn-yellow_confirm", 0.5, 0.0, 0.0)) {
+            if (actions.clickDetectionByLabel("common-btn-yellow_confirm", 0.5, 0.0, 0.0, false)) {
                 Logger::log(QString("刷新成功"));
                 waitWithEventProcessing(4000); // 等待刷新完成
 
@@ -105,7 +105,13 @@ void executeBorderBreakthrough()
         for (int i : surrenderIndex)
         {
             cv::Rect matchRect = vec[i].bbox;
-            cv::Point clickPt = vision::randomPointInRectExcludeWidth(matchRect, 0.0, 0.3, 10);
+            std::vector<cv::Rect> excludes = {
+                vision::widthExcludeRect(matchRect, 0.0, 0.3),    // 左侧 30%
+                vision::heightExcludeRect(matchRect, 0.0, 0.1),   // 上边框 10%
+                vision::heightExcludeRect(matchRect, 0.9, 1.0),   // 下边框 10%
+                vision::widthExcludeRect(matchRect, 0.9, 1.0),   // 右边框 10%
+            };
+            cv::Point clickPt = vision::randomPointInRectExcludeAreas(matchRect, excludes, 5);
             // Logger::log(vec[i].className);
             // std::cout << matchRect << std::endl;
             window.clickInWindow(clickPt);
@@ -178,7 +184,13 @@ void executeBorderBreakthrough()
         //点击突破框
         cv::Rect matchRect = det.bbox;
         Logger::log(QString("开始点击突破框"));
-        cv::Point clickPt = vision::randomPointInRectExcludeWidth(matchRect, 0.0, 0.3, 10);
+        std::vector<cv::Rect> excludes = {
+            vision::widthExcludeRect(matchRect, 0.0, 0.3),    // 左侧 30%
+            vision::heightExcludeRect(matchRect, 0.0, 0.1),   // 上边框 10%
+            vision::heightExcludeRect(matchRect, 0.9, 1.0),   // 下边框 10%
+            vision::widthExcludeRect(matchRect, 0.9, 1.0),   // 右边框 10%
+        };
+        cv::Point clickPt = vision::randomPointInRectExcludeAreas(matchRect, excludes, 5);
         window.clickInWindow(clickPt);
         waitWithEventProcessing(3000);
 
