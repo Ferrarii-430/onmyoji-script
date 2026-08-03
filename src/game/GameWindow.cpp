@@ -152,7 +152,18 @@ void GameWindow::clickInWindow(const cv::Point& clickPoint)
         }
     }
 
-    if (isDegenerateClientRect) {
+    if (mouseClickMode == "Hook" || mouseClickMode == "Dx11Hook") {
+        // 通过已注入的 DX11 hook DLL 在游戏进程内部投递鼠标消息，
+        // 适合 Unity 游戏后台运行；坐标使用截图(后备缓冲区)坐标系，
+        // 由 DLL 侧换算为客户区坐标，因此这里传入原始 clickPoint。
+        // Hook 模式不依赖窗口客户区状态，即使窗口最小化也能正常工作。
+        const QString pid = processId();
+        if (pid.isEmpty()) {
+            Logger::log(QString("Hook点击失败：无法获取进程ID"));
+        } else {
+            success = capture::clickByDllInjection(pid, clickPoint.x, clickPoint.y);
+        }
+    } else if (isDegenerateClientRect) {
         Logger::log(QString("窗口最小化或客户区为0，使用后台消息点击(PostMessage)"));
         success = simulator.StealthMessageClick(messageTarget, messagePoint.x, messagePoint.y);
     } else if (mouseClickMode == "PostMessage") {
@@ -168,16 +179,6 @@ void GameWindow::clickInWindow(const cv::Point& clickPoint)
         success = simulator.ExecuteTrajectoryWithClick(start, targetScreen,
                                                      TrajectoryType::BEZIER,
                                                      SETTING_CONFIG.getMouseSpeed() * 10);
-    } else if (mouseClickMode == "Hook" || mouseClickMode == "Dx11Hook") {
-        // 通过已注入的 DX11 hook DLL 在游戏进程内部投递鼠标消息，
-        // 适合 Unity 游戏后台运行；坐标使用截图(后备缓冲区)坐标系，
-        // 由 DLL 侧换算为客户区坐标，因此这里传入原始 clickPoint。
-        const QString pid = processId();
-        if (pid.isEmpty()) {
-            Logger::log(QString("Hook点击失败：无法获取进程ID"));
-        } else {
-            success = capture::clickByDllInjection(pid, clickPoint.x, clickPoint.y);
-        }
     } else {
         Logger::log(QString("无法识别的鼠标点击模式，执行默认策略"));
         success = simulator.StealthMessageClick(messageTarget, messagePoint.x, messagePoint.y);
