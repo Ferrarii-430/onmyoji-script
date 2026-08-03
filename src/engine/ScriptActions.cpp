@@ -107,7 +107,7 @@ cv::Rect computeOcrRoi(const cv::Mat& winImg, const QRectF& roiPercent,
     }
     ocrImagePath = saveDir + "ocr_roi_capture.png";
     cv::imwrite(ocrImagePath.toStdString(), winImg(roiRect));
-    Logger::log(QString("OCR识别区域: 百分比(%1%%,%2%%,%3%%,%4%%) -> 像素(%5,%6,%7x%8)")
+    Logger::log(QString("OCR识别区域: 百分比(%1%,%2%,%3%,%4%) -> 像素(%5,%6,%7x%8)")
                     .arg(roiPercent.x()).arg(roiPercent.y())
                     .arg(roiPercent.width()).arg(roiPercent.height())
                     .arg(roiRect.x).arg(roiRect.y)
