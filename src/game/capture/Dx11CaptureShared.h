@@ -35,4 +35,28 @@ struct Dx11CaptureShared {
 };
 #pragma pack(pop)
 
+// ============================================================================
+// 坐标点击（后台输入注入）共享内存协议。
+// 该文件的结构体布局必须与注入 DLL (onmyoji-dx11-hook/src/main.cpp) 中的
+// Dx11ClickCommand 完全一致。DLL 已注入游戏进程，向 swap chain 输出窗口
+// PostMessage 鼠标消息实现后台点击。script 进程把 (x,y) 写入共享内存并
+// SetEvent 请求事件，轮询 doneSeq 确认 DLL 已投递。
+// ============================================================================
+#define DX11_CLICK_SHARED_NAME L"OnmyojiDx11ClickShared"
+#define DX11_CLICK_REQUEST_EVENT_NAME L"OnmyojiDx11ClickRequest"
+
+static const uint32_t DX11_CLICK_MAGIC = 0x314B4C43; // 'CLK1'
+static const uint32_t DX11_CLICK_VERSION = 1;
+
+#pragma pack(push, 4)
+struct Dx11ClickCommand {
+    uint32_t magic;     // DX11_CLICK_MAGIC
+    uint32_t version;   // DX11_CLICK_VERSION
+    uint32_t sequence;  // 写端每次请求自增
+    uint32_t doneSeq;   // DLL 执行投递后置为本次 sequence
+    int32_t  x;         // 截图像素坐标（与后备缓冲区一致）
+    int32_t  y;
+};
+#pragma pack(pop)
+
 #endif // DX11_CAPTURE_SHARED_H

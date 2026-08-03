@@ -7,6 +7,7 @@
 #include "src/core/EventLoopUtils.h"
 #include "src/core/Logger.h"
 #include "src/core/SettingManager.h"
+#include "src/game/capture/Dx11HookCapture.h"
 #include "src/platform/DPIHelper.h"
 #include "src/platform/MouseSimulator.h"
 #include "src/platform/ProcessUtils.h"
@@ -167,6 +168,16 @@ void GameWindow::clickInWindow(const cv::Point& clickPoint)
         success = simulator.ExecuteTrajectoryWithClick(start, targetScreen,
                                                      TrajectoryType::BEZIER,
                                                      SETTING_CONFIG.getMouseSpeed() * 10);
+    } else if (mouseClickMode == "Hook" || mouseClickMode == "Dx11Hook") {
+        // 通过已注入的 DX11 hook DLL 在游戏进程内部投递鼠标消息，
+        // 适合 Unity 游戏后台运行；坐标使用截图(后备缓冲区)坐标系，
+        // 由 DLL 侧换算为客户区坐标，因此这里传入原始 clickPoint。
+        const QString pid = processId();
+        if (pid.isEmpty()) {
+            Logger::log(QString("Hook点击失败：无法获取进程ID"));
+        } else {
+            success = capture::clickByDllInjection(pid, clickPoint.x, clickPoint.y);
+        }
     } else {
         Logger::log(QString("无法识别的鼠标点击模式，执行默认策略"));
         success = simulator.StealthMessageClick(messageTarget, messagePoint.x, messagePoint.y);

@@ -92,6 +92,13 @@ bool SettingManager::parseConfig() {
         qWarning() << "配置缺少 persistScreenshot 字段或类型错误，使用默认值:" << m_persistScreenshot;
     }
 
+    // 解析鼠标点击模式（PostMessage / InputMouse / Hook）
+    if (m_config.contains("mouseClickMode") && m_config["mouseClickMode"].isString()) {
+        m_mouseClickMode = m_config["mouseClickMode"].toString();
+    } else {
+        qWarning() << "配置缺少 mouseClickMode 字段或类型错误，使用默认值:" << m_mouseClickMode;
+    }
+
     return true;
 }
 
