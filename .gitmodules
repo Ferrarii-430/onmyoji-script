@@ -1,0 +1,12 @@
+[submodule "dx11-hook"]
+	path = dx11-hook
+	url = https://github.com/Ferrarii-430/onmyoji-dx11-hook
+[submodule "injector"]
+	path = injector
+	url = https://github.com/Ferrarii-430/onmyoji-injector
+[submodule "push-dx11"]
+	path = push-dx11
+	url = https://github.com/Ferrarii-430/onmyoji-dx11-hook
+[submodule "push-inj"]
+	path = push-inj
+	url = https://github.com/Ferrarii-430/onmyoji-injector
