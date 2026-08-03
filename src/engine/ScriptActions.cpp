@@ -591,9 +591,15 @@ bool ScriptActions::hasDetectionWithLabel(const std::vector<Detection>& detectio
         });
 }
 
-void ScriptActions::clickDetection(const Detection& det)
+void ScriptActions::clickDetection(const Detection& det, bool randomClick)
 {
-    cv::Point physicalClickPt = vision::randomPointInRectExcludeWidth(det.bbox, 0.0, 0.0, 3);
+    cv::Point physicalClickPt;
+    if (randomClick) {
+        physicalClickPt = vision::randomPointInRectExcludeWidth(det.bbox, 0.0, 0.0, 3);
+    } else {
+        physicalClickPt = cv::Point(det.bbox.x + det.bbox.width / 2,
+                                    det.bbox.y + det.bbox.height / 2);
+    }
 
     QString capturePath = AppPaths::instance().dx11CapturePath();
     QString matchPath = AppPaths::instance().matchResultPath();
@@ -615,7 +621,8 @@ void ScriptActions::clickDetection(const Detection& det)
 }
 
 QString ScriptActions::clickFirstDetectionByLabels(const QStringList& targetLabels, double threshold,
-                                                   double excludeStart, double excludeEnd)
+                                                   double excludeStart, double excludeEnd,
+                                                   bool randomClick)
 {
     // 只截图/识别一次，按 targetLabels 的填入顺序作为优先级，命中哪个就点哪个（只点一次）
     const auto detections = yoloRecognizes(threshold, excludeStart, excludeEnd);
@@ -623,7 +630,7 @@ QString ScriptActions::clickFirstDetectionByLabels(const QStringList& targetLabe
     for (const QString& targetLabel : targetLabels) {
         for (const auto& det : detections) {
             if (comparesEqual(det.className, targetLabel)) {
-                clickDetection(det);
+                clickDetection(det, randomClick);
                 return targetLabel;
             }
         }
@@ -633,9 +640,10 @@ QString ScriptActions::clickFirstDetectionByLabels(const QStringList& targetLabe
 }
 
 bool ScriptActions::clickDetectionByLabel(const QString& targetLabel, double threshold,
-                                          double excludeStart, double excludeEnd)
+                                          double excludeStart, double excludeEnd,
+                                          bool randomClick)
 {
-    return !clickFirstDetectionByLabels(QStringList{targetLabel}, threshold, excludeStart, excludeEnd).isEmpty();
+    return !clickFirstDetectionByLabels(QStringList{targetLabel}, threshold, excludeStart, excludeEnd, randomClick).isEmpty();
 }
 
 // 智能路径处理：绝对路径直接使用，相对路径拼接基础路径

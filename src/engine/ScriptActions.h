@@ -47,11 +47,13 @@ public:
 
     // 在 YOLO 识别结果中点击指定标签，成功返回 true
     bool clickDetectionByLabel(const QString& targetLabel, double threshold,
-                               double excludeStart, double excludeEnd);
+                               double excludeStart, double excludeEnd,
+                               bool randomClick = true);
     // 单次 YOLO 识别，多个标签按填入顺序作为优先级，命中首个即点击并返回命中的标签，
     // 全部未命中返回空。用于「只识别一次、多标签择一点击」的场景。
     QString clickFirstDetectionByLabels(const QStringList& targetLabels, double threshold,
-                                        double excludeStart, double excludeEnd);
+                                        double excludeStart, double excludeEnd,
+                                        bool randomClick = true);
     static bool hasDetectionWithLabel(const std::vector<Detection>& detections, const QString& targetLabel);
 
     // 发射信号让 UI 显示识别结果图
@@ -67,7 +69,7 @@ private:
     static double dpiScalingFactor();
 
     // 命中某个 YOLO 检测框后：画框、保存调试图、回显并点击
-    void clickDetection(const Detection& det);
+    void clickDetection(const Detection& det, bool randomClick = true);
     // 命中某条 OCR 文字后：换算坐标、画框、保存调试图、回显并点击，返回结果图路径
     QString ocrClickMatchedItem(const cv::Mat& winImg, const QJsonObject& item, const cv::Rect& roiRect,
                                 bool useRoi, bool randomClick, const QString& saveDir);
