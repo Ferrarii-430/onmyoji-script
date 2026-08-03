@@ -104,40 +104,39 @@ cv::Point randomPointInRectExcludeWidth(const cv::Rect& r,
     return cv::Point(r.x + r.width / 2, r.y + r.height / 2);
 }
 
-cv::Point randomPointInRectExcludeWidthAndHeight(const cv::Rect& r,
-                                                 double excludeStartWidth, double excludeEndWidth,
-                                                 double excludeStartHeight, double excludeEndHeight,
-                                                 int maxAttempts)
+cv::Rect widthExcludeRect(const cv::Rect& r, double startRatio, double endRatio)
 {
-    // 宽度方向无效时退化为仅排除高度
-    const bool widthValid = excludeStartWidth < excludeEndWidth;
-    // 高度方向无效时退化为仅排除宽度
-    const bool heightValid = excludeStartHeight < excludeEndHeight;
+    int x = r.x + static_cast<int>(r.width * startRatio);
+    int w = static_cast<int>(r.width * (endRatio - startRatio));
+    return cv::Rect(x, r.y, w, r.height);
+}
 
-    if (!widthValid && !heightValid) {
+cv::Rect heightExcludeRect(const cv::Rect& r, double startRatio, double endRatio)
+{
+    int y = r.y + static_cast<int>(r.height * startRatio);
+    int h = static_cast<int>(r.height * (endRatio - startRatio));
+    return cv::Rect(r.x, y, r.width, h);
+}
+
+cv::Point randomPointInRectExcludeAreas(const cv::Rect& r,
+                                        const std::vector<cv::Rect>& excludeAreas,
+                                        int maxAttempts)
+{
+    if (excludeAreas.empty()) {
         return randomPointInRect(r);
-    }
-
-    cv::Rect excludeWidthRect;
-    if (widthValid) {
-        int excludeX = r.x + r.width * excludeStartWidth;
-        int excludeW = r.width * (excludeEndWidth - excludeStartWidth);
-        excludeWidthRect = cv::Rect(excludeX, r.y, excludeW, r.height);
-    }
-
-    cv::Rect excludeHeightRect;
-    if (heightValid) {
-        int excludeY = r.y + r.height * excludeStartHeight;
-        int excludeH = r.height * (excludeEndHeight - excludeStartHeight);
-        excludeHeightRect = cv::Rect(r.x, excludeY, r.width, excludeH);
     }
 
     int attempts = 0;
     while (attempts < maxAttempts) {
         cv::Point candidate = randomPointInRect(r);
-        bool inWidth = widthValid && excludeWidthRect.contains(candidate);
-        bool inHeight = heightValid && excludeHeightRect.contains(candidate);
-        if (!inWidth && !inHeight) {
+        bool excluded = false;
+        for (const auto& area : excludeAreas) {
+            if (area.contains(candidate)) {
+                excluded = true;
+                break;
+            }
+        }
+        if (!excluded) {
             return candidate;
         }
         attempts++;

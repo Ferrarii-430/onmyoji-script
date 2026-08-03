@@ -23,12 +23,16 @@ cv::Point randomPointInRectExcludeWidth(const cv::Rect& r,
                                         double excludeStartWidth, double excludeEndWidth,
                                         int maxAttempts = 10);
 
-// 在矩形内随机取一点，同时排除宽度方向 [excludeStartWidth, excludeEndWidth] 对应的垂直区域
-// 和高度方向 [excludeStartHeight, excludeEndHeight] 对应的水平区域
-cv::Point randomPointInRectExcludeWidthAndHeight(const cv::Rect& r,
-                                                 double excludeStartWidth, double excludeEndWidth,
-                                                 double excludeStartHeight, double excludeEndHeight,
-                                                 int maxAttempts = 10);
+// 根据百分比生成宽度方向的排除区域（垂直条带），[startRatio, endRatio) 为 0~1 的小数
+cv::Rect widthExcludeRect(const cv::Rect& r, double startRatio, double endRatio);
+
+// 根据百分比生成高度方向的排除区域（水平条带），[startRatio, endRatio) 为 0~1 的小数
+cv::Rect heightExcludeRect(const cv::Rect& r, double startRatio, double endRatio);
+
+// 在矩形内随机取一点，排除指定的多个区域，支持任意排除组合（如左侧 + 上下边框）
+cv::Point randomPointInRectExcludeAreas(const cv::Rect& r,
+                                        const std::vector<cv::Rect>& excludeAreas,
+                                        int maxAttempts = 10);
 
 } // namespace vision
 
