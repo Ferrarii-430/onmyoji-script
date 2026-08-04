@@ -44,37 +44,52 @@ namespace scenarios
             return;
         }
 
-        if (teamPlay)
+        // 根据当前场景跳转到对应流程节点继续执行
+        // 场景: 1=御魂副本选择 2=队伍界面 3=战斗界面 4=奖励领取界面
+        // 流程: settle(点击挑战) -> ready(点击准备) -> battle(等待战斗结束) -> team(组队邀请/收尾)
+        switch (currentInterface)
         {
-            //组队模式
-            if (currentInterface == 1)
-            {
-                Logger::log(QString("组队模式无法从当前场景: %1 启动").arg(currentInterface));
+            case 1: // 御魂副本选择界面（单人模式起点）
+                if (teamPlay)
+                {
+                    Logger::log(QString("组队模式无法从当前场景: %1 启动").arg(currentInterface));
+                    return;
+                }
+                goto settle;
+            case 2: // 队伍界面（组队模式起点）
+                goto settle;
+            case 3: // 战斗界面，跳过挑战/准备，直接等待战斗结束
+                goto battle;
+            case 4: // 奖励领取界面，战斗已结束，进入组队/收尾流程
+                goto team;
+            default:
                 return;
+        }
+
+    settle:
+        // 点击右下角挑战按钮，进入战斗
+        // 单人模式默认从御魂副本界面开始，组队模式默认从组队界面开始，
+        // 但都可以用同一个逻辑，判断右下角的挑战按钮
+        {
+            const QString settled = actions.ocrRecognizesAndClickAny({"挑战", "战"}, 0.8, false, QRectF(80, 65, 100, 100));
+            if (!settled.isEmpty())
+            {
+                Logger::log(QString("点击挑战"));
+                waitWithEventProcessing(4000);
+                isCaptain = true; // 是队长
+            } else
+            {
+                isCaptain = false;
             }
-        } else
-        {
-            //单人模式
         }
 
-        //单人模式默认从御魂副本界面开始 组队模式默认从组队界面开始，但是都可以用同一个逻辑，判断右下角的挑战按钮
-        const QString settled = actions.ocrRecognizesAndClickAny({"挑战", "战"}, 0.8, false, QRectF(80, 65, 100, 100));
-        if (!settled.isEmpty())
-        {
-            Logger::log(QString("点击挑战"));
-            waitWithEventProcessing(4000);
-            isCaptain = true; // 是队长
-        }else
-        {
-            isCaptain = false;
-        }
-
-        //如果有准备按钮 则点击，否则无视，因为正常会手动点锁定
+    ready:
+        // 如果有准备按钮则点击，否则无视，因为正常会手动点锁定
         actions.yoloRecognizesAndClick(0.60, false, "battle-ready", 0, 0);
-
         waitWithEventProcessing(4000);
 
-        //判断是否已经进入战斗界面
+    battle:
+        // 判断是否已经进入战斗界面
         if (!actions.yoloContainsLabels(0.55, {"common-exit-battle"}, false))
         {
             //未进入
@@ -83,27 +98,29 @@ namespace scenarios
         }
 
         //循环等待战斗结束
-        bool isError = true;
-        for (int i = 0; i < MAX_WAIT_NUM; ++i)
         {
-            QString savePathBattleEnd = actions.opencvRecognizesAndClick(screenshotPath + "battle_end.png", 0.65, true);
-            waitWithEventProcessing(MAX_WAIT_TIME);
-            if (!savePathBattleEnd.isEmpty())
+            bool isError = true;
+            for (int i = 0; i < MAX_WAIT_NUM; ++i)
             {
-                isError = false;
-                break;
+                QString savePathBattleEnd = actions.opencvRecognizesAndClick(screenshotPath + "battle_end.png", 0.65, true);
+                waitWithEventProcessing(MAX_WAIT_TIME);
+                if (!savePathBattleEnd.isEmpty())
+                {
+                    isError = false;
+                    break;
+                }
             }
-        }
 
-        if (isError)
-        {
-            Logger::log(QString("等待战斗完成超时"));
-            return;
+            if (isError)
+            {
+                Logger::log(QString("等待战斗完成超时"));
+                return;
+            }
         }
 
         waitWithEventProcessing(4000);
 
-
+    team:
         //组队模式下 要进行区分 队长要发送邀请 队员则要等待接受邀请
         //单人模式下 会直接退到御魂副本界面
         if (teamPlay)
@@ -120,6 +137,7 @@ namespace scenarios
                     if (!savePath.isEmpty())
                     {
                         autoSendRequestEnable = true;
+                        isError = false;
                         Logger::log(QString("自动入队已开启"));
                         break;
                     }
@@ -133,11 +151,8 @@ namespace scenarios
             {
                 Logger::log(QString("组队等待超时"));
             }
-
-        } else
-        {
-          //单机模式下到这里就可以停止逻辑，会自动退到御魂副本界面，从头开始执行逻辑即可
         }
+        //单机模式下到这里就可以停止逻辑，会自动退到御魂副本界面，从头开始执行逻辑即可
     }
 
     /**
