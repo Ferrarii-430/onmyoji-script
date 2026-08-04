@@ -68,18 +68,59 @@ namespace scenarios
 
     settle:
         // 点击右下角挑战按钮，进入战斗
-        // 单人模式默认从御魂副本界面开始，组队模式默认从组队界面开始，
+        // 单人模式默认从御魂副本界面开始，组队模式默认从组队界面开始
         // 但都可以用同一个逻辑，判断右下角的挑战按钮
         {
-            const QString settled = actions.ocrRecognizesAndClickAny({"挑战", "战"}, 0.8, false, QRectF(80, 65, 100, 100));
-            if (!settled.isEmpty())
+            if (teamPlay)
             {
-                Logger::log(QString("点击挑战"));
-                waitWithEventProcessing(4000);
-                isCaptain = true; // 是队长
+                //组队模式
+                //此时需要判断能否点击 组队模式下要等人齐才能点挑战
+
+                //先判断是不是队长
+                QJsonArray teamData = actions.ocrRecognizes(QRectF(80, 65, 100, 100));
+                for (int i = 0; i < teamData.size(); ++i)
+                {
+                    QJsonObject item = teamData[i].toObject();
+                    QString text = item["text"].toString();
+
+                    if (text.contains("战"))
+                    {
+                        isCaptain = true;
+                        break;
+                    }
+                    isCaptain = false;
+                }
+
+                if (isCaptain)
+                {
+                    // 队长状态
+                    for (int i = 0; i < MAX_WAIT_NUM; ++i)
+                    {
+                        //循环等待队友进入
+                        waitWithEventProcessing(MAX_WAIT_TIME);
+                    }
+                } else
+                {
+                    // 队友状态
+                    for (int i = 0; i < MAX_WAIT_NUM; ++i)
+                    {
+                        //循环等待队长邀请
+                        waitWithEventProcessing(MAX_WAIT_TIME);
+                    }
+                }
             } else
             {
-                isCaptain = false;
+                //单人模式
+                const QString settled = actions.ocrRecognizesAndClickAny({"挑战"}, 0.8, true, QRectF(80, 65, 100, 100));
+                if (!settled.isEmpty())
+                {
+                    Logger::log(QString("点击挑战"));
+                    waitWithEventProcessing(4000);
+                    isCaptain = true;
+                } else
+                {
+                    isCaptain = false;
+                }
             }
         }
 
@@ -93,7 +134,7 @@ namespace scenarios
         if (!actions.yoloContainsLabels(0.55, {"common-exit-battle"}, false))
         {
             //未进入
-            Logger::log(QString("未进入战斗"));
+            Logger::log(QString("未进入战斗，任务结束"));
             return;
         }
 
@@ -106,6 +147,15 @@ namespace scenarios
                 waitWithEventProcessing(MAX_WAIT_TIME);
                 if (!savePathBattleEnd.isEmpty())
                 {
+                    if (isCaptain)
+                    {
+                        if (!autoSendRequestEnable)
+                        {
+                            waitWithEventProcessing(2000);
+                            //未开启自动邀请时 这里会弹出是否自动邀请
+                            actions.yoloRecognizesAndClick(0.60, false, "battle-ready", 0, 0);
+                        }
+                    }
                     isError = false;
                     break;
                 }
@@ -122,28 +172,44 @@ namespace scenarios
 
     team:
         //组队模式下 要进行区分 队长要发送邀请 队员则要等待接受邀请
-        //单人模式下 会直接退到御魂副本界面
+        //单人模式下 会直接退到御魂副本界面 则无需额外判断
         if (teamPlay)
         {
             //组队模式
             bool isError = true;
             for (int i = 0; i < MAX_WAIT_NUM; ++i)
             {
-                if (autoSendRequestEnable)
+                if (isCaptain)
                 {
-                    //1. 第一次会退到主界面等待邀请
-                    //判断是否收到组队请求
-                    QString savePath = actions.opencvRecognizesAndClick(screenshotPath + "accept_invitation.png", 0.8, false);
-                    if (!savePath.isEmpty())
+                    // 队长状态 要发送邀请队友入队
+                    if (autoSendRequestEnable)
                     {
-                        autoSendRequestEnable = true;
-                        isError = false;
-                        Logger::log(QString("自动入队已开启"));
-                        break;
+                        //自动发送邀请 等待队友入队 进入战斗
+                        //需要添加识别战斗按钮 按钮有两个状态 【可点击】【不可点击】
+                    } else
+                    {
+                        //正常都是开启的，如果未开启需要手动邀请
+                        Logger::log(QString("未开启自动邀请，需手动邀请队友"));
                     }
                 } else
                 {
-                    // 2. 处于自动入队 此时会在等待入队界面 等待进入战斗
+                    //队友状态 等待队长发送邀请
+                    if (autoSendRequestEnable)
+                    {
+                        //1. 第一次会退到主界面等待邀请
+                        // 循环等待队长发送邀请
+                        QString savePath = actions.opencvRecognizesAndClick(screenshotPath + "accept_invitation.png", 0.8, false);
+                        if (!savePath.isEmpty())
+                        {
+                            autoSendRequestEnable = true;
+                            isError = false;
+                            Logger::log(QString("自动入队已开启"));
+                            break;
+                        }
+                    } else
+                    {
+                        // 2. 处于自动入队 此时会在等待入队界面 等待队长邀请进入队伍 进入战斗
+                    }
                 }
                 waitWithEventProcessing(MAX_WAIT_TIME);
             }
@@ -152,7 +218,7 @@ namespace scenarios
                 Logger::log(QString("组队等待超时"));
             }
         }
-        //单机模式下到这里就可以停止逻辑，会自动退到御魂副本界面，从头开始执行逻辑即可
+        //单机模式下到这里就可以停止逻辑，会自动退到御魂副本界面，从头开始执行逻辑进入战斗即可
     }
 
     /**
