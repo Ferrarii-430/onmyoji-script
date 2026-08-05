@@ -1,6 +1,7 @@
 #ifndef TEMPLATEMATCHER_H
 #define TEMPLATEMATCHER_H
 
+#include <QString>
 #include <opencv2/core/mat.hpp>
 #include <opencv2/core/types.hpp>
 
@@ -49,12 +50,26 @@ cv::Rect convertBaseRectToScreen(const cv::Rect& baseRect,
                                  const cv::Size& realSize,
                                  const cv::Size& baseSize = cv::Size(BASE_MATCH_WIDTH, BASE_MATCH_HEIGHT));
 
-// 固定分辨率模板匹配：先将 haystack 保持比例 + padding 归一化到 1920x1080，
-// 再做单次 matchTemplate。outRect 返回【基准坐标系】下的矩形。
+// 从 BGRA 模板中提取灰度图与 Alpha 掩码（alpha>0 视为有效区域）。
+// 非 4 通道图像返回空 mask，灰度图按常规方式转换。
+void extractTemplateMask(const cv::Mat& src, cv::Mat& outGray, cv::Mat& outMask);
+
+// 模板侧载元数据：记录模板被截取时的游戏窗口客户区分辨率。
+// 路径与模板 PNG 相同目录、相同文件名，扩展名为 .json。
+// 文件内容示例：{"captureWidth":660,"captureHeight":372}
+void saveTemplateCaptureSize(const QString& templatePath, const cv::Size& size);
+cv::Size loadTemplateCaptureSize(const QString& templatePath);
+
+// 固定分辨率模板匹配：先将 haystack 保持比例 + padding 归一化，
+// 再对 needle 做多尺度 matchTemplate。outRect 返回【基准坐标系】下的矩形。
 // 若 info 不为 nullptr，会写入本次匹配的 ScaleInfo 供调用方还原坐标使用。
+// mask 为可选参数：CV_8U 单通道，255=参与匹配，0=忽略；用于处理带透明区域的 PNG 模板。
+// templateCaptureSize 为可选参数：若提供有效尺寸，则以该尺寸为基准进行归一化，
+// 适用于“在当前窗口分辨率下截图并作为模板”的工作流。
 bool findTemplate(const cv::Mat& haystack, const cv::Mat& needle,
                   cv::Rect& outRect, double& outScore, double threshold,
-                  ScaleInfo* info = nullptr);
+                  ScaleInfo* info = nullptr, const cv::Mat& mask = cv::Mat(),
+                  const cv::Size& templateCaptureSize = cv::Size());
 
 // [兼容旧调用] 内部走归一化单次匹配流程，scaleMin/scaleMax/scaleStep 已废弃。
 // 返回的 outRect 已转换回【DX11 原始捕获坐标系】，便于旧调用方直接用于绘制/点击。

@@ -2,7 +2,13 @@
 
 #include <algorithm>
 #include <cmath>
+#include <QCoreApplication>
+#include <QDir>
 #include <QElapsedTimer>
+#include <QFile>
+#include <QFileInfo>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <opencv2/imgproc.hpp>
 
 #include "src/core/Logger.h"
@@ -163,11 +169,125 @@ cv::Rect convertBaseRectToScreen(const cv::Rect& baseRect,
                     static_cast<int>(std::round(baseRect.height * sy)));
 }
 
-// 固定分辨率模板匹配：haystack 保持比例 + padding 归一化到 1920x1080，再单次 matchTemplate。
-// outRect 返回【基准坐标系】下的矩形；info（若传入）记录本次归一化的 ScaleInfo。
+void extractTemplateMask(const cv::Mat& src, cv::Mat& outGray, cv::Mat& outMask)
+{
+    outGray.release();
+    outMask.release();
+
+    if (src.empty()) return;
+
+    try {
+        if (src.channels() == 4) {
+            std::vector<cv::Mat> ch;
+            cv::split(src, ch);
+            cv::Mat bgr;
+            cv::merge(std::vector<cv::Mat>{ch[0], ch[1], ch[2]}, bgr);
+            cv::cvtColor(bgr, outGray, cv::COLOR_BGR2GRAY);
+            // alpha > 0 视为有效匹配区域
+            cv::threshold(ch[3], outMask, 1, 255, cv::THRESH_BINARY);
+        } else if (src.channels() == 3) {
+            cv::cvtColor(src, outGray, cv::COLOR_BGR2GRAY);
+        } else if (src.channels() == 1) {
+            outGray = src.clone();
+        } else {
+            // 其他通道数：先做灰度化尝试
+            cv::cvtColor(src, outGray, cv::COLOR_BGR2GRAY);
+        }
+    } catch (const cv::Exception& e) {
+        Logger::log(QString("[WARN] extractTemplateMask 失败: %1").arg(e.what()));
+    }
+}
+
+static QString templateSidecarPath(const QString& templatePath)
+{
+    QFileInfo fi(templatePath);
+    // 侧载文件统一放在 screenshot/benchmark/ 子目录下
+    const QString benchmarkDir = fi.absolutePath() + "/benchmark";
+    return benchmarkDir + "/" + fi.completeBaseName() + ".json";
+}
+
+// 把绝对路径转成相对于 applicationDirPath 的相对路径，便于侧载中记录可移植路径。
+static QString relativeToAppDir(const QString& absolutePath)
+{
+    if (absolutePath.isEmpty()) return absolutePath;
+    const QString appDir = QCoreApplication::applicationDirPath();
+    QString normalizedAppDir = QDir::cleanPath(appDir);
+    QString normalizedPath = QDir::cleanPath(absolutePath);
+    if (!normalizedAppDir.endsWith('/')) normalizedAppDir += '/';
+    if (normalizedPath.startsWith(normalizedAppDir, Qt::CaseInsensitive)) {
+        return normalizedPath.mid(normalizedAppDir.length());
+    }
+    return absolutePath;
+}
+
+void saveTemplateCaptureSize(const QString& templatePath, const cv::Size& size)
+{
+    if (templatePath.isEmpty() || size.width <= 0 || size.height <= 0) return;
+
+    const QString sidecarPath = templateSidecarPath(templatePath);
+    const QString sidecarDir = QFileInfo(sidecarPath).absolutePath();
+    QDir dir;
+    if (!dir.exists(sidecarDir)) {
+        if (!dir.mkpath(sidecarDir)) {
+            Logger::log(QString("[WARN] 无法创建侧载目录: %1").arg(sidecarDir));
+            return;
+        }
+    }
+
+    QJsonObject obj;
+    obj["captureWidth"] = size.width;
+    obj["captureHeight"] = size.height;
+    obj["path"] = relativeToAppDir(templatePath);
+
+    QFile file(sidecarPath);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        Logger::log(QString("[WARN] 无法保存模板侧载: %1").arg(file.errorString()));
+        return;
+    }
+    file.write(QJsonDocument(obj).toJson(QJsonDocument::Compact));
+    file.close();
+    Logger::log(QString("已保存模板侧载: %1 (path=%2)").arg(sidecarPath).arg(obj["path"].toString()));
+}
+
+cv::Size loadTemplateCaptureSize(const QString& templatePath)
+{
+    if (templatePath.isEmpty()) return cv::Size();
+
+    const QString sidecarPath = templateSidecarPath(templatePath);
+    QFile file(sidecarPath);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        Logger::log(QString("[WARN] 未找到模板侧载文件: %1").arg(sidecarPath));
+        return cv::Size();
+    }
+
+    QByteArray data = file.readAll();
+    file.close();
+
+    QJsonDocument doc = QJsonDocument::fromJson(data);
+    if (!doc.isObject()) {
+        Logger::log(QString("[WARN] 模板侧载文件格式错误: %1").arg(sidecarPath));
+        return cv::Size();
+    }
+
+    QJsonObject obj = doc.object();
+    int w = obj.value("captureWidth").toInt(-1);
+    int h = obj.value("captureHeight").toInt(-1);
+    if (w <= 0 || h <= 0) {
+        Logger::log(QString("[WARN] 模板侧载分辨率无效(%1x%2): %3").arg(w).arg(h).arg(sidecarPath));
+        return cv::Size();
+    }
+
+    Logger::log(QString("读取模板侧载分辨率: %1x%2 (%3, path=%4)")
+                .arg(w).arg(h).arg(sidecarPath).arg(obj.value("path").toString()));
+    return cv::Size(w, h);
+}
+
+// 固定分辨率模板匹配：haystack 保持比例 + padding 归一化，
+// 再对 needle 做多尺度扫描匹配。outRect 返回【基准坐标系】下的矩形。
 bool findTemplate(const cv::Mat& haystack, const cv::Mat& needle,
                   cv::Rect& outRect, double& outScore, double threshold,
-                  ScaleInfo* info)
+                  ScaleInfo* info, const cv::Mat& mask,
+                  const cv::Size& templateCaptureSize)
 {
     outScore = -1;
     if (info) *info = ScaleInfo{};
@@ -185,16 +305,22 @@ bool findTemplate(const cv::Mat& haystack, const cv::Mat& needle,
     QElapsedTimer timer;
     timer.start();
 
-    // 1. 截图保持比例 + padding 归一化到基准分辨率
+    // 1. 决定归一化目标分辨率：
+    //    - 若提供了模板截取时的分辨率，则以该分辨率为基准（工作流：在当前窗口分辨率下截图做模板）
+    //    - 否则保持原来的 1920x1080 基准
+    const bool hasCaptureSize = (templateCaptureSize.width > 0 && templateCaptureSize.height > 0);
+    const int targetWidth  = hasCaptureSize ? templateCaptureSize.width  : BASE_MATCH_WIDTH;
+    const int targetHeight = hasCaptureSize ? templateCaptureSize.height : BASE_MATCH_HEIGHT;
+
     ScaleInfo localInfo;
-    cv::Mat normHay = normalizeGameFrame(haystack, localInfo, BASE_MATCH_WIDTH, BASE_MATCH_HEIGHT);
+    cv::Mat normHay = normalizeGameFrame(haystack, localInfo, targetWidth, targetHeight);
     if (normHay.empty()) {
         Logger::log(QString("[ERROR] 截图归一化失败"));
         return false;
     }
     if (info) *info = localInfo;
 
-    // 2. 灰度化（保留原图做 HSV 校验用，这里只用归一化后的图）
+    // 2. 灰度化
     cv::Mat gHay, gNeedle;
     try {
         if (normHay.channels() == 3) {
@@ -217,61 +343,135 @@ bool findTemplate(const cv::Mat& haystack, const cv::Mat& needle,
         return false;
     }
 
-    // 模板尺寸不能大于归一化后的截图尺寸
-    if (gNeedle.cols > gHay.cols || gNeedle.rows > gHay.rows) {
-        Logger::log(QString("[ERROR] 模板尺寸(%1x%2)大于基准截图尺寸(%3x%4)，"
-                            "请确认模板是否在 1920x1080 基准下截取")
-                    .arg(gNeedle.cols).arg(gNeedle.rows).arg(gHay.cols).arg(gHay.rows));
-        return false;
-    }
-
-    // 3. 单次模板匹配（不再多尺度扫描）
-    cv::Mat result;
+    // 3. 对截图做轻度对比度增强，降低亮度变化对 TM_CCOEFF_NORMED 的影响
     try {
-        cv::matchTemplate(gHay, gNeedle, result, cv::TM_CCOEFF_NORMED);
+        cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE(2.0, cv::Size(8, 8));
+        clahe->apply(gHay, gHay);
     } catch (const cv::Exception& e) {
-        Logger::log(QString("[ERROR] matchTemplate 异常: %1").arg(e.what()));
-        return false;
-    }
-    if (result.empty()) {
-        Logger::log(QString("[ERROR] matchTemplate 结果为空"));
-        return false;
+        Logger::log(QString("[WARN] CLAHE 失败: %1").arg(e.what()));
     }
 
-    double minVal, maxVal;
-    cv::Point minLoc, maxLoc;
-    try {
+    // mask 校验：尺寸必须和模板一致，且为 CV_8U
+    cv::Mat validMask;
+    if (!mask.empty() && mask.size() == needle.size() && mask.type() == CV_8U) {
+        validMask = mask;
+    }
+
+    // 4. 模板基准化：
+    //    - 如果使用了模板截取分辨率，needle 已经处于目标分辨率，无需再缩放
+    //    - 否则按老逻辑把 needle 从截图分辨率映射到 1920x1080
+    cv::Mat baseNeedle;
+    cv::Mat baseMask;
+    if (hasCaptureSize) {
+        baseNeedle = gNeedle;
+        baseMask = validMask;
+    } else {
+        const double baseScale = localInfo.valid() ? localInfo.scale : 1.0;
+        if (std::abs(baseScale - 1.0) < 1e-3) {
+            baseNeedle = gNeedle;
+            baseMask = validMask;
+        } else {
+            cv::Size baseSize(static_cast<int>(std::round(gNeedle.cols * baseScale)),
+                              static_cast<int>(std::round(gNeedle.rows * baseScale)));
+            if (baseSize.width < 1 || baseSize.height < 1 ||
+                baseSize.width > gHay.cols || baseSize.height > gHay.rows) {
+                Logger::log(QString("[ERROR] 模板映射到基准尺寸后越界: baseNeedle=%1x%2, haystack=%3x%4")
+                            .arg(baseSize.width).arg(baseSize.height).arg(gHay.cols).arg(gHay.rows));
+                return false;
+            }
+            const int baseInterp = (baseScale < 1.0) ? cv::INTER_AREA : cv::INTER_CUBIC;
+            cv::resize(gNeedle, baseNeedle, baseSize, 0, 0, baseInterp);
+            if (!validMask.empty()) {
+                cv::resize(validMask, baseMask, baseSize, 0, 0, cv::INTER_NEAREST);
+            }
+        }
+    }
+
+    // 5. 在基准分辨率下做小范围多尺度扫描，覆盖 UI 缩放/截图标示差异
+    const double scaleMin = 0.85;
+    const double scaleMax = 1.15;
+    const double scaleStep = 0.05;
+
+    double bestScore = -1.0;
+    cv::Rect bestRect;
+    double bestFineScale = 1.0;
+
+    for (double s = scaleMin; s <= scaleMax + 1e-6; s += scaleStep) {
+        cv::Size scaledSize(static_cast<int>(std::round(baseNeedle.cols * s)),
+                            static_cast<int>(std::round(baseNeedle.rows * s)));
+        if (scaledSize.width < 1 || scaledSize.height < 1) continue;
+        if (scaledSize.width > gHay.cols || scaledSize.height > gHay.rows) continue;
+
+        cv::Mat scaledNeedle;
+        const int needleInterp = (s < 1.0) ? cv::INTER_AREA : cv::INTER_CUBIC;
+        cv::resize(baseNeedle, scaledNeedle, scaledSize, 0, 0, needleInterp);
+        if (scaledNeedle.empty()) continue;
+
+        cv::Mat scaledMask;
+        if (!baseMask.empty()) {
+            cv::resize(baseMask, scaledMask, scaledSize, 0, 0, cv::INTER_NEAREST);
+        }
+
+        cv::Mat result;
+        try {
+            if (scaledMask.empty()) {
+                cv::matchTemplate(gHay, scaledNeedle, result, cv::TM_CCOEFF_NORMED);
+            } else {
+                cv::matchTemplate(gHay, scaledNeedle, result, cv::TM_CCOEFF_NORMED, scaledMask);
+            }
+        } catch (const cv::Exception& e) {
+            Logger::log(QString("[WARN] matchTemplate 尺度 %1 异常: %2").arg(s).arg(e.what()));
+            continue;
+        }
+        if (result.empty()) continue;
+
+        double minVal, maxVal;
+        cv::Point minLoc, maxLoc;
         cv::minMaxLoc(result, &minVal, &maxVal, &minLoc, &maxLoc);
-    } catch (const cv::Exception& e) {
-        Logger::log(QString("[ERROR] minMaxLoc 异常: %1").arg(e.what()));
-        return false;
+
+        if (maxVal > bestScore) {
+            bestScore = maxVal;
+            // 返回匹配到的实际区域尺寸（基准坐标系）
+            bestRect = cv::Rect(maxLoc.x, maxLoc.y, scaledNeedle.cols, scaledNeedle.rows);
+            bestFineScale = s;
+        }
     }
 
-    outScore = maxVal;
-    // 返回基准坐标系下的矩形
-    outRect = cv::Rect(maxLoc.x, maxLoc.y, gNeedle.cols, gNeedle.rows);
+    // 防御：确保矩形在基准画布范围内
+    bestRect &= cv::Rect(0, 0, gHay.cols, gHay.rows);
+
+    outScore = bestScore;
+    outRect = bestRect;
+
+    const double loggedBaseScale = hasCaptureSize ? 1.0 : (localInfo.valid() ? localInfo.scale : 1.0);
+    const int loggedBaseW = hasCaptureSize ? templateCaptureSize.width  : BASE_MATCH_WIDTH;
+    const int loggedBaseH = hasCaptureSize ? templateCaptureSize.height : BASE_MATCH_HEIGHT;
 
     if (outScore < threshold) {
         Logger::log(QString("[WARN] 没有找到匹配，bestScore=%1 threshold=%2 耗时=%3ms "
-                            "(src=%4x%5 -> base %6x%7, scale=%8, offset=(%9,%10))")
+                            "(src=%4x%5 -> base %6x%7, scale=%8, offset=(%9,%10), baseNeedleScale=%11, fineScale=%12)")
                     .arg(outScore, 0, 'f', 4).arg(threshold, 0, 'f', 4)
                     .arg(timer.elapsed())
                     .arg(localInfo.srcWidth).arg(localInfo.srcHeight)
-                    .arg(BASE_MATCH_WIDTH).arg(BASE_MATCH_HEIGHT)
+                    .arg(loggedBaseW).arg(loggedBaseH)
                     .arg(localInfo.scale, 0, 'f', 4)
-                    .arg(localInfo.offsetX).arg(localInfo.offsetY));
+                    .arg(localInfo.offsetX).arg(localInfo.offsetY)
+                    .arg(loggedBaseScale, 0, 'f', 4)
+                    .arg(bestFineScale, 0, 'f', 2));
         return false;
     }
 
     Logger::log(QString("[RESULT] bestScore=%1 baseRect=(%2,%3,%4x%5) 耗时=%6ms "
-                        "(src=%7x%8 -> base %9x%10, scale=%11, offset=(%12,%13))")
+                        "(src=%7x%8 -> base %9x%10, scale=%11, offset=(%12,%13), baseNeedleScale=%14, fineScale=%15)")
                 .arg(outScore, 0, 'f', 4)
                 .arg(outRect.x).arg(outRect.y).arg(outRect.width).arg(outRect.height)
                 .arg(timer.elapsed())
                 .arg(localInfo.srcWidth).arg(localInfo.srcHeight)
-                .arg(BASE_MATCH_WIDTH).arg(BASE_MATCH_HEIGHT)
+                .arg(loggedBaseW).arg(loggedBaseH)
                 .arg(localInfo.scale, 0, 'f', 4)
-                .arg(localInfo.offsetX).arg(localInfo.offsetY));
+                .arg(localInfo.offsetX).arg(localInfo.offsetY)
+                .arg(loggedBaseScale, 0, 'f', 4)
+                .arg(bestFineScale, 0, 'f', 2));
 
     return true;
 }

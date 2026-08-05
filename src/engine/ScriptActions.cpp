@@ -31,9 +31,18 @@ struct CachedTemplate {
     cv::Mat image;
 };
 
-cv::Mat loadTemplateGrayscale(const QString& templatePath, bool& cacheHit)
+struct CachedTemplateWithMask {
+    qint64 fileSize = 0;
+    qint64 modifiedTime = 0;
+    cv::Mat gray;
+    cv::Mat mask;
+};
+
+// 加载模板并提取灰度图 + Alpha 掩码（若模板为 PNG 透明图）。
+// 返回的 gray 可直接传给 findTemplate，mask 用于忽略透明区域。
+CachedTemplateWithMask loadTemplateWithMask(const QString& templatePath, bool& cacheHit)
 {
-    static QHash<QString, CachedTemplate> cache;
+    static QHash<QString, CachedTemplateWithMask> cache;
 
     const QFileInfo fileInfo(templatePath);
     const QString canonicalPath = fileInfo.canonicalFilePath();
@@ -45,22 +54,29 @@ cv::Mat loadTemplateGrayscale(const QString& templatePath, bool& cacheHit)
     if (cached != cache.cend()
         && cached->fileSize == fileSize
         && cached->modifiedTime == modifiedTime
-        && !cached->image.empty()) {
+        && !cached->gray.empty()) {
         cacheHit = true;
-        return cached->image;
+        return cached.value();
     }
 
     cacheHit = false;
-    cv::Mat image = cv::imread(templatePath.toStdString(), cv::IMREAD_GRAYSCALE);
-    if (image.empty()) {
-        return image;
+    cv::Mat src = cv::imread(templatePath.toStdString(), cv::IMREAD_UNCHANGED);
+    if (src.empty()) {
+        return CachedTemplateWithMask{};
+    }
+
+    cv::Mat gray, mask;
+    vision::extractTemplateMask(src, gray, mask);
+    if (gray.empty()) {
+        return CachedTemplateWithMask{};
     }
 
     if (cache.size() >= 64 && !cache.contains(cacheKey)) {
         cache.clear();
     }
-    cache.insert(cacheKey, CachedTemplate{fileSize, modifiedTime, image});
-    return image;
+    CachedTemplateWithMask item{fileSize, modifiedTime, gray, mask};
+    cache.insert(cacheKey, item);
+    return item;
 }
 
 // 加载彩色模板(BGR)并带缓存，供 HSV 颜色校验使用。
@@ -163,7 +179,9 @@ void ScriptActions::processAndShowImage(const QString& imagePath)
     emit requestShowImage(imagePath);
 }
 
-QString ScriptActions::opencvRecognizesAndClickByBase64(const QString& base64, const double threshold, const bool randomClick, const bool colorCheck)
+QString ScriptActions::opencvRecognizesAndClickByBase64(const QString& base64, const double threshold,
+                                                        const bool randomClick, const bool colorCheck,
+                                                        const cv::Size& captureSize)
 {
     if (base64.isEmpty()) {
         return "错误: base64 图像数据为空";
@@ -186,6 +204,11 @@ QString ScriptActions::opencvRecognizesAndClickByBase64(const QString& base64, c
     }
     tempFile.close(); // 关闭文件以确保数据刷新
 
+    // 若提供了模板截取分辨率，写入临时侧载文件供 findTemplate 使用
+    if (captureSize.width > 0 && captureSize.height > 0) {
+        vision::saveTemplateCaptureSize(tempFile.fileName(), captureSize);
+    }
+
     return opencvRecognizesAndClick(tempFile.fileName(), threshold, randomClick, colorCheck);
 }
 
@@ -197,16 +220,25 @@ QString ScriptActions::opencvRecognizesAndClick(const QString& templPath, const 
         return nullptr;
     }
 
-    //加载模板文件
+    //加载模板文件（同时提取 Alpha 掩码，透明区域不参与匹配）
     QString tempSavePath = resolveTemplatePath(templPath, AppPaths::instance().screenshotPath());
     bool templateCacheHit = false;
-    cv::Mat templ = loadTemplateGrayscale(tempSavePath, templateCacheHit);
-    if (templ.empty()) {
+    const auto templWithMask = loadTemplateWithMask(tempSavePath, templateCacheHit);
+    if (templWithMask.gray.empty()) {
         Logger::log("模板图片加载失败: " + tempSavePath);
         return nullptr;
     }
     if (!templateCacheHit) {
-        Logger::log("已加载模板图片: " + tempSavePath);
+        Logger::log("已加载模板图片: " + tempSavePath +
+                    (templWithMask.mask.empty() ? "" : " (含透明掩码)"));
+    }
+    const cv::Mat& templ = templWithMask.gray;
+    const cv::Mat& templMask = templWithMask.mask;
+
+    // 读取模板截取时的游戏窗口分辨率（侧载 JSON），若存在则按该分辨率归一化截图
+    const cv::Size templCaptureSize = vision::loadTemplateCaptureSize(tempSavePath);
+    if (templCaptureSize.width > 0 && templCaptureSize.height > 0) {
+        Logger::log(QString("使用模板截取分辨率: %1x%2").arg(templCaptureSize.width).arg(templCaptureSize.height));
     }
 
     // 加载彩色模板用于 HSV 颜色校验（灰度匹配无法区分同形状不同色的模板）
@@ -217,13 +249,14 @@ QString ScriptActions::opencvRecognizesAndClick(const QString& templPath, const 
         templColor = loadTemplateColor(tempSavePath, colorCacheHit);
     }
 
-    // 在窗口图像中查找模板（返回基准坐标系 1920x1080 下的矩形 + ScaleInfo）
+    // 在窗口图像中查找模板（返回基准坐标系下的矩形 + ScaleInfo）
     Logger::log(QString("OpenCV识图 模板: %1  截图: %2x%3  阈值: %4")
                 .arg(tempSavePath).arg(winImg.cols).arg(winImg.rows).arg(threshold, 0, 'f', 2));
     double score = 0.0;
     cv::Rect matchRectBase;
     vision::ScaleInfo scaleInfo;
-    bool found = vision::findTemplate(winImg, templ, matchRectBase, score, threshold, &scaleInfo);
+    bool found = vision::findTemplate(winImg, templ, matchRectBase, score, threshold,
+                                      &scaleInfo, templMask, templCaptureSize);
 
     if (!found) {
         Logger::log(QString("未找到匹配区域! score=%1").arg(score));

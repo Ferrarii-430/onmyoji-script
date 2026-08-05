@@ -11,10 +11,14 @@
 #include <QPainter>
 #include <qscreen.h>
 #include <QTimer>
+#include <windows.h>
 #include "src/core/AppPaths.h"
+#include "src/game/GameWindow.h"
 #include "ui_TypeOpenCVForm.h"
 #include "ScreenCaptureWidget.h"
+#include "src/core/Logger.h"
 #include "src/core/ProfileStore.h"
+#include "src/vision/TemplateMatcher.h"
 
 TypeOpenCVForm::TypeOpenCVForm(QWidget *parent) :
     QWidget(parent), ui(new Ui::TypeOpenCVForm) {
@@ -59,6 +63,8 @@ void TypeOpenCVForm::loadFromJson(const QString &configId, const QJsonObject &ob
     ui->spinScoreBox->setValue(obj["score"].toDouble());
     ui->randomClickCheckBox->setChecked(obj["randomClick"].toBool());
     ui->colorCheckCheckBox->setChecked(obj["colorCheck"].toBool());
+    templateCaptureWidth_ = obj["captureWidth"].toInt(0);
+    templateCaptureHeight_ = obj["captureHeight"].toInt(0);
 
     QString currentIdentifyErrorHandle = obj["identifyErrorHandle"].toString();
     int identifyErrorHandleIndex = ui->opencvErrorHandle->findData(currentIdentifyErrorHandle);
@@ -141,6 +147,8 @@ QJsonObject TypeOpenCVForm::toJson() const {
     obj["randomClick"] = ui->randomClickCheckBox->isChecked();
     obj["colorCheck"] = ui->colorCheckCheckBox->isChecked();
     obj["identifyErrorHandle"] = ui->opencvErrorHandle->currentData().toString();
+    obj["captureWidth"] = templateCaptureWidth_;
+    obj["captureHeight"] = templateCaptureHeight_;
 
     //如果是跳转
     if (comparesEqual(obj["identifyErrorHandle"].toString(), "jump"))
@@ -175,6 +183,28 @@ void TypeOpenCVForm::onCaptureButtonClicked() {
         updatePreview();       // 显示一次
         // qDebug() << "截图完成";
         sc->deleteLater();
+
+        // 记录当前游戏窗口客户区分辨率，用于后续按模板原生分辨率匹配
+        templateCaptureWidth_ = 0;
+        templateCaptureHeight_ = 0;
+        // 先尝试定位窗口；若程序刚启动还未定位，handle() 可能为空
+        if (!GameWindow::instance().locate()) {
+            Logger::log(QString("[WARN] 截图时未能定位游戏窗口，无法记录模板截取分辨率"));
+        }
+        HWND hwnd = GameWindow::instance().handle();
+        if (hwnd) {
+            RECT rc;
+            if (GetClientRect(hwnd, &rc)) {
+                templateCaptureWidth_ = rc.right - rc.left;
+                templateCaptureHeight_ = rc.bottom - rc.top;
+                Logger::log(QString("记录模板截取分辨率: %1x%2")
+                            .arg(templateCaptureWidth_).arg(templateCaptureHeight_));
+            } else {
+                Logger::log(QString("[WARN] GetClientRect 失败，错误码: %1").arg(GetLastError()));
+            }
+        } else {
+            Logger::log(QString("[WARN] 游戏窗口句柄为空，无法记录模板截取分辨率"));
+        }
     });
 }
 

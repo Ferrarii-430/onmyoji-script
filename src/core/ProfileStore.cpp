@@ -13,6 +13,7 @@
 
 #include "src/core/AppPaths.h"
 #include "src/core/Logger.h"
+#include "src/vision/TemplateMatcher.h"
 
 
 
@@ -126,6 +127,8 @@ void addConfigToJsonFile(const QString &filePath, const QString &configId, const
             newObj["randomClick"]= safeValue(json, "randomClick");
             newObj["colorCheck"] = safeValue(json, "colorCheck");
             newObj["imagePath"]  = safeValue(json, "image");
+            newObj["captureWidth"]  = safeValue(json, "captureWidth");
+            newObj["captureHeight"] = safeValue(json, "captureHeight");
             newObj["time"]       = safeValue(json, "time");
             newObj["randomWait"] = safeValue(json, "randomWait");
             newObj["offsetTime"] = safeValue(json, "offsetTime");
@@ -202,6 +205,8 @@ void updateConfigInJsonFile(const QString &filePath, const QString &configId, co
                     updatedStep["randomClick"]= safeValue(json, "randomClick");
                     updatedStep["colorCheck"] = safeValue(json, "colorCheck");
                     updatedStep["imagePath"]  = safeValue(json, "image");
+                    updatedStep["captureWidth"]  = safeValue(json, "captureWidth");
+                    updatedStep["captureHeight"] = safeValue(json, "captureHeight");
                     updatedStep["time"]       = safeValue(json, "time");
                     updatedStep["randomWait"] = safeValue(json, "randomWait");
                     updatedStep["offsetTime"] = safeValue(json, "offsetTime");
@@ -373,7 +378,19 @@ void saveBase64ImageToFile(QJsonObject &data) {
 
     qDebug() << "图片保存成功：" << filePath;
 
-    // 5. 写回路径到 JSON
+    // 5. 保存模板截取分辨率侧载（供后续按模板原生分辨率匹配）
+    int captureWidth = data.value("captureWidth").toInt(0);
+    int captureHeight = data.value("captureHeight").toInt(0);
+    if (captureWidth > 0 && captureHeight > 0) {
+        vision::saveTemplateCaptureSize(filePath, cv::Size(captureWidth, captureHeight));
+        Logger::log(QString("已保存模板侧载分辨率: %1x%2 -> %3.json")
+                    .arg(captureWidth).arg(captureHeight).arg(filePath));
+    } else {
+        Logger::log(QString("[WARN] 模板截取分辨率无效(%1x%2)，未生成侧载文件，将使用默认1920x1080基准")
+                    .arg(captureWidth).arg(captureHeight));
+    }
+
+    // 6. 写回路径到 JSON
     // data["image"] = filePath;
     data["image"] = stepsId + ".png";
 }

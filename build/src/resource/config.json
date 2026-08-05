@@ -39,7 +39,7 @@
     ],
     "steps": [
       {
-        "identifyErrorHandle": "next",
+        "identifyErrorHandle": "end",
         "imagePath": null,
         "jumpStepsId": null,
         "ocrText": null,
@@ -68,7 +68,7 @@
     ],
     "steps": [
       {
-        "identifyErrorHandle": "next",
+        "identifyErrorHandle": "end",
         "imagePath": null,
         "jumpStepsId": null,
         "ocrText": null,
@@ -82,5 +82,88 @@
         "type": "SYSTEM_ARENA"
       }
     ]
+  },
+  {
+    "id": "D942C666-2449-41P2-A484-044486E39P13",
+    "name": "系统方案-自动御魂",
+    "type": "system",
+    "systemConfig": [
+      {
+        "key": "teamPlay",
+        "label": "组队模式",
+        "control": "switch",
+        "value": true
+      }
+    ],
+    "steps": [
+      {
+        "identifyErrorHandle": "end",
+        "imagePath": null,
+        "jumpStepsId": null,
+        "ocrText": null,
+        "offsetTime": null,
+        "randomClick": true,
+        "randomWait": null,
+        "score": 0.55,
+        "stepsId": "98959147-b290-9645-5876-58995ub7e4e8",
+        "taskName": "自动御魂副本",
+        "time": null,
+        "type": "SYSTEM_MITAMA"
+      }
+    ]
+  },
+  {
+    "id": "890d8508-27ba-4d0f-bff3-42ad52c66d0e",
+    "name": "测试active",
+    "steps": [
+      {
+        "identifyErrorHandle": "next",
+        "imagePath": "challenge-btn-active.png",
+        "jumpStepsId": null,
+        "colorCheck": true,
+        "ocrRoiH": null,
+        "ocrRoiW": null,
+        "ocrRoiX": null,
+        "ocrRoiY": null,
+        "ocrText": null,
+        "offsetTime": null,
+        "randomClick": false,
+        "randomWait": null,
+        "score": 0.55,
+        "stepsId": "ff6g85f8-ffa7-464d-b2e9-d8507b34a473",
+        "taskName": "测试颜色识别",
+        "time": null,
+        "type": "OPENCV",
+        "yoloLabel": null
+      }
+    ],
+    "type": "normal"
+  },
+  {
+    "id": "9895eab9-0603-4d3f-acbb-dcc2f1f21357",
+    "name": "测试opencv",
+    "steps": [
+      {
+        "identifyErrorHandle": "next",
+        "imagePath": "challenge-btn.png",
+        "jumpStepsId": null,
+        "colorCheck": false,
+        "ocrRoiH": null,
+        "ocrRoiW": null,
+        "ocrRoiX": null,
+        "ocrRoiY": null,
+        "ocrText": null,
+        "offsetTime": null,
+        "randomClick": false,
+        "randomWait": null,
+        "score": 0.55,
+        "stepsId": "63f0766e-f20c-4108-b160-e65ed80e8ed0",
+        "taskName": "测试颜色识别2",
+        "time": null,
+        "type": "OPENCV",
+        "yoloLabel": null
+      }
+    ],
+    "type": "normal"
   }
 ]

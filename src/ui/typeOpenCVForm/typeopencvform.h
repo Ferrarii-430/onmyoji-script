@@ -35,6 +35,8 @@ private:
     QString currentConfigId;
     QJsonObject stepDataCopy;
     QMap<QString,QString> stepSelect;
+    int templateCaptureWidth_ = 0;   // 模板截取时游戏窗口客户区宽度
+    int templateCaptureHeight_ = 0;  // 模板截取时游戏窗口客户区高度
 };
 
 

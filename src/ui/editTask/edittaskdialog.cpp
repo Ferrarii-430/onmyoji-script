@@ -178,9 +178,10 @@ void EditTaskDialog::onTestButtonClick()
         QString imagePath = json["image"].toString(); //此时还是image 保存到config文件后是imagePath
         const double score = json["score"].toDouble();
         const bool randomClick = json["randomClick"].toBool();
+        const cv::Size captureSize(json["captureWidth"].toInt(0), json["captureHeight"].toInt(0));
         if (isBase64(imagePath))
         {
-            savePath  = ScriptActions::instance().opencvRecognizesAndClickByBase64(imagePath, score, randomClick);
+            savePath  = ScriptActions::instance().opencvRecognizesAndClickByBase64(imagePath, score, randomClick, false, captureSize);
         }else
         {
             savePath = ScriptActions::instance().opencvRecognizesAndClick(imagePath, score, randomClick);

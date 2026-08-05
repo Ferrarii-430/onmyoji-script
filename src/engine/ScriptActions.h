@@ -27,7 +27,8 @@ public:
     // OpenCV 模板匹配识别并点击，成功返回结果图路径，失败返回空
     // colorCheck 为是否做 HSV 颜色校验（用于区分同形状不同色的模板）
     QString opencvRecognizesAndClick(const QString& templPath, double threshold, bool randomClick, bool colorCheck = false);
-    QString opencvRecognizesAndClickByBase64(const QString& base64, double threshold, bool randomClick, bool colorCheck = false);
+    QString opencvRecognizesAndClickByBase64(const QString& base64, double threshold, bool randomClick,
+                                             bool colorCheck = false, const cv::Size& captureSize = cv::Size());
 
     // OCR 识别；roiPercent 为识别区域（左/上/宽/高，单位为图片尺寸的百分比 0~100）；
     // 宽或高 <= 0 时表示识别整张图
