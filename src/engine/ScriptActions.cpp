@@ -218,6 +218,8 @@ QString ScriptActions::opencvRecognizesAndClick(const QString& templPath, const 
     }
 
     // 在窗口图像中查找模板（返回基准坐标系 1920x1080 下的矩形 + ScaleInfo）
+    Logger::log(QString("OpenCV识图 模板: %1  截图: %2x%3  阈值: %4")
+                .arg(tempSavePath).arg(winImg.cols).arg(winImg.rows).arg(threshold, 0, 'f', 2));
     double score = 0.0;
     cv::Rect matchRectBase;
     vision::ScaleInfo scaleInfo;
