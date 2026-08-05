@@ -136,4 +136,47 @@ bool findTemplateMultiScale(const cv::Mat& haystack, const cv::Mat& needle,
     return true;
 }
 
+bool verifyHsvColorMatch(const cv::Mat& haystackColor, const cv::Mat& needleColor,
+                         const cv::Rect& roi,
+                         double hueTol, double satTol, double valTol)
+{
+    // 任一彩色图为空时不阻断匹配结果（仅靠形状匹配）
+    if (haystackColor.empty() || needleColor.empty()) return true;
+    if (roi.width <= 0 || roi.height <= 0) return true;
+
+    // 将 ROI 限制在图像范围内
+    cv::Rect clamped = roi & cv::Rect(0, 0, haystackColor.cols, haystackColor.rows);
+    if (clamped.width <= 0 || clamped.height <= 0) return false;
+
+    cv::Mat haystackRoi = haystackColor(clamped);
+
+    cv::Mat hHsv, nHsv;
+    try {
+        cv::cvtColor(haystackRoi, hHsv, cv::COLOR_BGR2HSV);
+        cv::cvtColor(needleColor, nHsv, cv::COLOR_BGR2HSV);
+    } catch (const cv::Exception& e) {
+        Logger::log(QString("[WARN] HSV 转换失败: %1").arg(e.what()));
+        return true; // 转换失败时不阻断
+    }
+
+    cv::Scalar hMean, hStd, nMean, nStd;
+    cv::meanStdDev(hHsv, hMean, hStd);
+    cv::meanStdDev(nHsv, nMean, nStd);
+
+    // H: 0~179 (环形), S/V: 0~255
+    double dh = std::abs(hMean[0] - nMean[0]);
+    dh = std::min(dh, 180.0 - dh); // 处理 hue 环形(如红色横跨0/179)
+
+    double ds = std::abs(hMean[1] - nMean[1]);
+    double dv = std::abs(hMean[2] - nMean[2]);
+
+    const bool ok = (dh <= hueTol && ds <= satTol && dv <= valTol);
+    Logger::log(QString("[HSV校验] dh=%1 ds=%2 dv=%3 (tol h=%4 s=%5 v=%6) => %7")
+                .arg(dh, 0, 'f', 1).arg(ds, 0, 'f', 1).arg(dv, 0, 'f', 1)
+                .arg(hueTol, 0, 'f', 1).arg(satTol, 0, 'f', 1).arg(valTol, 0, 'f', 1)
+                .arg(ok ? "通过" : "不通过"));
+
+    return ok;
+}
+
 } // namespace vision

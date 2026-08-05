@@ -63,6 +63,39 @@ cv::Mat loadTemplateGrayscale(const QString& templatePath, bool& cacheHit)
     return image;
 }
 
+// 加载彩色模板(BGR)并带缓存，供 HSV 颜色校验使用。
+cv::Mat loadTemplateColor(const QString& templatePath, bool& cacheHit)
+{
+    static QHash<QString, CachedTemplate> cache;
+
+    const QFileInfo fileInfo(templatePath);
+    const QString canonicalPath = fileInfo.canonicalFilePath();
+    const QString cacheKey = canonicalPath.isEmpty() ? fileInfo.absoluteFilePath() : canonicalPath;
+    const qint64 fileSize = fileInfo.size();
+    const qint64 modifiedTime = fileInfo.lastModified().toMSecsSinceEpoch();
+
+    const auto cached = cache.constFind(cacheKey);
+    if (cached != cache.cend()
+        && cached->fileSize == fileSize
+        && cached->modifiedTime == modifiedTime
+        && !cached->image.empty()) {
+        cacheHit = true;
+        return cached->image;
+    }
+
+    cacheHit = false;
+    cv::Mat image = cv::imread(templatePath.toStdString(), cv::IMREAD_COLOR);
+    if (image.empty()) {
+        return image;
+    }
+
+    if (cache.size() >= 64 && !cache.contains(cacheKey)) {
+        cache.clear();
+    }
+    cache.insert(cacheKey, CachedTemplate{fileSize, modifiedTime, image});
+    return image;
+}
+
 // 在结果图上绘制点击标记：白色描边 + 红点 + 十字线
 void drawClickMarker(cv::Mat& img, const cv::Point& clickPt)
 {
@@ -176,6 +209,10 @@ QString ScriptActions::opencvRecognizesAndClick(const QString& templPath, const 
         Logger::log("已加载模板图片: " + tempSavePath);
     }
 
+    // 加载彩色模板用于 HSV 颜色校验（灰度匹配无法区分同形状不同色的模板）
+    bool colorCacheHit = false;
+    cv::Mat templColor = loadTemplateColor(tempSavePath, colorCacheHit);
+
     // 在窗口图像中查找模板
     double score = 0.0;
     cv::Rect matchRect;
@@ -184,6 +221,12 @@ QString ScriptActions::opencvRecognizesAndClick(const QString& templPath, const 
 
     if (!found) {
         Logger::log(QString("未找到匹配区域! score=%1").arg(score));
+        return nullptr;
+    }
+
+    // HSV 颜色校验：形状匹配高分但颜色不符(同形状不同色模板)则判为未找到
+    if (!vision::verifyHsvColorMatch(winImg, templColor, matchRect)) {
+        Logger::log(QString("形状匹配 score=%1 但 HSV 颜色校验不通过，判为未找到").arg(score));
         return nullptr;
     }
 
