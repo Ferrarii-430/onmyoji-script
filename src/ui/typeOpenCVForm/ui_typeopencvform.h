@@ -99,7 +99,6 @@ public:
 
         colorCheckCheckBox = new QCheckBox(formLayoutWidget);
         colorCheckCheckBox->setObjectName("colorCheckCheckBox");
-        colorCheckCheckBox->setChecked(true);
 
         formLayout->setWidget(3, QFormLayout::ItemRole::FieldRole, colorCheckCheckBox);
 
