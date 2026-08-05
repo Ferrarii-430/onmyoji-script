@@ -74,30 +74,50 @@
      </widget>
     </item>
     <item row="3" column="0">
+     <widget class="QLabel" name="label_6">
+      <property name="text">
+       <string>颜色判断</string>
+      </property>
+     </widget>
+    </item>
+    <item row="3" column="1">
+     <widget class="QCheckBox" name="colorCheckCheckBox">
+      <property name="text">
+       <string/>
+      </property>
+      <property name="checked">
+       <bool>true</bool>
+      </property>
+      <property name="toolTip">
+       <string>开启后对匹配区域做 HSV 颜色校验，可区分同形状不同色的模板（如不同状态的按钮）</string>
+      </property>
+     </widget>
+    </item>
+    <item row="4" column="0">
      <widget class="QLabel" name="label_5">
       <property name="text">
        <string>识别失败处理</string>
       </property>
      </widget>
     </item>
-    <item row="3" column="1">
+    <item row="4" column="1">
      <widget class="QComboBox" name="opencvErrorHandle"/>
     </item>
-    <item row="5" column="0">
+    <item row="6" column="0">
      <widget class="QLabel" name="label_4">
       <property name="text">
        <string>截图</string>
       </property>
      </widget>
     </item>
-    <item row="5" column="1">
+    <item row="6" column="1">
      <widget class="QToolButton" name="btnCapture">
       <property name="text">
        <string>点击开始截图</string>
       </property>
      </widget>
     </item>
-    <item row="6" column="0" colspan="2">
+    <item row="7" column="0" colspan="2">
      <widget class="QLabel" name="labelPreview">
       <property name="sizePolicy">
        <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
@@ -113,14 +133,14 @@
       </property>
      </widget>
     </item>
-    <item row="4" column="0">
+    <item row="5" column="0">
      <widget class="QLabel" name="stepInputLabel">
       <property name="text">
        <string>跳转步骤</string>
       </property>
      </widget>
     </item>
-    <item row="4" column="1">
+    <item row="5" column="1">
      <widget class="QComboBox" name="stepInputBox"/>
     </item>
    </layout>

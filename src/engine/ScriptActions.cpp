@@ -163,7 +163,7 @@ void ScriptActions::processAndShowImage(const QString& imagePath)
     emit requestShowImage(imagePath);
 }
 
-QString ScriptActions::opencvRecognizesAndClickByBase64(const QString& base64, const double threshold, const bool randomClick)
+QString ScriptActions::opencvRecognizesAndClickByBase64(const QString& base64, const double threshold, const bool randomClick, const bool colorCheck)
 {
     if (base64.isEmpty()) {
         return "错误: base64 图像数据为空";
@@ -186,10 +186,10 @@ QString ScriptActions::opencvRecognizesAndClickByBase64(const QString& base64, c
     }
     tempFile.close(); // 关闭文件以确保数据刷新
 
-    return opencvRecognizesAndClick(tempFile.fileName(), threshold, randomClick);
+    return opencvRecognizesAndClick(tempFile.fileName(), threshold, randomClick, colorCheck);
 }
 
-QString ScriptActions::opencvRecognizesAndClick(const QString& templPath, const double threshold, const bool randomClick)
+QString ScriptActions::opencvRecognizesAndClick(const QString& templPath, const double threshold, const bool randomClick, const bool colorCheck)
 {
     cv::Mat winImg = capture::captureGameWindow();
     if (winImg.empty())
@@ -210,8 +210,12 @@ QString ScriptActions::opencvRecognizesAndClick(const QString& templPath, const 
     }
 
     // 加载彩色模板用于 HSV 颜色校验（灰度匹配无法区分同形状不同色的模板）
-    bool colorCacheHit = false;
-    cv::Mat templColor = loadTemplateColor(tempSavePath, colorCacheHit);
+    // 仅在 colorCheck 开启时加载与校验
+    cv::Mat templColor;
+    if (colorCheck) {
+        bool colorCacheHit = false;
+        templColor = loadTemplateColor(tempSavePath, colorCacheHit);
+    }
 
     // 在窗口图像中查找模板
     double score = 0.0;
@@ -225,7 +229,7 @@ QString ScriptActions::opencvRecognizesAndClick(const QString& templPath, const 
     }
 
     // HSV 颜色校验：形状匹配高分但颜色不符(同形状不同色模板)则判为未找到
-    if (!vision::verifyHsvColorMatch(winImg, templColor, matchRect)) {
+    if (colorCheck && !vision::verifyHsvColorMatch(winImg, templColor, matchRect)) {
         Logger::log(QString("形状匹配 score=%1 但 HSV 颜色校验不通过，判为未找到").arg(score));
         return nullptr;
     }
