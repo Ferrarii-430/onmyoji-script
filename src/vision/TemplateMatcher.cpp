@@ -62,16 +62,20 @@ cv::Mat normalizeGameFrame(const cv::Mat& src, ScaleInfo& info,
             return cv::Mat();
         }
 
-        // 创建目标画布并填充黑边（与 src 通道数一致），再把缩放后的图像贴到居中位置
-        cv::Mat dst(targetHeight, targetWidth, src.type(), cv::Scalar::all(0));
-        cv::Rect roi(info.offsetX, info.offsetY, scaledW, scaledH);
-        // 防御：确保 ROI 完全位于画布内
-        roi &= cv::Rect(0, 0, targetWidth, targetHeight);
-        if (roi.width <= 0 || roi.height <= 0) {
+        // 创建目标画布并填充黑边（与 src 通道数一致），再把缩放后的图像贴到居中位置。
+        // 注意：dstRoi 在基准画布坐标系，srcRoi 在 scaled 内部坐标系，两者尺寸必须严格一致，
+        // 否则 copyTo 会尝试 resize 目标子矩阵(fixedSize)触发断言。
+        cv::Mat dst = cv::Mat::zeros(targetHeight, targetWidth, src.type());
+        cv::Rect dstRoi(info.offsetX, info.offsetY, scaledW, scaledH);
+        // 防御：确保 ROI 完全位于画布内（极端缩放误差下可能越界一像素）
+        dstRoi &= cv::Rect(0, 0, targetWidth, targetHeight);
+        if (dstRoi.width <= 0 || dstRoi.height <= 0) {
             Logger::log(QString("[ERROR] normalizeGameFrame ROI 非法"));
             return cv::Mat();
         }
-        scaled(roi & cv::Rect(0, 0, scaled.cols, scaled.rows)).copyTo(dst(roi));
+        // scaled 中对应区域：与 dstRoi 同尺寸，起点为 (0,0)
+        cv::Rect srcRoi(0, 0, dstRoi.width, dstRoi.height);
+        scaled(srcRoi).copyTo(dst(dstRoi));
 
         return dst;
     } catch (const cv::Exception& e) {
