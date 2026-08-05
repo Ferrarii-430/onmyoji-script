@@ -10,31 +10,54 @@ namespace vision {
 constexpr int BASE_MATCH_WIDTH = 1920;
 constexpr int BASE_MATCH_HEIGHT = 1080;
 
-// 将任意分辨率截图等比例归一化到 targetWidth x targetHeight。
-// 缩小用 INTER_AREA，放大用 INTER_CUBIC，保留通道数。
-// 失败返回空 Mat。
+// 归一化过程的缩放信息：保持比例缩放 + 黑边 padding 后的坐标映射关系。
+// 通过该结构可以把基准坐标系(1920x1080)的点/矩形精确还原回 DX11 原始捕获坐标。
+struct ScaleInfo {
+    double scale = 1.0;   // 保持比例缩放比例（src -> base 使用的统一缩放系数）
+    int offsetX = 0;      // 缩放后图像在基准画布中的左上角 X 偏移（黑边宽度）
+    int offsetY = 0;      // 缩放后图像在基准画布中的左上角 Y 偏移（黑边高度）
+    int srcWidth = 0;     // DX11 原始捕获宽度
+    int srcHeight = 0;    // DX11 原始捕获高度
+
+    bool valid() const { return scale > 0.0 && srcWidth > 0 && srcHeight > 0; }
+};
+
+// 将任意 DX11 捕获截图保持比例缩放到 1920x1080，不足部分填充黑边。
+// info 记录 scale/offset/src 尺寸，用于后续把基准坐标精确还原回原始捕获坐标。
+// 缩小用 INTER_AREA，放大用 INTER_CUBIC，保留通道数。失败返回空 Mat。
+cv::Mat normalizeGameFrame(const cv::Mat& src, ScaleInfo& info,
+                           int targetWidth = BASE_MATCH_WIDTH,
+                           int targetHeight = BASE_MATCH_HEIGHT);
+
+// 基准坐标系(1920x1080)下的点还原回 DX11 原始捕获坐标系下的点。
+// 公式: realX = (baseX - offsetX) / scale
+cv::Point convertNormalizedPointToCapture(const cv::Point& basePoint, const ScaleInfo& info);
+
+// 基准坐标系下的矩形还原回 DX11 原始捕获坐标系下的矩形。
+cv::Rect convertNormalizedRectToCapture(const cv::Rect& baseRect, const ScaleInfo& info);
+
+// [已废弃] 旧的强制拉伸归一化，保留只为兼容，新代码请用 normalizeGameFrame。
 cv::Mat normalizeResolution(const cv::Mat& src,
                             int targetWidth = BASE_MATCH_WIDTH,
                             int targetHeight = BASE_MATCH_HEIGHT);
 
-// 基准坐标系(1920x1080)下的点转换为实际截图坐标系下的点。
+// [已废弃] 旧的简单坐标转换（按宽高独立缩放），仅用于兼容旧 findTemplateMultiScale。
 cv::Point convertBasePointToScreen(const cv::Point& basePoint,
                                    const cv::Size& realSize,
                                    const cv::Size& baseSize = cv::Size(BASE_MATCH_WIDTH, BASE_MATCH_HEIGHT));
-
-// 基准坐标系下的矩形转换为实际截图坐标系下的矩形。
 cv::Rect convertBaseRectToScreen(const cv::Rect& baseRect,
                                  const cv::Size& realSize,
                                  const cv::Size& baseSize = cv::Size(BASE_MATCH_WIDTH, BASE_MATCH_HEIGHT));
 
-// 固定分辨率模板匹配：先将 haystack 归一化到 1920x1080，再做单次 matchTemplate。
-// needle 需为基准分辨率下保存的模板。outRect 返回的是【基准坐标系】下的矩形。
+// 固定分辨率模板匹配：先将 haystack 保持比例 + padding 归一化到 1920x1080，
+// 再做单次 matchTemplate。outRect 返回【基准坐标系】下的矩形。
+// 若 info 不为 nullptr，会写入本次匹配的 ScaleInfo 供调用方还原坐标使用。
 bool findTemplate(const cv::Mat& haystack, const cv::Mat& needle,
-                  cv::Rect& outRect, double& outScore, double threshold);
+                  cv::Rect& outRect, double& outScore, double threshold,
+                  ScaleInfo* info = nullptr);
 
 // [兼容旧调用] 内部走归一化单次匹配流程，scaleMin/scaleMax/scaleStep 已废弃。
-// 与 findTemplate 的区别：返回的 outRect 已转换回【截图原始坐标系】，
-// 便于旧调用方直接用于绘制 / 点击。
+// 返回的 outRect 已转换回【DX11 原始捕获坐标系】，便于旧调用方直接用于绘制/点击。
 bool findTemplateMultiScale(const cv::Mat& haystack, const cv::Mat& needle,
                             cv::Rect& outRect, double& outScore,
                             double scaleMin, double scaleMax,

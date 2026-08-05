@@ -9,33 +9,123 @@
 
 namespace vision {
 
-// 将任意分辨率截图等比例归一化到 targetWidth x targetHeight。
-// 缩小用 INTER_AREA（抗锯齿），放大用 INTER_CUBIC（清晰边缘），保留通道数。
-cv::Mat normalizeResolution(const cv::Mat& src,
-                            int targetWidth,
-                            int targetHeight)
+// 保持比例缩放到目标尺寸，不足部分填充黑边（letterbox）。
+// 适用于 DX11 捕获尺寸 != 基准 1920x1080、且可能存在轻微宽高比误差的场景。
+cv::Mat normalizeGameFrame(const cv::Mat& src, ScaleInfo& info,
+                           int targetWidth, int targetHeight)
+{
+    info = ScaleInfo{}; // 重置为默认值
+
+    if (src.empty()) {
+        Logger::log(QString("[ERROR] normalizeGameFrame 输入为空"));
+        return cv::Mat();
+    }
+    if (src.cols <= 0 || src.rows <= 0 || targetWidth <= 0 || targetHeight <= 0) {
+        Logger::log(QString("[ERROR] normalizeGameFrame 尺寸非法: src=%1x%2 target=%3x%4")
+                    .arg(src.cols).arg(src.rows).arg(targetWidth).arg(targetHeight));
+        return cv::Mat();
+    }
+
+    info.srcWidth = src.cols;
+    info.srcHeight = src.rows;
+
+    // 已经是目标尺寸：无需缩放和 padding
+    if (src.cols == targetWidth && src.rows == targetHeight) {
+        info.scale = 1.0;
+        info.offsetX = 0;
+        info.offsetY = 0;
+        return src.clone();
+    }
+
+    try {
+        // 取宽高方向各自需要的缩放比例，取较小者保证图像完整放入画布(不变形)
+        const double scaleX = targetWidth / static_cast<double>(src.cols);
+        const double scaleY = targetHeight / static_cast<double>(src.rows);
+        const double scale = std::min(scaleX, scaleY);
+        info.scale = scale;
+
+        // 按保持比例缩放后的实际尺寸
+        const int scaledW = std::max(1, static_cast<int>(std::round(src.cols * scale)));
+        const int scaledH = std::max(1, static_cast<int>(std::round(src.rows * scale)));
+
+        // 居中放置，两侧/上下补黑边
+        info.offsetX = (targetWidth - scaledW) / 2;
+        info.offsetY = (targetHeight - scaledH) / 2;
+
+        // 缩小时用 INTER_AREA（抗锯齿），放大时用 INTER_CUBIC（清晰边缘）
+        const int interp = (scale < 1.0) ? cv::INTER_AREA : cv::INTER_CUBIC;
+
+        cv::Mat scaled;
+        cv::resize(src, scaled, cv::Size(scaledW, scaledH), 0, 0, interp);
+        if (scaled.empty()) {
+            Logger::log(QString("[ERROR] normalizeGameFrame resize 后为空"));
+            return cv::Mat();
+        }
+
+        // 创建目标画布并填充黑边（与 src 通道数一致），再把缩放后的图像贴到居中位置
+        cv::Mat dst(targetHeight, targetWidth, src.type(), cv::Scalar::all(0));
+        cv::Rect roi(info.offsetX, info.offsetY, scaledW, scaledH);
+        // 防御：确保 ROI 完全位于画布内
+        roi &= cv::Rect(0, 0, targetWidth, targetHeight);
+        if (roi.width <= 0 || roi.height <= 0) {
+            Logger::log(QString("[ERROR] normalizeGameFrame ROI 非法"));
+            return cv::Mat();
+        }
+        scaled(roi & cv::Rect(0, 0, scaled.cols, scaled.rows)).copyTo(dst(roi));
+
+        return dst;
+    } catch (const cv::Exception& e) {
+        Logger::log(QString("[ERROR] normalizeGameFrame 异常: %1").arg(e.what()));
+        return cv::Mat();
+    }
+}
+
+// 基准坐标系(1920x1080)下的点还原回 DX11 原始捕获坐标系下的点。
+// realX = (baseX - offsetX) / scale
+cv::Point convertNormalizedPointToCapture(const cv::Point& basePoint, const ScaleInfo& info)
+{
+    if (!info.valid()) return basePoint;
+    const double sx = (basePoint.x - info.offsetX) / info.scale;
+    const double sy = (basePoint.y - info.offsetY) / info.scale;
+    return cv::Point(static_cast<int>(std::round(sx)),
+                     static_cast<int>(std::round(sy)));
+}
+
+// 基准坐标系下的矩形还原回 DX11 原始捕获坐标系下的矩形。
+cv::Rect convertNormalizedRectToCapture(const cv::Rect& baseRect, const ScaleInfo& info)
+{
+    if (!info.valid()) return baseRect;
+    const double x1 = (baseRect.x - info.offsetX) / info.scale;
+    const double y1 = (baseRect.y - info.offsetY) / info.scale;
+    const double x2 = (baseRect.x + baseRect.width - info.offsetX) / info.scale;
+    const double y2 = (baseRect.y + baseRect.height - info.offsetY) / info.scale;
+    const int rx = static_cast<int>(std::round(x1));
+    const int ry = static_cast<int>(std::round(y1));
+    const int rw = static_cast<int>(std::round(x2 - x1));
+    const int rh = static_cast<int>(std::round(y2 - y1));
+    // 防御：避免负宽高
+    return cv::Rect(rx, ry, std::max(0, rw), std::max(0, rh));
+}
+
+// [已废弃] 旧的强制拉伸归一化，保留只为兼容。
+cv::Mat normalizeResolution(const cv::Mat& src, int targetWidth, int targetHeight)
 {
     if (src.empty()) {
         Logger::log(QString("[ERROR] normalizeResolution 输入为空"));
         return cv::Mat();
     }
     if (src.cols <= 0 || src.rows <= 0 || targetWidth <= 0 || targetHeight <= 0) {
-        Logger::log(QString("[ERROR] normalizeResolution 尺寸非法: src=%1x%2 target=%3x%4")
-                    .arg(src.cols).arg(src.rows).arg(targetWidth).arg(targetHeight));
+        Logger::log(QString("[ERROR] normalizeResolution 尺寸非法"));
         return cv::Mat();
     }
-
-    // 已经是目标尺寸，直接克隆返回（避免无谓缩放）
     if (src.cols == targetWidth && src.rows == targetHeight) {
         return src.clone();
     }
-
     try {
         cv::Mat dst;
-        const double scaleX = targetWidth / static_cast<double>(src.cols);
-        const double scaleY = targetHeight / static_cast<double>(src.rows);
-        // 任一方向缩小都用 INTER_AREA（对下采样更友好），否则用 INTER_CUBIC
-        const int interp = (scaleX < 1.0 || scaleY < 1.0) ? cv::INTER_AREA : cv::INTER_CUBIC;
+        const double sx = targetWidth / static_cast<double>(src.cols);
+        const double sy = targetHeight / static_cast<double>(src.rows);
+        const int interp = (sx < 1.0 || sy < 1.0) ? cv::INTER_AREA : cv::INTER_CUBIC;
         cv::resize(src, dst, cv::Size(targetWidth, targetHeight), 0, 0, interp);
         return dst;
     } catch (const cv::Exception& e) {
@@ -44,42 +134,39 @@ cv::Mat normalizeResolution(const cv::Mat& src,
     }
 }
 
-// 基准坐标系下的点转换为实际截图坐标系下的点
+// [已废弃] 旧的简单坐标转换（按宽高独立缩放），仅用于兼容旧 findTemplateMultiScale。
 cv::Point convertBasePointToScreen(const cv::Point& basePoint,
                                    const cv::Size& realSize,
                                    const cv::Size& baseSize)
 {
     if (baseSize.width <= 0 || baseSize.height <= 0) return basePoint;
-    const double scaleX = realSize.width / static_cast<double>(baseSize.width);
-    const double scaleY = realSize.height / static_cast<double>(baseSize.height);
-    return cv::Point(
-        static_cast<int>(std::round(basePoint.x * scaleX)),
-        static_cast<int>(std::round(basePoint.y * scaleY))
-    );
+    const double sx = realSize.width / static_cast<double>(baseSize.width);
+    const double sy = realSize.height / static_cast<double>(baseSize.height);
+    return cv::Point(static_cast<int>(std::round(basePoint.x * sx)),
+                     static_cast<int>(std::round(basePoint.y * sy)));
 }
 
-// 基准坐标系下的矩形转换为实际截图坐标系下的矩形
 cv::Rect convertBaseRectToScreen(const cv::Rect& baseRect,
                                  const cv::Size& realSize,
                                  const cv::Size& baseSize)
 {
     if (baseSize.width <= 0 || baseSize.height <= 0) return baseRect;
-    const double scaleX = realSize.width / static_cast<double>(baseSize.width);
-    const double scaleY = realSize.height / static_cast<double>(baseSize.height);
-    return cv::Rect(
-        static_cast<int>(std::round(baseRect.x * scaleX)),
-        static_cast<int>(std::round(baseRect.y * scaleY)),
-        static_cast<int>(std::round(baseRect.width * scaleX)),
-        static_cast<int>(std::round(baseRect.height * scaleY))
-    );
+    const double sx = realSize.width / static_cast<double>(baseSize.width);
+    const double sy = realSize.height / static_cast<double>(baseSize.height);
+    return cv::Rect(static_cast<int>(std::round(baseRect.x * sx)),
+                    static_cast<int>(std::round(baseRect.y * sy)),
+                    static_cast<int>(std::round(baseRect.width * sx)),
+                    static_cast<int>(std::round(baseRect.height * sy)));
 }
 
-// 固定分辨率模板匹配：haystack 内部归一化到 1920x1080 后单次 matchTemplate。
-// outRect 返回【基准坐标系】下的矩形，调用方如需在原图上绘制/点击请自行转换。
+// 固定分辨率模板匹配：haystack 保持比例 + padding 归一化到 1920x1080，再单次 matchTemplate。
+// outRect 返回【基准坐标系】下的矩形；info（若传入）记录本次归一化的 ScaleInfo。
 bool findTemplate(const cv::Mat& haystack, const cv::Mat& needle,
-                  cv::Rect& outRect, double& outScore, double threshold)
+                  cv::Rect& outRect, double& outScore, double threshold,
+                  ScaleInfo* info)
 {
     outScore = -1;
+    if (info) *info = ScaleInfo{};
 
     if (haystack.empty() || needle.empty()) {
         Logger::log(QString("[ERROR] 输入图像为空"));
@@ -91,19 +178,19 @@ bool findTemplate(const cv::Mat& haystack, const cv::Mat& needle,
         return false;
     }
 
-    const cv::Size baseSize(BASE_MATCH_WIDTH, BASE_MATCH_HEIGHT);
-
     QElapsedTimer timer;
     timer.start();
 
-    // 1. 截图归一化到基准分辨率（模板默认已是基准分辨率）
-    cv::Mat normHay = normalizeResolution(haystack, BASE_MATCH_WIDTH, BASE_MATCH_HEIGHT);
+    // 1. 截图保持比例 + padding 归一化到基准分辨率
+    ScaleInfo localInfo;
+    cv::Mat normHay = normalizeGameFrame(haystack, localInfo, BASE_MATCH_WIDTH, BASE_MATCH_HEIGHT);
     if (normHay.empty()) {
         Logger::log(QString("[ERROR] 截图归一化失败"));
         return false;
     }
+    if (info) *info = localInfo;
 
-    // 2. 灰度化
+    // 2. 灰度化（保留原图做 HSV 校验用，这里只用归一化后的图）
     cv::Mat gHay, gNeedle;
     try {
         if (normHay.channels() == 3) {
@@ -162,26 +249,30 @@ bool findTemplate(const cv::Mat& haystack, const cv::Mat& needle,
 
     if (outScore < threshold) {
         Logger::log(QString("[WARN] 没有找到匹配，bestScore=%1 threshold=%2 耗时=%3ms "
-                            "(基准 %4x%5, 原始截图 %6x%7)")
+                            "(src=%4x%5 -> base %6x%7, scale=%8, offset=(%9,%10))")
                     .arg(outScore, 0, 'f', 4).arg(threshold, 0, 'f', 4)
                     .arg(timer.elapsed())
+                    .arg(localInfo.srcWidth).arg(localInfo.srcHeight)
                     .arg(BASE_MATCH_WIDTH).arg(BASE_MATCH_HEIGHT)
-                    .arg(haystack.cols).arg(haystack.rows));
+                    .arg(localInfo.scale, 0, 'f', 4)
+                    .arg(localInfo.offsetX).arg(localInfo.offsetY));
         return false;
     }
 
     Logger::log(QString("[RESULT] bestScore=%1 baseRect=(%2,%3,%4x%5) 耗时=%6ms "
-                        "(基准 %7x%8, 原始截图 %9x%10)")
+                        "(src=%7x%8 -> base %9x%10, scale=%11, offset=(%12,%13))")
                 .arg(outScore, 0, 'f', 4)
                 .arg(outRect.x).arg(outRect.y).arg(outRect.width).arg(outRect.height)
                 .arg(timer.elapsed())
+                .arg(localInfo.srcWidth).arg(localInfo.srcHeight)
                 .arg(BASE_MATCH_WIDTH).arg(BASE_MATCH_HEIGHT)
-                .arg(haystack.cols).arg(haystack.rows));
+                .arg(localInfo.scale, 0, 'f', 4)
+                .arg(localInfo.offsetX).arg(localInfo.offsetY));
 
     return true;
 }
 
-// [兼容旧调用] 内部走归一化单次匹配，返回的 outRect 已转换回截图原始坐标系。
+// [兼容旧调用] 内部走归一化单次匹配，返回的 outRect 已转换回 DX11 原始捕获坐标系。
 // scaleMin/scaleMax/scaleStep 参数保留但已废弃，不再生效。
 bool findTemplateMultiScale(const cv::Mat& haystack, const cv::Mat& needle,
                             cv::Rect& outRect, double& outScore,
@@ -191,12 +282,13 @@ bool findTemplateMultiScale(const cv::Mat& haystack, const cv::Mat& needle,
     (void)scaleMin; (void)scaleMax; (void)scaleStep; // 已废弃
 
     cv::Rect baseRect;
-    if (!findTemplate(haystack, needle, baseRect, outScore, threshold)) {
+    ScaleInfo info;
+    if (!findTemplate(haystack, needle, baseRect, outScore, threshold, &info)) {
         return false;
     }
 
-    // 基准坐标 -> 截图原始坐标，便于旧调用方直接用于绘制/点击/HSV校验
-    outRect = convertBaseRectToScreen(baseRect, haystack.size());
+    // 基准坐标 -> DX11 原始捕获坐标，便于旧调用方直接用于绘制/点击/HSV校验
+    outRect = convertNormalizedRectToCapture(baseRect, info);
     return true;
 }
 
