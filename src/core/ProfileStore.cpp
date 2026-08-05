@@ -124,6 +124,7 @@ void addConfigToJsonFile(const QString &filePath, const QString &configId, const
             newObj["score"]      = safeValue(json, "score");
             newObj["ocrText"]    = safeValue(json, "ocrText");
             newObj["randomClick"]= safeValue(json, "randomClick");
+            newObj["colorCheck"] = safeValue(json, "colorCheck");
             newObj["imagePath"]  = safeValue(json, "image");
             newObj["time"]       = safeValue(json, "time");
             newObj["randomWait"] = safeValue(json, "randomWait");
@@ -199,6 +200,7 @@ void updateConfigInJsonFile(const QString &filePath, const QString &configId, co
                     updatedStep["score"]      = safeValue(json, "score");
                     updatedStep["ocrText"]    = safeValue(json, "ocrText");
                     updatedStep["randomClick"]= safeValue(json, "randomClick");
+                    updatedStep["colorCheck"] = safeValue(json, "colorCheck");
                     updatedStep["imagePath"]  = safeValue(json, "image");
                     updatedStep["time"]       = safeValue(json, "time");
                     updatedStep["randomWait"] = safeValue(json, "randomWait");
