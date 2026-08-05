@@ -23,7 +23,6 @@ TypeOpenCVForm::TypeOpenCVForm(QWidget *parent) :
     ui->stepInputLabel->hide(); // 初始状态隐藏
 
     ui->spinScoreBox->setValue(0.55);
-    ui->colorCheckCheckBox->setChecked(true); // 默认开启颜色判断
 
     ui->opencvErrorHandle->addItem("继续执行任务","next");
     ui->opencvErrorHandle->addItem("跳转步骤","jump");
@@ -58,7 +57,7 @@ void TypeOpenCVForm::loadFromJson(const QString &configId, const QJsonObject &ob
     ui->lineTaskNameEdit->setText(obj["taskName"].toString());
     ui->spinScoreBox->setValue(obj["score"].toDouble());
     ui->randomClickCheckBox->setChecked(obj["randomClick"].toBool());
-    ui->colorCheckCheckBox->setChecked(obj["colorCheck"].toBool(true));
+    ui->colorCheckCheckBox->setChecked(obj["colorCheck"].toBool());
 
     QString currentIdentifyErrorHandle = obj["identifyErrorHandle"].toString();
     int identifyErrorHandleIndex = ui->opencvErrorHandle->findData(currentIdentifyErrorHandle);

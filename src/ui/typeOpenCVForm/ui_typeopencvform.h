@@ -33,6 +33,8 @@ public:
     QDoubleSpinBox *spinScoreBox;
     QLabel *label_3;
     QCheckBox *randomClickCheckBox;
+    QLabel *label_6;
+    QCheckBox *colorCheckCheckBox;
     QLabel *label_5;
     QComboBox *opencvErrorHandle;
     QLabel *label_4;
@@ -90,25 +92,36 @@ public:
 
         formLayout->setWidget(2, QFormLayout::ItemRole::FieldRole, randomClickCheckBox);
 
+        label_6 = new QLabel(formLayoutWidget);
+        label_6->setObjectName("label_6");
+
+        formLayout->setWidget(3, QFormLayout::ItemRole::LabelRole, label_6);
+
+        colorCheckCheckBox = new QCheckBox(formLayoutWidget);
+        colorCheckCheckBox->setObjectName("colorCheckCheckBox");
+        colorCheckCheckBox->setChecked(true);
+
+        formLayout->setWidget(3, QFormLayout::ItemRole::FieldRole, colorCheckCheckBox);
+
         label_5 = new QLabel(formLayoutWidget);
         label_5->setObjectName("label_5");
 
-        formLayout->setWidget(3, QFormLayout::ItemRole::LabelRole, label_5);
+        formLayout->setWidget(4, QFormLayout::ItemRole::LabelRole, label_5);
 
         opencvErrorHandle = new QComboBox(formLayoutWidget);
         opencvErrorHandle->setObjectName("opencvErrorHandle");
 
-        formLayout->setWidget(3, QFormLayout::ItemRole::FieldRole, opencvErrorHandle);
+        formLayout->setWidget(4, QFormLayout::ItemRole::FieldRole, opencvErrorHandle);
 
         label_4 = new QLabel(formLayoutWidget);
         label_4->setObjectName("label_4");
 
-        formLayout->setWidget(5, QFormLayout::ItemRole::LabelRole, label_4);
+        formLayout->setWidget(6, QFormLayout::ItemRole::LabelRole, label_4);
 
         btnCapture = new QToolButton(formLayoutWidget);
         btnCapture->setObjectName("btnCapture");
 
-        formLayout->setWidget(5, QFormLayout::ItemRole::FieldRole, btnCapture);
+        formLayout->setWidget(6, QFormLayout::ItemRole::FieldRole, btnCapture);
 
         labelPreview = new QLabel(formLayoutWidget);
         labelPreview->setObjectName("labelPreview");
@@ -116,17 +129,17 @@ public:
         labelPreview->setSizePolicy(sizePolicy);
         labelPreview->setScaledContents(false);
 
-        formLayout->setWidget(6, QFormLayout::ItemRole::SpanningRole, labelPreview);
+        formLayout->setWidget(7, QFormLayout::ItemRole::SpanningRole, labelPreview);
 
         stepInputLabel = new QLabel(formLayoutWidget);
         stepInputLabel->setObjectName("stepInputLabel");
 
-        formLayout->setWidget(4, QFormLayout::ItemRole::LabelRole, stepInputLabel);
+        formLayout->setWidget(5, QFormLayout::ItemRole::LabelRole, stepInputLabel);
 
         stepInputBox = new QComboBox(formLayoutWidget);
         stepInputBox->setObjectName("stepInputBox");
 
-        formLayout->setWidget(4, QFormLayout::ItemRole::FieldRole, stepInputBox);
+        formLayout->setWidget(5, QFormLayout::ItemRole::FieldRole, stepInputBox);
 
 
         retranslateUi(TypeOpenCVForm);
@@ -141,6 +154,11 @@ public:
         label_2->setText(QCoreApplication::translate("TypeOpenCVForm", "\345\210\206\346\225\260\351\230\210\345\200\274", nullptr));
         label_3->setText(QCoreApplication::translate("TypeOpenCVForm", "\346\230\257\345\220\246\351\232\217\346\234\272\347\202\271\345\207\273", nullptr));
         randomClickCheckBox->setText(QString());
+        label_6->setText(QCoreApplication::translate("TypeOpenCVForm", "\345\274\200\345\220\257\351\242\234\350\211\262\345\210\244\346\226\255", nullptr));
+#if QT_CONFIG(tooltip)
+        colorCheckCheckBox->setToolTip(QCoreApplication::translate("TypeOpenCVForm", "\345\274\200\345\220\257\345\220\216\345\257\271\345\214\271\351\205\215\345\214\272\345\237\237\345\201\232 HSV \351\242\234\350\211\262\346\240\241\351\252\214\357\274\214\345\217\257\345\214\272\345\210\206\345\220\214\345\275\242\347\212\266\344\270\215\345\220\214\350\211\262\347\232\204\346\250\241\346\235\277\357\274\210\345\246\202\344\270\215\345\220\214\347\212\266\346\200\201\347\232\204\346\214\211\351\222\256\357\274\211", nullptr));
+#endif // QT_CONFIG(tooltip)
+        colorCheckCheckBox->setText(QString());
         label_5->setText(QCoreApplication::translate("TypeOpenCVForm", "\350\257\206\345\210\253\345\244\261\350\264\245\345\244\204\347\220\206", nullptr));
         label_4->setText(QCoreApplication::translate("TypeOpenCVForm", "\346\210\252\345\233\276", nullptr));
         btnCapture->setText(QCoreApplication::translate("TypeOpenCVForm", "\347\202\271\345\207\273\345\274\200\345\247\213\346\210\252\345\233\276", nullptr));
