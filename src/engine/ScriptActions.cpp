@@ -217,16 +217,18 @@ QString ScriptActions::opencvRecognizesAndClick(const QString& templPath, const 
         templColor = loadTemplateColor(tempSavePath, colorCacheHit);
     }
 
-    // 在窗口图像中查找模板
+    // 在窗口图像中查找模板（返回基准坐标系 1920x1080 下的矩形）
     double score = 0.0;
-    cv::Rect matchRect;
-    bool found = vision::findTemplateMultiScale(winImg, templ, matchRect, score,
-                                                0.4, 0.9, 0.1, threshold);
+    cv::Rect matchRectBase;
+    bool found = vision::findTemplate(winImg, templ, matchRectBase, score, threshold);
 
     if (!found) {
         Logger::log(QString("未找到匹配区域! score=%1").arg(score));
         return nullptr;
     }
+
+    // 基准坐标转换为截图原始坐标，用于绘制结果图、HSV 校验和点击
+    cv::Rect matchRect = vision::convertBaseRectToScreen(matchRectBase, winImg.size());
 
     // HSV 颜色校验：形状匹配高分但颜色不符(同形状不同色模板)则判为未找到
     if (colorCheck && !vision::verifyHsvColorMatch(winImg, templColor, matchRect)) {
