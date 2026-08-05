@@ -52,7 +52,7 @@ QString TaskRunner::executeStep(const QJsonObject& step)
                 QString imagePath = step["imagePath"].toString();
                 const double score = step["score"].toDouble();
                 const bool randomClick = step["randomClick"].toBool();
-                const bool colorCheck = step["colorCheck"].toBool(true);
+                const bool colorCheck = step["colorCheck"].toBool(false);
                 savePath = recognizeWithRetry([&]() {
                     return actions.opencvRecognizesAndClick(imagePath, score, randomClick, colorCheck);
                 });

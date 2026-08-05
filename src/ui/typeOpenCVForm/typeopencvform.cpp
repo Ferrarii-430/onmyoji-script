@@ -23,6 +23,7 @@ TypeOpenCVForm::TypeOpenCVForm(QWidget *parent) :
     ui->stepInputLabel->hide(); // 初始状态隐藏
 
     ui->spinScoreBox->setValue(0.55);
+    ui->colorCheckCheckBox->setChecked(false); // 默认不开启颜色判断
 
     ui->opencvErrorHandle->addItem("继续执行任务","next");
     ui->opencvErrorHandle->addItem("跳转步骤","jump");
