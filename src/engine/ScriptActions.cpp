@@ -280,10 +280,10 @@ QString ScriptActions::opencvRecognizesAndClick(const QString& templPath, const 
                            matchRect.y + matchRect.height / 2);
     }
 
-    // 将物理坐标转换为逻辑坐标：除以缩放因子
-    double scaleFactor = dpiScalingFactor();
-    clickPt.x = static_cast<int>(clickPt.x / scaleFactor);
-    clickPt.y = static_cast<int>(clickPt.y / scaleFactor);
+    // clickPt 为截图坐标系坐标，由 GameWindow::mapCapturePointToClient 负责
+    // 截图坐标 -> 客户区坐标 的换算（基于实际捕获尺寸与客户区尺寸比例），
+    // 此处不应再除以 DPI 缩放因子，否则在 4k 等高 DPI 屏幕上会二次缩放，
+    // 导致点击点偏移到 ROI 框左上方。
 
     // 保存带识别框和点击位置的图片
     cv::Mat resultImg = winImg.clone();
@@ -751,12 +751,4 @@ QString ScriptActions::resolveTemplatePath(const QString& templatePath, const QS
         return templatePath;
     }
     return basePath + templatePath;
-}
-
-double ScriptActions::dpiScalingFactor()
-{
-    HDC hdc = GetDC(NULL);
-    int dpiX = GetDeviceCaps(hdc, LOGPIXELSX);
-    ReleaseDC(NULL, hdc);
-    return dpiX / 96.0; // 标准DPI为96
 }

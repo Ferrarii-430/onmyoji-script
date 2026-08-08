@@ -68,7 +68,6 @@ private:
     ScriptActions() = default;
 
     static QString resolveTemplatePath(const QString& templatePath, const QString& basePath);
-    static double dpiScalingFactor();
 
     // 命中某个 YOLO 检测框后：画框、保存调试图、回显并点击
     void clickDetection(const Detection& det, bool randomClick = true);

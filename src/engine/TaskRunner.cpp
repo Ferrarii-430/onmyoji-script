@@ -242,6 +242,7 @@ void TaskRunner::run(const QJsonArray& steps, int cycleCount)
                     }
                 } else if (identifyErrorHandle == "end") {
                     Logger::log(QString("任务结束"));
+                    break;
                 } else {
                     Logger::log(QString("未知的错误处理选项: %1，使用默认next处理").arg(identifyErrorHandle));
                     // 默认为next
