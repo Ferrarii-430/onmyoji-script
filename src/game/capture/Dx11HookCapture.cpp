@@ -19,6 +19,7 @@
 #include "src/core/Logger.h"
 #include "src/core/SettingManager.h"
 #include "src/game/capture/Dx11CaptureShared.h"
+#include "src/vision/ImageIo.h"
 
 namespace capture {
 
@@ -379,7 +380,7 @@ bool captureByDllInjection(const QString& targetPid, cv::Mat& winImg)
 
     // 回退：共享内存不可用时，若开启了持久化则尝试读取 PNG 文件。
     if (persist && QFile::exists(DX11_CAPTURE_PATH)) {
-        winImg = cv::imread(DX11_CAPTURE_PATH.toStdString());
+        winImg = vision::imreadQt(DX11_CAPTURE_PATH);
         if (!winImg.empty()) {
             Logger::log(QString("截图成功(文件回退)，图像尺寸: %1 x %2  通道数: %3")
                             .arg(winImg.cols).arg(winImg.rows).arg(winImg.channels()));

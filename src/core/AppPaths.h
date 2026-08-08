@@ -6,6 +6,12 @@
 #define APPPATHS_H
 #include <qcoreapplication.h>
 #include <QString>
+#include <QDir>
+
+#ifdef Q_OS_WIN
+#include <windows.h>
+#include <vector>
+#endif
 
 
 class AppPaths {
@@ -19,21 +25,32 @@ public:
     AppPaths(const AppPaths&) = delete;
     AppPaths& operator=(const AppPaths&) = delete;
 
+    // 获取程序目录的短路径（8.3 格式），避免中文路径在 OpenCV / 外部注入器 / OCR 工具中
+    // 因 ANSI 编码导致无法读写文件的问题。若短路径获取失败则回退到原始路径。
+    static QString applicationDirPath() {
+        QString path = QCoreApplication::applicationDirPath();
+#ifdef Q_OS_WIN
+        return toShortPath(path);
+#else
+        return path;
+#endif
+    }
+
     // 路径获取方法
     QString dx11CapturePath() const {
-        return QCoreApplication::applicationDirPath() + "/src/resource/thumbnail/debug_capture_result.png";
+        return applicationDirPath() + "/src/resource/thumbnail/debug_capture_result.png";
     }
 
     QString matchResultPath() const {
-        return QCoreApplication::applicationDirPath() + "/src/resource/thumbnail/debug_match_result.png";
+        return applicationDirPath() + "/src/resource/thumbnail/debug_match_result.png";
     }
 
     QString dx11LogPath() const {
-        return QCoreApplication::applicationDirPath() + "/src/resource/log/dx11_log.txt";
+        return applicationDirPath() + "/src/resource/log/dx11_log.txt";
     }
 
     QString dx11HookDllPath() const {
-        return QCoreApplication::applicationDirPath() + "/src/resource/hook/libdx11_hook.dll";
+        return applicationDirPath() + "/src/resource/hook/libdx11_hook.dll";
     }
 
     QString dx11HookDllName() const {
@@ -41,35 +58,35 @@ public:
     }
 
     QString remoteCaptureExePath() const {
-        return QCoreApplication::applicationDirPath() + "/remote_capture_call.exe";
+        return applicationDirPath() + "/remote_capture_call.exe";
     }
 
     QString screenshotPath() const {
-        return QCoreApplication::applicationDirPath() + "/src/resource/screenshot/";
+        return applicationDirPath() + "/src/resource/screenshot/";
     }
 
     QString thumbnailPath() const {
-        return QCoreApplication::applicationDirPath() + "/src/resource/thumbnail/";
+        return applicationDirPath() + "/src/resource/thumbnail/";
     }
 
     QString configPath() const {
-        return QCoreApplication::applicationDirPath() + "/src/resource/config.json";
+        return applicationDirPath() + "/src/resource/config.json";
     }
 
     QString rapidOCRExePath() const {
-        return QCoreApplication::applicationDirPath() + "/src/resource/RapidOCR/RapidOCR-json.exe";
+        return applicationDirPath() + "/src/resource/RapidOCR/RapidOCR-json.exe";
     }
 
     QString classesNamePath() const {
-        return QCoreApplication::applicationDirPath() + "/src/resource/classes.txt";
+        return applicationDirPath() + "/src/resource/classes.txt";
     }
 
     QString labelCatalogPath() const {
-        return QCoreApplication::applicationDirPath() + "/src/resource/yolo_label_catalog.json";
+        return applicationDirPath() + "/src/resource/yolo_label_catalog.json";
     }
 
     QString onmyojiYoloOnnxPath() const {
-        return QCoreApplication::applicationDirPath() + "/src/resource/onmyoji-yolo-v5.onnx";
+        return applicationDirPath() + "/src/resource/onmyoji-yolo-v5.onnx";
     }
 
     QString rapidOCRDetPathV4() const {
@@ -89,12 +106,27 @@ public:
     }
 
     QString rapidOCRModelsPath() const {
-        return QCoreApplication::applicationDirPath() + "/src/resource/RapidOCR/models/";
+        return applicationDirPath() + "/src/resource/RapidOCR/models/";
     }
 
 private:
     AppPaths() = default;
     ~AppPaths() = default;
+
+#ifdef Q_OS_WIN
+    static QString toShortPath(const QString& path) {
+        const wchar_t* wPath = reinterpret_cast<const wchar_t*>(path.utf16());
+        const DWORD len = GetShortPathNameW(wPath, nullptr, 0);
+        if (len == 0) {
+            return path;
+        }
+        std::vector<wchar_t> buffer(len);
+        if (GetShortPathNameW(wPath, buffer.data(), len) == 0) {
+            return path;
+        }
+        return QString::fromWCharArray(buffer.data());
+    }
+#endif
 };
 
 

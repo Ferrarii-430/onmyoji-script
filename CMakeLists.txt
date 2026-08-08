@@ -82,6 +82,7 @@ add_executable(qtTest WIN32
         src/vision/DetectionCatalog.h
         src/vision/Geometry.cpp
         src/vision/Geometry.h
+        src/vision/ImageIo.h
         src/vision/OcrEngine.cpp
         src/vision/OcrEngine.h
         src/vision/TemplateMatcher.cpp

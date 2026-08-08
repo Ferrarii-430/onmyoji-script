@@ -20,6 +20,7 @@
 #include "src/game/capture/CaptureService.h"
 #include "src/vision/ClassNameCache.h"
 #include "src/vision/Geometry.h"
+#include "src/vision/ImageIo.h"
 #include "src/vision/OcrEngine.h"
 #include "src/vision/TemplateMatcher.h"
 
@@ -60,7 +61,7 @@ CachedTemplateWithMask loadTemplateWithMask(const QString& templatePath, bool& c
     }
 
     cacheHit = false;
-    cv::Mat src = cv::imread(templatePath.toStdString(), cv::IMREAD_UNCHANGED);
+    cv::Mat src = vision::imreadQt(templatePath, cv::IMREAD_UNCHANGED);
     if (src.empty()) {
         return CachedTemplateWithMask{};
     }
@@ -100,7 +101,7 @@ cv::Mat loadTemplateColor(const QString& templatePath, bool& cacheHit)
     }
 
     cacheHit = false;
-    cv::Mat image = cv::imread(templatePath.toStdString(), cv::IMREAD_COLOR);
+    cv::Mat image = vision::imreadQt(templatePath, cv::IMREAD_COLOR);
     if (image.empty()) {
         return image;
     }
@@ -155,7 +156,7 @@ cv::Rect computeOcrRoi(const cv::Mat& winImg, const QRectF& roiPercent,
         dir.mkpath(".");
     }
     ocrImagePath = saveDir + "ocr_roi_capture.png";
-    cv::imwrite(ocrImagePath.toStdString(), winImg(roiRect));
+    vision::imwriteQt(ocrImagePath, winImg(roiRect));
     Logger::log(QString("OCR识别区域: 百分比(%1%,%2%,%3%,%4%) -> 像素(%5,%6,%7x%8)")
                     .arg(roiPercent.x()).arg(roiPercent.y())
                     .arg(roiPercent.width()).arg(roiPercent.height())
@@ -291,7 +292,7 @@ QString ScriptActions::opencvRecognizesAndClick(const QString& templPath, const 
     drawClickMarker(resultImg, clickPt);
 
     QString savePath = AppPaths::instance().matchResultPath();
-    cv::imwrite(savePath.toStdString(), resultImg);
+    vision::imwriteQt(savePath, resultImg);
 
     Logger::log(QString("转换后点击点: (%1, %2)").arg(clickPt.x).arg(clickPt.y));
     GameWindow::instance().clickInWindow(clickPt);
@@ -406,7 +407,7 @@ QString ScriptActions::ocrClickMatchedItem(const cv::Mat& winImg, const QJsonObj
     }
 
     QString savePath = AppPaths::instance().matchResultPath();
-    cv::imwrite(savePath.toStdString(), resultImg);
+    vision::imwriteQt(savePath, resultImg);
 
     GameWindow::instance().clickInWindow(clickPt);
     processAndShowImage(savePath);
@@ -582,7 +583,7 @@ QString ScriptActions::yoloRecognizesAndClick(const double threshold, const bool
     }
 
     QString savePath = AppPaths::instance().matchResultPath();
-    cv::imwrite(savePath.toStdString(), captureImg);
+    vision::imwriteQt(savePath, captureImg);
     processAndShowImage(savePath);
 
     if (matchRect.empty())
@@ -625,15 +626,15 @@ std::vector<Detection> ScriptActions::yoloRecognizes(const double threshold, dou
     }
 
     // 输出识别结果日志（置信度阈值=threshold，低于该分数的已在检测阶段过滤）
-    Logger::log(QString("YOLO 识别完成：共 %1 个目标（置信度阈值=%2）")
-                    .arg(final_detections.size())
-                    .arg(threshold, 0, 'f', 2));
+    // Logger::log(QString("YOLO 识别完成：共 %1 个目标（置信度阈值=%2）")
+    //                 .arg(final_detections.size())
+    //                 .arg(threshold, 0, 'f', 2));
     for (const auto& det : final_detections) {
-        Logger::log(QString("  - %1  置信度=%2  位置=[%3,%4,%5x%6]")
-                        .arg(det.className)
-                        .arg(det.confidence, 0, 'f', 4)
-                        .arg(det.bbox.x).arg(det.bbox.y)
-                        .arg(det.bbox.width).arg(det.bbox.height));
+        // Logger::log(QString("  - %1  置信度=%2  位置=[%3,%4,%5x%6]")
+        //                 .arg(det.className)
+        //                 .arg(det.confidence, 0, 'f', 4)
+        //                 .arg(det.bbox.x).arg(det.bbox.y)
+        //                 .arg(det.bbox.width).arg(det.bbox.height));
     }
 
     // 如果指定了排除区域，也在图像上标记出来（蓝色矩形）
@@ -647,7 +648,7 @@ std::vector<Detection> ScriptActions::yoloRecognizes(const double threshold, dou
     }
 
     QString savePath = AppPaths::instance().matchResultPath();
-    cv::imwrite(savePath.toStdString(), captureImg);
+    vision::imwriteQt(savePath, captureImg);
     processAndShowImage(savePath);
 
     return final_detections;
@@ -700,7 +701,7 @@ void ScriptActions::clickDetection(const Detection& det, bool randomClick)
 
     QString capturePath = AppPaths::instance().dx11CapturePath();
     QString matchPath = AppPaths::instance().matchResultPath();
-    cv::Mat captureImg = cv::imread(capturePath.toStdString());
+    cv::Mat captureImg = vision::imreadQt(capturePath);
     QString labelName = ClassNameCache::getClassName(det.class_id);
     if (!captureImg.empty()) {
         cv::rectangle(captureImg, det.bbox, cv::Scalar(0, 255, 0), 2);
@@ -708,7 +709,7 @@ void ScriptActions::clickDetection(const Detection& det, bool randomClick)
         cv::putText(captureImg, label, cv::Point(det.bbox.x, det.bbox.y - 10),
                    cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 0), 1);
         drawClickMarker(captureImg, physicalClickPt);
-        cv::imwrite(matchPath.toStdString(), captureImg);
+        vision::imwriteQt(matchPath, captureImg);
         processAndShowImage(matchPath);
     } else {
         Logger::log(QString("共享内存截图缺失，跳过调试图保存"));

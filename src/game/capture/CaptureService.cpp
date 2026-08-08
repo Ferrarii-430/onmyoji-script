@@ -3,6 +3,7 @@
 #include <opencv2/imgcodecs.hpp>
 
 #include "src/core/AppPaths.h"
+#include "src/vision/ImageIo.h"
 #include "src/core/Logger.h"
 #include "src/core/SettingManager.h"
 #include "src/game/GameWindow.h"
@@ -44,7 +45,7 @@ cv::Mat captureGameWindow()
     // 持久化开关开启时才保存 debug 图片
     if (SETTING_CONFIG.getPersistScreenshot()) {
         QString saveCapturePath = AppPaths::instance().thumbnailPath() + "/debug_capture_result.png";
-        cv::imwrite(saveCapturePath.toStdString(), winImg);
+        vision::imwriteQt(saveCapturePath, winImg);
     }
 
     window.setLastCaptureSize(winImg.size());

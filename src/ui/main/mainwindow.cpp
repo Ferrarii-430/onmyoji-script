@@ -34,6 +34,7 @@
 #include "src/ui/editTask/edittaskdialog.h"
 #include "src/ui/setting/settingdialog.h"
 #include "src/vision/ClassNameCache.h"
+#include "src/vision/ImageIo.h"
 #include "src/vision/YOLODetector.h"
 
 mainwindow::mainwindow(QWidget *parent) :
@@ -631,7 +632,7 @@ void mainwindow::showOpenCVIdentifyImage(const QString& savePath) const
     }
 
     // 用 OpenCV 读取图像
-    cv::Mat img = cv::imread(savePath.toStdString());
+    cv::Mat img = vision::imreadQt(savePath);
     if (img.empty()) {
         qWarning() << "[ERROR] 无法加载图片:" << savePath;
         ui->openCVIdentifyLabel->clear();
