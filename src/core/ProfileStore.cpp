@@ -268,6 +268,22 @@ QJsonArray getSystemConfig(const QString &configId)
     return QJsonArray();
 }
 
+// 读取某方案顶层 tip 字段(方案功能使用说明)，无则返回空字符串
+QString getSystemTip(const QString &configId)
+{
+    const QString target = cleanString(configId);
+    for (const QJsonValue &val : m_configArray) {
+        if (!val.isObject()) {
+            continue;
+        }
+        QJsonObject obj = val.toObject();
+        if (cleanString(obj["id"].toString()).compare(target, Qt::CaseInsensitive) == 0) {
+            return obj.value("tip").toString();
+        }
+    }
+    return QString();
+}
+
 // 按 key 读取某方案的配置值(只取 value)，找不到返回 defaultValue
 QJsonValue getSystemConfigValue(const QString &configId, const QString &key,
                                 const QJsonValue &defaultValue)

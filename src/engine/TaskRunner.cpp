@@ -240,9 +240,6 @@ void TaskRunner::run(const QJsonArray& steps, int cycleCount)
                         Logger::log(QString("识别失败，重试次数用尽，继续下一个步骤"));
                         // 默认为next
                     }
-                } else if (identifyErrorHandle == "end") {
-                    Logger::log(QString("任务结束"));
-                    break;
                 } else {
                     Logger::log(QString("未知的错误处理选项: %1，使用默认next处理").arg(identifyErrorHandle));
                     // 默认为next

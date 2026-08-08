@@ -7,6 +7,7 @@
 #include "settingdialog.h"
 
 #include <QDir>
+#include <QLabel>
 #include <QMessageBox>
 
 #include "src/core/Logger.h"
@@ -19,6 +20,16 @@ SettingDialog::SettingDialog(QWidget *parent) :
     ui->setupUi(this);
 
     initSetting();
+
+    // GitHub 项目指引链接，点击用默认浏览器打开
+    auto *githubLink = new QLabel(this);
+    githubLink->setText("<a href=\"https://github.com/Ferrarii-430/onmyoji-script\" "
+                        "style=\"color:#5b6cf0; text-decoration:none;\">GitHub 项目地址</a>");
+    githubLink->setOpenExternalLinks(true);
+    githubLink->setCursor(Qt::PointingHandCursor);
+    githubLink->setToolTip("点击在浏览器中打开项目主页");
+    githubLink->setGeometry(120, 210, 171, 20);
+    githubLink->setAlignment(Qt::AlignCenter);
 
     // 连接信号槽
     connect(ui->btnSave, &QToolButton::clicked, this, &SettingDialog::onSaveClicked);
@@ -47,7 +58,7 @@ void SettingDialog::initSetting() const
 
     ui->mouseClickMode->addItem("PostMessage", "PostMessage");
     ui->mouseClickMode->addItem("InputMouse", "InputMouse");
-    ui->mouseClickMode->addItem("Hook注入(后台)", "Hook");
+    ui->mouseClickMode->addItem("Hook点击", "Hook");
 
     //初始化值
     ui->mouseControlMode->setCurrentText(SETTING_CONFIG.getMouseControlMode());

@@ -2,44 +2,26 @@
   {
     "id": "DC42C888-2449-41D2-A894-095606E38D12",
     "name": "空的配置",
-    "steps": [
-      {
-        "identifyErrorHandle": "next",
-        "imagePath": "battle_end.png",
-        "jumpStepsId": null,
-        "ocrRoiH": null,
-        "ocrRoiW": null,
-        "ocrRoiX": null,
-        "ocrRoiY": null,
-        "ocrText": null,
-        "offsetTime": null,
-        "randomClick": false,
-        "randomWait": null,
-        "score": 0.6,
-        "stepsId": "941ad4c7-2181-4a2c-93f5-15e20fbe5ea5",
-        "taskName": "识别奖励",
-        "time": null,
-        "type": "OPENCV",
-        "yoloLabel": null
-      }
-    ],
+    "steps": [],
     "type": "normal"
   },
   {
     "id": "D942C888-2449-41D2-A794-055586E39P13",
     "name": "系统方案-结界突破",
     "type": "system",
+    "tip": "自动循环执行结界突破，识别并攻击可突破的结界，突破完成后自动返回继续下一轮。",
     "systemConfig": [
       {
         "key": "retentionLevel",
         "label": "保留当前等级(退4)",
         "control": "switch",
-        "value": true
+        "value": true,
+        "tip": "开启后达到当前等级上限时退4次以保留等级，避免升级；关闭则正常突破升层。"
       }
     ],
     "steps": [
       {
-        "identifyErrorHandle": "end",
+        "identifyErrorHandle": "break",
         "imagePath": null,
         "jumpStepsId": null,
         "ocrText": null,
@@ -58,17 +40,19 @@
     "id": "A1B2C3D4-2449-41D2-A794-055586E3ARENA",
     "name": "系统方案-自动挂机斗技",
     "type": "system",
+    "tip": "自动挂机斗技，匹配对手并自动战斗，适合刷取每日信誉值。",
     "systemConfig": [
       {
         "key": "automaticStop",
         "label": "刷满信誉值自动停止",
         "control": "switch",
-        "value": true
+        "value": true,
+        "tip": "信誉值刷满当日上限后自动停止挂机，避免无效战斗。"
       }
     ],
     "steps": [
       {
-        "identifyErrorHandle": "end",
+        "identifyErrorHandle": "break",
         "imagePath": null,
         "jumpStepsId": null,
         "ocrText": null,
@@ -87,17 +71,19 @@
     "id": "D942C666-2449-41P2-A484-044486E39P13",
     "name": "系统方案-自动御魂",
     "type": "system",
+    "tip": "自动循环刷御魂副本，支持单人或组队模式。组队模式下自动识别队长/队友身份并执行对应流程。",
     "systemConfig": [
       {
         "key": "teamPlay",
         "label": "组队模式",
         "control": "switch",
-        "value": true
+        "value": true,
+        "tip": "开启后需两人组队。组队模式建议在 组队/战斗界面开启功能。"
       }
     ],
     "steps": [
       {
-        "identifyErrorHandle": "end",
+        "identifyErrorHandle": "break",
         "imagePath": null,
         "jumpStepsId": null,
         "ocrText": null,
@@ -111,59 +97,5 @@
         "type": "SYSTEM_MITAMA"
       }
     ]
-  },
-  {
-    "id": "890d8508-27ba-4d0f-bff3-42ad52c66d0e",
-    "name": "测试active",
-    "steps": [
-      {
-        "identifyErrorHandle": "next",
-        "imagePath": "challenge-btn-active.png",
-        "jumpStepsId": null,
-        "colorCheck": true,
-        "ocrRoiH": null,
-        "ocrRoiW": null,
-        "ocrRoiX": null,
-        "ocrRoiY": null,
-        "ocrText": null,
-        "offsetTime": null,
-        "randomClick": false,
-        "randomWait": null,
-        "score": 0.55,
-        "stepsId": "ff6g85f8-ffa7-464d-b2e9-d8507b34a473",
-        "taskName": "测试颜色识别",
-        "time": null,
-        "type": "OPENCV",
-        "yoloLabel": null
-      }
-    ],
-    "type": "normal"
-  },
-  {
-    "id": "9895eab9-0603-4d3f-acbb-dcc2f1f21357",
-    "name": "测试opencv",
-    "steps": [
-      {
-        "identifyErrorHandle": "next",
-        "imagePath": "challenge-btn.png",
-        "jumpStepsId": null,
-        "colorCheck": false,
-        "ocrRoiH": null,
-        "ocrRoiW": null,
-        "ocrRoiX": null,
-        "ocrRoiY": null,
-        "ocrText": null,
-        "offsetTime": null,
-        "randomClick": false,
-        "randomWait": null,
-        "score": 0.55,
-        "stepsId": "63f0766e-f20c-4108-b160-e65ed80e8ed0",
-        "taskName": "测试颜色识别2",
-        "time": null,
-        "type": "OPENCV",
-        "yoloLabel": null
-      }
-    ],
-    "type": "normal"
   }
 ]

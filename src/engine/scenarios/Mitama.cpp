@@ -264,13 +264,23 @@ namespace scenarios
                     } else
                     {
                         // 2. 第一次会退到主界面等待邀请
-                        // 循环等待队长发送邀请
-                        QString savePath = actions.opencvRecognizesAndClick(screenshotPath + "turn-on-auto.png", 0.8, false);
-                        if (!savePath.isEmpty())
+                        // 优先扫描 turn-on-auto.png（开启自动入队），命中则点击并开启自动模式；
+                        // 未命中再扫描 accept_invitation.png（单次接受邀请）。
+                        // 只有 turn-on-auto.png 才会开启 autoSendRequestEnable。
+                        QString savePathAuto = actions.opencvRecognizesAndClick(screenshotPath + "turn-on-auto.png", 0.8, false);
+                        if (!savePathAuto.isEmpty())
                         {
                             autoSendRequestEnable = true;
                             teamIsError = false;
                             Logger::log(QString("自动入队已开启"));
+                            break;
+                        }
+
+                        QString savePathAccept = actions.opencvRecognizesAndClick(screenshotPath + "accept_invitation.png", 0.8, false);
+                        if (!savePathAccept.isEmpty())
+                        {
+                            teamIsError = false;
+                            Logger::log(QString("已接受组队邀请"));
                             break;
                         }
                     }

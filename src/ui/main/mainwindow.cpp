@@ -21,6 +21,7 @@
 #include <QFormLayout>
 #include <QLabel>
 #include <QSpinBox>
+#include <QVBoxLayout>
 #include "QMessageBox"
 
 #include "src/core/AppPaths.h"
@@ -262,6 +263,17 @@ void mainwindow::showSystemConfigForm(const QString &configId)
     title->setStyleSheet("font-weight: bold; font-size: 12pt; color: #333; padding-bottom: 4px;");
     form->addRow(title);
 
+    // 方案级 tip：整个方案的功能使用说明，显示在标题下方
+    const QString systemTip = getSystemTip(configId);
+    if (!systemTip.isEmpty()) {
+        auto *tipLabel = new QLabel(systemTip, m_systemConfigForm);
+        tipLabel->setWordWrap(true);
+        tipLabel->setStyleSheet(
+            "color: #6b7280; font-size: 9pt; background-color: #eef2f7;"
+            "border: 1px solid #d0d7e2; border-radius: 6px; padding: 8px;");
+        form->addRow(tipLabel);
+    }
+
     const QString configPath = AppPaths::instance().configPath();
 
     for (const QJsonValue &val : systemConfig) {
@@ -269,46 +281,63 @@ void mainwindow::showSystemConfigForm(const QString &configId)
         const QString key = field["key"].toString();
         const QString label = field["label"].toString();
         const QString control = field["control"].toString();
+        const QString itemTip = field.value("tip").toString();
+
+        // 每个配置项用一个垂直容器承载「控件 + 可选 tip 提示」，便于统一加入表单
+        auto *fieldWidget = new QWidget(m_systemConfigForm);
+        auto *fieldLayout = new QVBoxLayout(fieldWidget);
+        fieldLayout->setContentsMargins(0, 0, 0, 0);
+        fieldLayout->setSpacing(4);
 
         if (control == "number") {
             if (field.value("decimals").toInt(0) <= 0) {
                 // 整数：QSpinBox
-                auto *spin = new QSpinBox(m_systemConfigForm);
+                auto *spin = new QSpinBox(fieldWidget);
                 spin->setRange(field.value("min").toInt(0), field.value("max").toInt(100));
                 spin->setSingleStep(field.value("step").toInt(1));
                 spin->setValue(field.value("value").toInt());
                 connect(spin, qOverload<int>(&QSpinBox::valueChanged), this,
                         [=](int v) { updateSystemConfigValue(configPath, configId, key, v); });
-                form->addRow(label, spin);
+                fieldLayout->addWidget(spin);
             } else {
                 // 小数：QDoubleSpinBox
-                auto *spin = new QDoubleSpinBox(m_systemConfigForm);
+                auto *spin = new QDoubleSpinBox(fieldWidget);
                 spin->setDecimals(field.value("decimals").toInt(2));
                 spin->setRange(field.value("min").toDouble(0.0), field.value("max").toDouble(1.0));
                 spin->setSingleStep(field.value("step").toDouble(0.1));
                 spin->setValue(field.value("value").toDouble());
                 connect(spin, qOverload<double>(&QDoubleSpinBox::valueChanged), this,
                         [=](double v) { updateSystemConfigValue(configPath, configId, key, v); });
-                form->addRow(label, spin);
+                fieldLayout->addWidget(spin);
             }
         } else if (control == "switch") {
             // 开关：QCheckBox
-            auto *check = new QCheckBox(m_systemConfigForm);
+            auto *check = new QCheckBox(fieldWidget);
             check->setChecked(field.value("value").toBool());
             connect(check, &QCheckBox::toggled, this,
                     [=](bool v) { updateSystemConfigValue(configPath, configId, key, v); });
-            form->addRow(label, check);
+            fieldLayout->addWidget(check);
         } else if (control == "select") {
             // 下拉：QComboBox
-            auto *combo = new QComboBox(m_systemConfigForm);
+            auto *combo = new QComboBox(fieldWidget);
             for (const QJsonValue &opt : field.value("options").toArray()) {
                 combo->addItem(opt.toString());
             }
             combo->setCurrentText(field.value("value").toString());
             connect(combo, &QComboBox::currentTextChanged, this,
                     [=](const QString &v) { updateSystemConfigValue(configPath, configId, key, v); });
-            form->addRow(label, combo);
+            fieldLayout->addWidget(combo);
         }
+
+        // 配置项级 tip：单个选项的解释说明，显示在控件下方
+        if (!itemTip.isEmpty()) {
+            auto *itemTipLabel = new QLabel(itemTip, fieldWidget);
+            itemTipLabel->setWordWrap(true);
+            itemTipLabel->setStyleSheet("color: #9ca3af; font-size: 8pt;");
+            fieldLayout->addWidget(itemTipLabel);
+        }
+
+        form->addRow(label, fieldWidget);
     }
 
     m_systemConfigForm->show();
@@ -321,6 +350,7 @@ void mainwindow::showStepsInTable(const QJsonArray &steps) {
     if (m_systemConfigForm) {
         m_systemConfigForm->hide();
     }
+    ui->tableWidget->raise();
     ui->tableWidget->clear(); // 清空表格
     ui->tableWidget->setRowCount(steps.size());
     ui->tableWidget->setColumnCount(5); // 新增序号列

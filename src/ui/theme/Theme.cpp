@@ -169,6 +169,9 @@ QListWidget::item:selected, QTableWidget::item:selected {
     background-color: #5b6cf0;
     color: #ffffff;
 }
+QHeaderView {
+    background: transparent;
+}
 QHeaderView::section {
     background-color: #eceef4;
     color: #4a4d57;
