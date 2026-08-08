@@ -1,5 +1,6 @@
 #include "src/vision/OcrEngine.h"
 
+#include <QCoreApplication>
 #include <QDebug>
 #include <QDir>
 #include <QFile>
@@ -7,6 +8,7 @@
 #include <QJsonDocument>
 #include <QJsonParseError>
 #include <QProcess>
+#include <QProcessEnvironment>
 
 #include "src/core/AppPaths.h"
 
@@ -88,14 +90,24 @@ QJsonObject runRapidOCR(const QString& imagePath)
     }
 
     QProcess process;
+    process.setWorkingDirectory(QFileInfo(rapidOCRExe).absolutePath());
+
+    // 让 RapidOCR-json.exe 能找到主程序目录下的 onnxruntime.dll 等依赖
+    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    QString currentPath = env.value("PATH");
+    env.insert("PATH", QCoreApplication::applicationDirPath() + ";" + currentPath);
+    process.setProcessEnvironment(env);
+
     QStringList arguments;
     arguments << ("--image_path=" + DX11_CAPTURE_PATH);
     arguments << ("--models=" + rapidOCRModelsPath);
     arguments << ("--det=" + rapidOCRDetPath);
     arguments << ("--cls=" + rapidOCRClsPath);
     arguments << ("--rec=" + rapidOCRRecPath);
+    arguments << ("--keys=" + AppPaths::instance().rapidOCRKeysPath());
 
     qDebug() << "执行ocr识别命令:" << rapidOCRExe << arguments;
+    qDebug() << "ocr工作目录:" << QFileInfo(rapidOCRExe).absolutePath();
 
     process.start(rapidOCRExe, arguments);
 
@@ -108,6 +120,12 @@ QJsonObject runRapidOCR(const QString& imagePath)
     int exitCode = process.exitCode();
     QByteArray output = process.readAllStandardOutput();
     QByteArray errorOutput = process.readAllStandardError();
+
+    qDebug() << "ocr退出码:" << exitCode;
+    qDebug() << "ocr标准输出:" << output;
+    if (!errorOutput.isEmpty()) {
+        qDebug() << "ocr错误输出:" << errorOutput;
+    }
 
     if (exitCode != 0) {
         qWarning() << "ocr识别命令执行失败，退出码:" << exitCode;

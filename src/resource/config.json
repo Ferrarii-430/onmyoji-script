@@ -21,7 +21,7 @@
     ],
     "steps": [
       {
-        "identifyErrorHandle": "break",
+        "identifyErrorHandle": "end",
         "imagePath": null,
         "jumpStepsId": null,
         "ocrText": null,
@@ -52,7 +52,7 @@
     ],
     "steps": [
       {
-        "identifyErrorHandle": "break",
+        "identifyErrorHandle": "end",
         "imagePath": null,
         "jumpStepsId": null,
         "ocrText": null,
@@ -83,7 +83,7 @@
     ],
     "steps": [
       {
-        "identifyErrorHandle": "break",
+        "identifyErrorHandle": "end",
         "imagePath": null,
         "jumpStepsId": null,
         "ocrText": null,

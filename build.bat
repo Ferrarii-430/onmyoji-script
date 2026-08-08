@@ -210,6 +210,10 @@ if exist "%CMAKE_BUILD_DIR%\onnxruntime.dll" (
 ) else (
     echo [警告] 未找到 onnxruntime.dll
 )
+REM 同时把 onnxruntime.dll 放到 RapidOCR-json.exe 同目录，避免子进程找不到依赖
+if exist "%BUILD_OUT%\onnxruntime.dll" (
+    copy /y "%BUILD_OUT%\onnxruntime.dll" "%BUILD_OUT%\src\resource\RapidOCR\onnxruntime.dll" >nul
+)
 
 REM ---------- 5. 复制 remote_capture_call.exe ----------
 echo [步骤 5/7] 复制 remote_capture_call.exe
