@@ -126,10 +126,13 @@ void drawClickMarker(cv::Mat& img, const cv::Point& clickPt)
 // 按百分比(0~100)计算 OCR 识别区域并在需要裁剪时保存裁剪图。
 // 返回换算回全图坐标所需的 roiRect（未裁剪时为整张图，原点为 0）。
 // roiPercent 宽/高<=0、区域无效、或区域即整张图时识别整张图并令 ocrImagePath 为空。
+// outScale 输出裁剪图送入 OCR 前的放大倍数（坐标还原需除以该值）；未裁剪时为 1.0。
+// 小裁剪图最小边不足时按比例放大，避免文字像素过少导致检测网络漏检。
 cv::Rect computeOcrRoi(const cv::Mat& winImg, const QRectF& roiPercent,
-                       const QString& saveDir, QString& ocrImagePath)
+                       const QString& saveDir, QString& ocrImagePath, double& outScale)
 {
     ocrImagePath.clear();
+    outScale = 1.0;
     const cv::Rect fullRect(0, 0, winImg.cols, winImg.rows);
     if (roiPercent.width() <= 0.0 || roiPercent.height() <= 0.0) {
         return fullRect;
@@ -156,12 +159,31 @@ cv::Rect computeOcrRoi(const cv::Mat& winImg, const QRectF& roiPercent,
         dir.mkpath(".");
     }
     ocrImagePath = saveDir + "ocr_roi_capture.png";
-    vision::imwriteQt(ocrImagePath, winImg(roiRect));
-    Logger::log(QString("OCR识别区域: 百分比(%1%,%2%,%3%,%4%) -> 像素(%5,%6,%7x%8)")
-                    .arg(roiPercent.x()).arg(roiPercent.y())
-                    .arg(roiPercent.width()).arg(roiPercent.height())
-                    .arg(roiRect.x).arg(roiRect.y)
-                    .arg(roiRect.width).arg(roiRect.height));
+
+    // 裁剪图最小边低于阈值时等比放大，保证文字像素高度落入检测网络友好区间
+    constexpr int MIN_OCR_SIDE = 320;
+    const int minSide = std::min(roiRect.width, roiRect.height);
+    cv::Mat roiImg = winImg(roiRect);
+    if (minSide < MIN_OCR_SIDE) {
+        outScale = static_cast<double>(MIN_OCR_SIDE) / minSide;
+        cv::Mat scaledImg;
+        cv::resize(roiImg, scaledImg, cv::Size(),
+                   outScale, outScale, cv::INTER_CUBIC);
+        vision::imwriteQt(ocrImagePath, scaledImg);
+        Logger::log(QString("OCR识别区域: 百分比(%1%,%2%,%3%,%4%) -> 像素(%5,%6,%7x%8) 放大%9倍")
+                        .arg(roiPercent.x()).arg(roiPercent.y())
+                        .arg(roiPercent.width()).arg(roiPercent.height())
+                        .arg(roiRect.x).arg(roiRect.y)
+                        .arg(roiRect.width).arg(roiRect.height)
+                        .arg(outScale, 0, 'f', 2));
+    } else {
+        vision::imwriteQt(ocrImagePath, roiImg);
+        Logger::log(QString("OCR识别区域: 百分比(%1%,%2%,%3%,%4%) -> 像素(%5,%6,%7x%8)")
+                        .arg(roiPercent.x()).arg(roiPercent.y())
+                        .arg(roiPercent.width()).arg(roiPercent.height())
+                        .arg(roiRect.x).arg(roiRect.y)
+                        .arg(roiRect.width).arg(roiRect.height));
+    }
     return roiRect;
 }
 
@@ -313,10 +335,12 @@ QJsonArray ScriptActions::ocrRecognizes(const QRectF& roiPercent)
     const QString saveDir = AppPaths::instance().thumbnailPath();
 
     QString ocrImagePath;
-    const cv::Rect roiRect = computeOcrRoi(winImg, roiPercent, saveDir, ocrImagePath);
+    double roiScale = 1.0;
+    const cv::Rect roiRect = computeOcrRoi(winImg, roiPercent, saveDir, ocrImagePath, roiScale);
     const bool useRoi = !ocrImagePath.isEmpty();
 
-    QJsonObject result = vision::runRapidOCR(ocrImagePath);
+    // 裁剪模式增大 padding，给检测网络更多边缘上下文
+    QJsonObject result = vision::runRapidOCR(ocrImagePath, useRoi ? 200 : 50);
     QJsonArray dataArray = result["data"].toArray();
 
     if (useRoi) {
@@ -336,8 +360,9 @@ QJsonArray ScriptActions::ocrRecognizes(const QRectF& roiPercent)
                 }
 
                 QJsonArray adjustedPoint;
-                adjustedPoint.append(point[0].toInt() + roiRect.x);
-                adjustedPoint.append(point[1].toInt() + roiRect.y);
+                // OCR 坐标基于放大后的裁剪图，先除以 roiScale 还原裁剪图原始像素，再加 roiRect 偏移
+                adjustedPoint.append(static_cast<int>(point[0].toInt() / roiScale) + roiRect.x);
+                adjustedPoint.append(static_cast<int>(point[1].toInt() / roiScale) + roiRect.y);
                 for (int j = 2; j < point.size(); ++j) {
                     adjustedPoint.append(point[j]);
                 }
@@ -353,7 +378,8 @@ QJsonArray ScriptActions::ocrRecognizes(const QRectF& roiPercent)
 }
 
 QString ScriptActions::ocrClickMatchedItem(const cv::Mat& winImg, const QJsonObject& item, const cv::Rect& roiRect,
-                                           const bool useRoi, const bool randomClick, const QString& saveDir)
+                                           const bool useRoi, const double roiScale,
+                                           const bool randomClick, const QString& saveDir)
 {
     QJsonArray box = item["box"].toArray();
     if (box.size() != 4) {
@@ -367,14 +393,15 @@ QString ScriptActions::ocrClickMatchedItem(const cv::Mat& winImg, const QJsonObj
     QJsonArray point3 = box[2].toArray();
     QJsonArray point4 = box[3].toArray();
 
-    int x1 = point1[0].toInt();
-    int y1 = point1[1].toInt();
-    int x2 = point2[0].toInt();
-    int y2 = point2[1].toInt();
-    int x3 = point3[0].toInt();
-    int y3 = point3[1].toInt();
-    int x4 = point4[0].toInt();
-    int y4 = point4[1].toInt();
+    // OCR 坐标基于（可能放大后的）裁剪图，需先除以 roiScale 还原到裁剪图原始像素，再加 roiRect 偏移
+    int x1 = static_cast<int>(point1[0].toInt() / roiScale);
+    int y1 = static_cast<int>(point1[1].toInt() / roiScale);
+    int x2 = static_cast<int>(point2[0].toInt() / roiScale);
+    int y2 = static_cast<int>(point2[1].toInt() / roiScale);
+    int x3 = static_cast<int>(point3[0].toInt() / roiScale);
+    int y3 = static_cast<int>(point3[1].toInt() / roiScale);
+    int x4 = static_cast<int>(point4[0].toInt() / roiScale);
+    int y4 = static_cast<int>(point4[1].toInt() / roiScale);
 
     // 计算矩形的最小外接矩形
     int minX = std::min({x1, x2, x3, x4});
@@ -428,10 +455,12 @@ QString ScriptActions::ocrRecognizesAndClick(const QString& ocrText, const doubl
     const QString saveDir = AppPaths::instance().thumbnailPath();
 
     QString ocrImagePath;
-    const cv::Rect roiRect = computeOcrRoi(winImg, roiPercent, saveDir, ocrImagePath);
+    double roiScale = 1.0;
+    const cv::Rect roiRect = computeOcrRoi(winImg, roiPercent, saveDir, ocrImagePath, roiScale);
     const bool useRoi = !ocrImagePath.isEmpty();
 
-    QJsonObject result = vision::runRapidOCR(ocrImagePath);
+    // 裁剪模式增大 padding，给检测网络更多边缘上下文
+    QJsonObject result = vision::runRapidOCR(ocrImagePath, useRoi ? 200 : 50);
     QString savePath;
 
     if (!result.isEmpty()) {
@@ -447,7 +476,7 @@ QString ScriptActions::ocrRecognizesAndClick(const QString& ocrText, const doubl
                 hasOcrText = true;
                 if (score >= threshold)
                 {
-                    savePath = ocrClickMatchedItem(winImg, item, roiRect, useRoi, randomClick, saveDir);
+                    savePath = ocrClickMatchedItem(winImg, item, roiRect, useRoi, roiScale, randomClick, saveDir);
                     if (!savePath.isEmpty()) {
                         break;
                     }
@@ -481,11 +510,13 @@ QString ScriptActions::ocrRecognizesAndClickAny(const QStringList& ocrTexts, con
     const QString saveDir = AppPaths::instance().thumbnailPath();
 
     QString ocrImagePath;
-    const cv::Rect roiRect = computeOcrRoi(winImg, roiPercent, saveDir, ocrImagePath);
+    double roiScale = 1.0;
+    const cv::Rect roiRect = computeOcrRoi(winImg, roiPercent, saveDir, ocrImagePath, roiScale);
     const bool useRoi = !ocrImagePath.isEmpty();
 
     // 只做一次 OCR，多个文字按填入顺序作为优先级，命中首个即点击并返回命中的文字
-    QJsonObject result = vision::runRapidOCR(ocrImagePath);
+    // 裁剪模式增大 padding，给检测网络更多边缘上下文
+    QJsonObject result = vision::runRapidOCR(ocrImagePath, useRoi ? 200 : 50);
     if (result.isEmpty()) {
         return QString();
     }
@@ -502,7 +533,7 @@ QString ScriptActions::ocrRecognizesAndClickAny(const QStringList& ocrTexts, con
                 Logger::log(QString("[OCR] 已识别到:" + item["text"].toString() + " 但分数过低"));
                 continue;
             }
-            if (!ocrClickMatchedItem(winImg, item, roiRect, useRoi, randomClick, saveDir).isEmpty()) {
+            if (!ocrClickMatchedItem(winImg, item, roiRect, useRoi, roiScale, randomClick, saveDir).isEmpty()) {
                 return ocrText;
             }
         }

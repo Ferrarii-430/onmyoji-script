@@ -72,8 +72,9 @@ private:
     // 命中某个 YOLO 检测框后：画框、保存调试图、回显并点击
     void clickDetection(const Detection& det, bool randomClick = true);
     // 命中某条 OCR 文字后：换算坐标、画框、保存调试图、回显并点击，返回结果图路径
+    // roiScale 为裁剪图送入 OCR 前的放大倍数，用于把 OCR 坐标还原回裁剪图原始像素
     QString ocrClickMatchedItem(const cv::Mat& winImg, const QJsonObject& item, const cv::Rect& roiRect,
-                                bool useRoi, bool randomClick, const QString& saveDir);
+                                bool useRoi, double roiScale, bool randomClick, const QString& saveDir);
 };
 
 #endif // SCRIPTACTIONS_H
