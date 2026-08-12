@@ -26,6 +26,11 @@ cv::Mat captureGameWindow()
 
     GameWindow& window = GameWindow::instance();
 
+    // 所有截图模式前都按需无感调整窗口宽度至 600。
+    // hook 模式下 Unity 最小化时的 swap chain 尺寸由 Unity 决定，可能过小（如 606x341）；
+    // PrintWindow 模式同样需要窗口尺寸足够大才能截到清晰画面。
+    window.ensureMinWidthForCapture(640);
+
     QString screenshotMode = SETTING_CONFIG.getScreenshotMode();
     if (screenshotMode == "PrintWindow") {
         hasWinImg = captureByPrintWindow(window.handle(), winImg);

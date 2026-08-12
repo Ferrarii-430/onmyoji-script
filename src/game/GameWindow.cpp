@@ -83,6 +83,129 @@ QString GameWindow::processId()
     return QString::number(processId);
 }
 
+void GameWindow::ensureMinWidthForCapture(int minWidth)
+{
+    if (!IsWindow(hwnd_)) {
+        return;
+    }
+
+    // 判断当前窗口宽度。优先使用上次截图尺寸（反映 hook swap chain 实际尺寸）；
+    // 首次截图时 lastCaptureSize_ 为 0，需要主动获取窗口客户区尺寸。
+    int currentWidth = lastCaptureSize_.width;
+    const bool wasIconic = IsIconic(hwnd_) != 0;
+
+    // 获取窗口"正常"位置/尺寸（非最小化/非最大化状态下的矩形）。
+    // 注意：阴阳师窗口被系统隐藏时，rcNormalPosition 可能返回系统占位区
+    // (-30000 附近, 30x30)。位置若在系统隐藏区，恢复时改用屏幕中心。
+    WINDOWPLACEMENT wp{};
+    wp.length = sizeof(WINDOWPLACEMENT);
+    if (!GetWindowPlacement(hwnd_, &wp)) {
+        Logger::log(QString("窗口宽度调整: GetWindowPlacement 失败，放弃调整"));
+        return;
+    }
+    const RECT placementRect = wp.rcNormalPosition;
+    const int placementW = placementRect.right - placementRect.left;
+    const int placementH = placementRect.bottom - placementRect.top;
+    const bool isHiddenPlacement = placementRect.left < -10000 || placementRect.left > 10000;
+
+    // 首次截图且窗口最小化：GetClientRect 返回 0，需临时恢复以探测真实尺寸
+    bool sizeProbed = false;
+    if (currentWidth == 0 && wasIconic) {
+        ShowWindow(hwnd_, SW_SHOWNOACTIVATE);
+        core::waitWithEventProcessing(50);
+        sizeProbed = true;
+    }
+
+    // 首次截图：获取客户区尺寸作为判断依据
+    if (currentWidth == 0) {
+        RECT clientRect{};
+        if (GetClientRect(hwnd_, &clientRect)) {
+            currentWidth = clientRect.right;
+        }
+    }
+
+    // 尺寸足够，无需调整
+    if (currentWidth >= minWidth) {
+        if (sizeProbed) {
+            ShowWindow(hwnd_, SW_MINIMIZE);
+            core::waitWithEventProcessing(50);
+        }
+        Logger::log(QString("窗口宽度调整: 当前宽度 %1 >= %2，无需调整")
+                    .arg(currentWidth).arg(minWidth));
+        return;
+    }
+
+    Logger::log(QString("窗口宽度调整: 当前宽度 %1 < %2，开始调整窗口尺寸")
+                .arg(currentWidth).arg(minWidth));
+    Logger::log(QString("窗口宽度调整: placement 位置 (%1, %2), 尺寸 %3x%4, isHidden=%5")
+                .arg(placementRect.left).arg(placementRect.top)
+                .arg(placementW).arg(placementH).arg(isHiddenPlacement));
+
+    // 若窗口最小化且尚未为探测而恢复，现在恢复（不激活，不抢前台）
+    if (wasIconic && !sizeProbed) {
+        ShowWindow(hwnd_, SW_SHOWNOACTIVATE);
+        core::waitWithEventProcessing(50);
+        Logger::log(QString("窗口宽度调整: 窗口已从最小化恢复（不激活）"));
+    }
+
+    // 用当前真实窗口矩形确定临时高度（恢复后的实际尺寸，比 placement 更可靠）
+    RECT curRect{};
+    GetWindowRect(hwnd_, &curRect);
+    int curH = curRect.bottom - curRect.top;
+    if (curH < 100) curH = 450; // 极端情况下的安全兜底
+
+    // 先移到屏幕外避免用户看到闪烁
+    SetWindowPos(hwnd_, HWND_BOTTOM,
+                 -10000, -10000, 0, 0,
+                 SWP_NOSIZE | SWP_NOACTIVATE);
+
+    // 模拟用户拖动边框调整尺寸的完整消息序列。
+    // 仅 SetWindowPos 改窗口矩形不会触发 Unity 调用 Screen.SetResolution，
+    // 必须发送 WM_ENTERSIZEMOVE / WM_EXITSIZEMOVE / WM_SIZE 让 Unity 检测到尺寸变化。
+    SendMessage(hwnd_, WM_ENTERSIZEMOVE, 0, 0);
+    SetWindowPos(hwnd_, nullptr,
+                 -10000, -10000,
+                 minWidth, curH,
+                 SWP_NOACTIVATE | SWP_NOZORDER);
+    RECT newSize{};
+    GetClientRect(hwnd_, &newSize);
+    SendMessage(hwnd_, WM_SIZE, SIZE_RESTORED,
+                MAKELPARAM(newSize.right, newSize.bottom));
+    SendMessage(hwnd_, WM_EXITSIZEMOVE, 0, 0);
+    Logger::log(QString("窗口宽度调整: 已发送尺寸调整消息 (目标宽度 %1, 临时高度 %2)")
+                .arg(minWidth).arg(curH));
+
+    // 等待 Unity 监听 WM_EXITSIZEMOVE 后调用 Screen.SetResolution 重建 swap chain
+    core::waitWithEventProcessing(500);
+
+    // 恢复原位置。若 placement 在系统隐藏区，改用屏幕中心。
+    int restoreX = placementRect.left;
+    int restoreY = placementRect.top;
+    if (isHiddenPlacement) {
+        restoreX = (GetSystemMetrics(SM_CXSCREEN) - minWidth) / 2;
+        restoreY = (GetSystemMetrics(SM_CYSCREEN) - curH) / 2;
+        Logger::log(QString("窗口宽度调整: placement 在系统隐藏区，恢复位置改用屏幕中心 (%1, %2)")
+                    .arg(restoreX).arg(restoreY));
+    }
+    SetWindowPos(hwnd_, nullptr,
+                 restoreX, restoreY,
+                 0, 0,
+                 SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOZORDER);
+    Logger::log(QString("窗口宽度调整: 位置已恢复至 (%1, %2)").arg(restoreX).arg(restoreY));
+
+    // 恢复最小化状态（hook 截图支持最小化，此后按新尺寸出帧）
+    if (wasIconic) {
+        ShowWindow(hwnd_, SW_MINIMIZE);
+        core::waitWithEventProcessing(50);
+        Logger::log(QString("窗口宽度调整: 窗口已重新最小化"));
+    }
+
+    // 清空上次截图尺寸，强制下次截图重新获取（避免用到调整前的旧值）
+    lastCaptureSize_ = cv::Size();
+
+    Logger::log(QString("窗口宽度调整完成"));
+}
+
 void GameWindow::clickInWindow(const cv::Point& clickPoint)
 {
     if (!IsWindow(hwnd_)) {

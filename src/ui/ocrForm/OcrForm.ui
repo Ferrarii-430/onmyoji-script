@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>291</width>
-    <height>560</height>
+    <height>620</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -19,7 +19,7 @@
      <x>0</x>
      <y>0</y>
      <width>291</width>
-     <height>554</height>
+     <height>614</height>
     </rect>
    </property>
    <layout class="QFormLayout" name="formLayout">
@@ -27,7 +27,7 @@
      <number>6</number>
     </property>
     <property name="verticalSpacing">
-     <number>20</number>
+     <number>12</number>
     </property>
     <item row="0" column="0">
      <widget class="QLabel" name="label">
@@ -58,11 +58,11 @@
     </item>
     <item row="4" column="0">
      <widget class="QLabel" name="roiPosLabel">
-      <property name="text">
-       <string>区域左/上(%)</string>
-      </property>
       <property name="toolTip">
        <string>识别区域左上角坐标，占图片宽/高的百分比</string>
+      </property>
+      <property name="text">
+       <string>区域左/上(%)</string>
       </property>
      </widget>
     </item>
@@ -70,27 +70,27 @@
      <layout class="QHBoxLayout" name="roiPosLayout">
       <item>
        <widget class="QDoubleSpinBox" name="roiXBox">
-        <property name="maximum">
-         <double>100.000000000000000</double>
+        <property name="suffix">
+         <string>%</string>
         </property>
         <property name="decimals">
          <number>1</number>
         </property>
-        <property name="suffix">
-         <string>%</string>
+        <property name="maximum">
+         <double>100.000000000000000</double>
         </property>
        </widget>
       </item>
       <item>
        <widget class="QDoubleSpinBox" name="roiYBox">
-        <property name="maximum">
-         <double>100.000000000000000</double>
+        <property name="suffix">
+         <string>%</string>
         </property>
         <property name="decimals">
          <number>1</number>
         </property>
-        <property name="suffix">
-         <string>%</string>
+        <property name="maximum">
+         <double>100.000000000000000</double>
         </property>
        </widget>
       </item>
@@ -98,11 +98,11 @@
     </item>
     <item row="5" column="0">
      <widget class="QLabel" name="roiSizeLabel">
-      <property name="text">
-       <string>区域宽/高(%)</string>
-      </property>
       <property name="toolTip">
        <string>识别区域宽高，占图片宽/高的百分比；100%x100% 表示识别整张图片</string>
+      </property>
+      <property name="text">
+       <string>区域宽/高(%)</string>
       </property>
      </widget>
     </item>
@@ -110,14 +110,14 @@
      <layout class="QHBoxLayout" name="roiSizeLayout">
       <item>
        <widget class="QDoubleSpinBox" name="roiWBox">
-        <property name="maximum">
-         <double>100.000000000000000</double>
+        <property name="suffix">
+         <string>%</string>
         </property>
         <property name="decimals">
          <number>1</number>
         </property>
-        <property name="suffix">
-         <string>%</string>
+        <property name="maximum">
+         <double>100.000000000000000</double>
         </property>
         <property name="value">
          <double>100.000000000000000</double>
@@ -126,14 +126,14 @@
       </item>
       <item>
        <widget class="QDoubleSpinBox" name="roiHBox">
-        <property name="maximum">
-         <double>100.000000000000000</double>
+        <property name="suffix">
+         <string>%</string>
         </property>
         <property name="decimals">
          <number>1</number>
         </property>
-        <property name="suffix">
-         <string>%</string>
+        <property name="maximum">
+         <double>100.000000000000000</double>
         </property>
         <property name="value">
          <double>100.000000000000000</double>
@@ -143,23 +143,102 @@
      </layout>
     </item>
     <item row="6" column="0">
+     <widget class="QLabel" name="enhanceLabel">
+      <property name="toolTip">
+       <string>仅在识别区域小于整张图片时生效，可多选；小字号/暗底文字建议全部开启</string>
+      </property>
+      <property name="text">
+       <string>识别增强</string>
+      </property>
+     </widget>
+    </item>
+    <item row="6" column="1">
+     <layout class="QGridLayout" name="enhanceLayout">
+      <property name="topMargin">
+       <number>2</number>
+      </property>
+      <property name="bottomMargin">
+       <number>2</number>
+      </property>
+      <property name="horizontalSpacing">
+       <number>16</number>
+      </property>
+      <property name="verticalSpacing">
+       <number>8</number>
+      </property>
+      <item row="0" column="0">
+       <widget class="QCheckBox" name="enhanceUpscaleBox">
+        <property name="text">
+         <string>放大</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+        <property name="toolTip">
+         <string>裁剪图过小时等比放大（双三次插值），最多 3 倍；识别整张图片时不生效</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QCheckBox" name="enhanceGrayscaleBox">
+        <property name="toolTip">
+         <string>转为灰度图，去掉彩色背景干扰</string>
+        </property>
+        <property name="text">
+         <string>灰度</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QCheckBox" name="enhanceContrastBox">
+        <property name="toolTip">
+         <string>CLAHE 局部对比度增强，提亮暗处文字（会自动转灰度）</string>
+        </property>
+        <property name="text">
+         <string>对比度</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QCheckBox" name="enhanceSharpenBox">
+        <property name="toolTip">
+         <string>USM 锐化，恢复放大后被抹平的笔画边缘</string>
+        </property>
+        <property name="text">
+         <string>锐化</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="0" colspan="2">
+       <widget class="QCheckBox" name="enhanceInvertBox">
+        <property name="toolTip">
+         <string>检测到暗底亮字时反色为白底黑字（会自动转灰度）</string>
+        </property>
+        <property name="text">
+         <string>暗底自动反色</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+    <item row="7" column="0">
      <widget class="QLabel" name="label_4">
       <property name="text">
        <string>识别失败处理</string>
       </property>
      </widget>
     </item>
-    <item row="6" column="1">
+    <item row="7" column="1">
      <widget class="QComboBox" name="opencvErrorHandle"/>
     </item>
-    <item row="7" column="0">
+    <item row="8" column="0">
      <widget class="QLabel" name="stepInputLabel">
       <property name="text">
        <string>跳转步骤</string>
       </property>
      </widget>
     </item>
-    <item row="7" column="1">
+    <item row="8" column="1">
      <widget class="QComboBox" name="stepInputBox"/>
     </item>
     <item row="3" column="0">
@@ -186,33 +265,50 @@
       </property>
      </widget>
     </item>
-    <item row="8" column="0">
+    <item row="9" column="0">
      <widget class="QLabel" name="label_5">
       <property name="text">
        <string>预览</string>
       </property>
      </widget>
     </item>
-    <item row="8" column="1">
-     <widget class="QToolButton" name="btnUploadImage">
-      <property name="text">
-       <string>上传图片查看区域</string>
+    <item row="9" column="1">
+     <layout class="QHBoxLayout" name="previewBtnLayout">
+      <property name="spacing">
+       <number>8</number>
       </property>
-     </widget>
+      <item>
+       <widget class="QToolButton" name="btnUploadImage">
+        <property name="text">
+         <string>上传图片查看区域</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QToolButton" name="btnCaptureImage">
+        <property name="toolTip">
+         <string/>
+        </property>
+        <property name="text">
+         <string>截图获取</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
     </item>
-    <item row="9" column="0" colspan="2">
-     <widget class="RoiPreviewWidget" name="roiPreview">
-      <property name="minimumSize">
-       <size>
-        <width>260</width>
-        <height>150</height>
-       </size>
-      </property>
+    <item row="10" column="0" colspan="2">
+     <widget class="RoiPreviewWidget" name="roiPreview" native="true">
       <property name="sizePolicy">
        <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
         <horstretch>0</horstretch>
         <verstretch>0</verstretch>
        </sizepolicy>
+      </property>
+      <property name="minimumSize">
+       <size>
+        <width>260</width>
+        <height>150</height>
+       </size>
       </property>
      </widget>
     </item>

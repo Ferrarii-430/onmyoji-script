@@ -42,11 +42,29 @@ void RoiPreviewWidget::setRoiPercent(double x, double y, double w, double h)
 
 QRectF RoiPreviewWidget::canvasRect() const
 {
-    QRectF bounds = rect().adjusted(1, 1, -1, -1);
+    const QRectF bounds = rect().adjusted(1, 1, -1, -1);
     if (bounds.width() <= 0.0 || bounds.height() <= 0.0) {
         return {};
     }
-    return bounds;
+
+    // 画布代表被识别的那张图：上传了图片按图片原始宽高比，否则按游戏窗口的 16:9。
+    // 必须保持比例，否则 ROI 百分比在预览里的形状与实际截图区域不一致，会误导框选。
+    double targetAspect = 16.0 / 9.0;
+    if (!image_.isNull() && image_.height() > 0) {
+        targetAspect = static_cast<double>(image_.width()) / image_.height();
+    }
+
+    // 在控件内按目标比例居中做 letterbox（多余方向留边）
+    double w = bounds.width();
+    double h = w / targetAspect;
+    if (h > bounds.height()) {
+        h = bounds.height();
+        w = h * targetAspect;
+    }
+
+    return QRectF(bounds.x() + (bounds.width() - w) / 2.0,
+                  bounds.y() + (bounds.height() - h) / 2.0,
+                  w, h);
 }
 
 QRectF RoiPreviewWidget::roiRectIn(const QRectF &canvas) const

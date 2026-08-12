@@ -109,6 +109,8 @@ namespace scenarios
                 if (isCaptain)
                 {
                     // 队长状态
+                    Logger::log(QString("等待队友进入战斗"));
+                    bool enteredBattle = false;
                     for (int i = 0; i < MAX_WAIT_NUM; ++i)
                     {
                         //循环等待队友进入
@@ -118,8 +120,14 @@ namespace scenarios
                         {
                             //进入战斗
                             Logger::log(QString("点击进入御魂副本战斗"));
+                            enteredBattle = true;
                             break;
                         }
+                    }
+                    if (!enteredBattle)
+                    {
+                        Logger::log(QString("等待挑战按钮超时"));
+                        return;
                     }
                 } else
                 {
@@ -153,13 +161,22 @@ namespace scenarios
 
     battle:
         // 判断是否已经进入战斗界面
-        for (int i = 0; i < MAX_WAIT_NUM; ++i)
         {
-            waitWithEventProcessing(MAX_WAIT_TIME);
-            if (actions.yoloContainsLabels(0.55, {"common-exit-battle"}, false))
+            bool enteredBattleScene = false;
+            for (int i = 0; i < MAX_WAIT_NUM; ++i)
             {
-                Logger::log(QString("已进入御魂战斗场景"));
-                break;
+                waitWithEventProcessing(MAX_WAIT_TIME);
+                if (actions.yoloContainsLabels(0.55, {"common-exit-battle"}, false))
+                {
+                    Logger::log(QString("已进入御魂战斗场景"));
+                    enteredBattleScene = true;
+                    break;
+                }
+            }
+            if (!enteredBattleScene)
+            {
+                Logger::log(QString("等待进入战斗场景超时"));
+                return;
             }
         }
 
@@ -290,6 +307,7 @@ namespace scenarios
             if (teamIsError)
             {
                 Logger::log(QString("组队等待超时"));
+                return;
             }
         }else
         {

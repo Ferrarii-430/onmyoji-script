@@ -15,6 +15,7 @@
 #include <QtWidgets/QComboBox>
 #include <QtWidgets/QDoubleSpinBox>
 #include <QtWidgets/QFormLayout>
+#include <QtWidgets/QGridLayout>
 #include <QtWidgets/QHBoxLayout>
 #include <QtWidgets/QLabel>
 #include <QtWidgets/QLineEdit>
@@ -42,6 +43,13 @@ public:
     QHBoxLayout *roiSizeLayout;
     QDoubleSpinBox *roiWBox;
     QDoubleSpinBox *roiHBox;
+    QLabel *enhanceLabel;
+    QGridLayout *enhanceLayout;
+    QCheckBox *enhanceUpscaleBox;
+    QCheckBox *enhanceGrayscaleBox;
+    QCheckBox *enhanceContrastBox;
+    QCheckBox *enhanceSharpenBox;
+    QCheckBox *enhanceInvertBox;
     QLabel *label_4;
     QComboBox *opencvErrorHandle;
     QLabel *stepInputLabel;
@@ -50,21 +58,23 @@ public:
     QCheckBox *randomClickCheckBox;
     QDoubleSpinBox *spinScoreBox;
     QLabel *label_5;
+    QHBoxLayout *previewBtnLayout;
     QToolButton *btnUploadImage;
+    QToolButton *btnCaptureImage;
     RoiPreviewWidget *roiPreview;
 
     void setupUi(QWidget *OcrForm)
     {
         if (OcrForm->objectName().isEmpty())
             OcrForm->setObjectName("OcrForm");
-        OcrForm->resize(291, 560);
+        OcrForm->resize(291, 620);
         formLayoutWidget = new QWidget(OcrForm);
         formLayoutWidget->setObjectName("formLayoutWidget");
-        formLayoutWidget->setGeometry(QRect(0, 0, 291, 554));
+        formLayoutWidget->setGeometry(QRect(0, 0, 291, 614));
         formLayout = new QFormLayout(formLayoutWidget);
         formLayout->setObjectName("formLayout");
         formLayout->setHorizontalSpacing(6);
-        formLayout->setVerticalSpacing(20);
+        formLayout->setVerticalSpacing(12);
         formLayout->setContentsMargins(0, 0, 0, 0);
         label = new QLabel(formLayoutWidget);
         label->setObjectName("label");
@@ -100,15 +110,15 @@ public:
         roiPosLayout->setObjectName("roiPosLayout");
         roiXBox = new QDoubleSpinBox(formLayoutWidget);
         roiXBox->setObjectName("roiXBox");
-        roiXBox->setMaximum(100.000000000000000);
         roiXBox->setDecimals(1);
+        roiXBox->setMaximum(100.000000000000000);
 
         roiPosLayout->addWidget(roiXBox);
 
         roiYBox = new QDoubleSpinBox(formLayoutWidget);
         roiYBox->setObjectName("roiYBox");
-        roiYBox->setMaximum(100.000000000000000);
         roiYBox->setDecimals(1);
+        roiYBox->setMaximum(100.000000000000000);
 
         roiPosLayout->addWidget(roiYBox);
 
@@ -124,16 +134,16 @@ public:
         roiSizeLayout->setObjectName("roiSizeLayout");
         roiWBox = new QDoubleSpinBox(formLayoutWidget);
         roiWBox->setObjectName("roiWBox");
-        roiWBox->setMaximum(100.000000000000000);
         roiWBox->setDecimals(1);
+        roiWBox->setMaximum(100.000000000000000);
         roiWBox->setValue(100.000000000000000);
 
         roiSizeLayout->addWidget(roiWBox);
 
         roiHBox = new QDoubleSpinBox(formLayoutWidget);
         roiHBox->setObjectName("roiHBox");
-        roiHBox->setMaximum(100.000000000000000);
         roiHBox->setDecimals(1);
+        roiHBox->setMaximum(100.000000000000000);
         roiHBox->setValue(100.000000000000000);
 
         roiSizeLayout->addWidget(roiHBox);
@@ -141,25 +151,64 @@ public:
 
         formLayout->setLayout(5, QFormLayout::ItemRole::FieldRole, roiSizeLayout);
 
+        enhanceLabel = new QLabel(formLayoutWidget);
+        enhanceLabel->setObjectName("enhanceLabel");
+
+        formLayout->setWidget(6, QFormLayout::ItemRole::LabelRole, enhanceLabel);
+
+        enhanceLayout = new QGridLayout();
+        enhanceLayout->setObjectName("enhanceLayout");
+        enhanceLayout->setHorizontalSpacing(16);
+        enhanceLayout->setVerticalSpacing(8);
+        enhanceLayout->setContentsMargins(-1, 2, -1, 2);
+        enhanceUpscaleBox = new QCheckBox(formLayoutWidget);
+        enhanceUpscaleBox->setObjectName("enhanceUpscaleBox");
+        enhanceUpscaleBox->setChecked(true);
+
+        enhanceLayout->addWidget(enhanceUpscaleBox, 0, 0, 1, 1);
+
+        enhanceGrayscaleBox = new QCheckBox(formLayoutWidget);
+        enhanceGrayscaleBox->setObjectName("enhanceGrayscaleBox");
+
+        enhanceLayout->addWidget(enhanceGrayscaleBox, 0, 1, 1, 1);
+
+        enhanceContrastBox = new QCheckBox(formLayoutWidget);
+        enhanceContrastBox->setObjectName("enhanceContrastBox");
+
+        enhanceLayout->addWidget(enhanceContrastBox, 1, 0, 1, 1);
+
+        enhanceSharpenBox = new QCheckBox(formLayoutWidget);
+        enhanceSharpenBox->setObjectName("enhanceSharpenBox");
+
+        enhanceLayout->addWidget(enhanceSharpenBox, 1, 1, 1, 1);
+
+        enhanceInvertBox = new QCheckBox(formLayoutWidget);
+        enhanceInvertBox->setObjectName("enhanceInvertBox");
+
+        enhanceLayout->addWidget(enhanceInvertBox, 2, 0, 1, 2);
+
+
+        formLayout->setLayout(6, QFormLayout::ItemRole::FieldRole, enhanceLayout);
+
         label_4 = new QLabel(formLayoutWidget);
         label_4->setObjectName("label_4");
 
-        formLayout->setWidget(6, QFormLayout::ItemRole::LabelRole, label_4);
+        formLayout->setWidget(7, QFormLayout::ItemRole::LabelRole, label_4);
 
         opencvErrorHandle = new QComboBox(formLayoutWidget);
         opencvErrorHandle->setObjectName("opencvErrorHandle");
 
-        formLayout->setWidget(6, QFormLayout::ItemRole::FieldRole, opencvErrorHandle);
+        formLayout->setWidget(7, QFormLayout::ItemRole::FieldRole, opencvErrorHandle);
 
         stepInputLabel = new QLabel(formLayoutWidget);
         stepInputLabel->setObjectName("stepInputLabel");
 
-        formLayout->setWidget(7, QFormLayout::ItemRole::LabelRole, stepInputLabel);
+        formLayout->setWidget(8, QFormLayout::ItemRole::LabelRole, stepInputLabel);
 
         stepInputBox = new QComboBox(formLayoutWidget);
         stepInputBox->setObjectName("stepInputBox");
 
-        formLayout->setWidget(7, QFormLayout::ItemRole::FieldRole, stepInputBox);
+        formLayout->setWidget(8, QFormLayout::ItemRole::FieldRole, stepInputBox);
 
         label_6 = new QLabel(formLayoutWidget);
         label_6->setObjectName("label_6");
@@ -181,23 +230,34 @@ public:
         label_5 = new QLabel(formLayoutWidget);
         label_5->setObjectName("label_5");
 
-        formLayout->setWidget(8, QFormLayout::ItemRole::LabelRole, label_5);
+        formLayout->setWidget(9, QFormLayout::ItemRole::LabelRole, label_5);
 
+        previewBtnLayout = new QHBoxLayout();
+        previewBtnLayout->setSpacing(8);
+        previewBtnLayout->setObjectName("previewBtnLayout");
         btnUploadImage = new QToolButton(formLayoutWidget);
         btnUploadImage->setObjectName("btnUploadImage");
 
-        formLayout->setWidget(8, QFormLayout::ItemRole::FieldRole, btnUploadImage);
+        previewBtnLayout->addWidget(btnUploadImage);
+
+        btnCaptureImage = new QToolButton(formLayoutWidget);
+        btnCaptureImage->setObjectName("btnCaptureImage");
+
+        previewBtnLayout->addWidget(btnCaptureImage);
+
+
+        formLayout->setLayout(9, QFormLayout::ItemRole::FieldRole, previewBtnLayout);
 
         roiPreview = new RoiPreviewWidget(formLayoutWidget);
         roiPreview->setObjectName("roiPreview");
-        roiPreview->setMinimumSize(QSize(260, 150));
         QSizePolicy sizePolicy(QSizePolicy::Policy::Expanding, QSizePolicy::Policy::Expanding);
         sizePolicy.setHorizontalStretch(0);
         sizePolicy.setVerticalStretch(0);
         sizePolicy.setHeightForWidth(roiPreview->sizePolicy().hasHeightForWidth());
         roiPreview->setSizePolicy(sizePolicy);
+        roiPreview->setMinimumSize(QSize(260, 150));
 
-        formLayout->setWidget(9, QFormLayout::ItemRole::SpanningRole, roiPreview);
+        formLayout->setWidget(10, QFormLayout::ItemRole::SpanningRole, roiPreview);
 
 
         retranslateUi(OcrForm);
@@ -211,24 +271,52 @@ public:
         label->setText(QCoreApplication::translate("OcrForm", "\344\273\273\345\212\241\345\220\215\347\247\260", nullptr));
         label_3->setText(QCoreApplication::translate("OcrForm", "\350\257\206\345\210\253\346\226\207\345\255\227", nullptr));
         label_2->setText(QCoreApplication::translate("OcrForm", "\345\210\206\346\225\260\351\230\210\345\200\274", nullptr));
-        roiPosLabel->setText(QCoreApplication::translate("OcrForm", "\345\214\272\345\237\237\345\267\246/\344\270\212(%)", nullptr));
 #if QT_CONFIG(tooltip)
         roiPosLabel->setToolTip(QCoreApplication::translate("OcrForm", "\350\257\206\345\210\253\345\214\272\345\237\237\345\267\246\344\270\212\350\247\222\345\235\220\346\240\207\357\274\214\345\215\240\345\233\276\347\211\207\345\256\275/\351\253\230\347\232\204\347\231\276\345\210\206\346\257\224", nullptr));
 #endif // QT_CONFIG(tooltip)
+        roiPosLabel->setText(QCoreApplication::translate("OcrForm", "\345\214\272\345\237\237\345\267\246/\344\270\212(%)", nullptr));
         roiXBox->setSuffix(QCoreApplication::translate("OcrForm", "%", nullptr));
         roiYBox->setSuffix(QCoreApplication::translate("OcrForm", "%", nullptr));
-        roiSizeLabel->setText(QCoreApplication::translate("OcrForm", "\345\214\272\345\237\237\345\256\275/\351\253\230(%)", nullptr));
 #if QT_CONFIG(tooltip)
         roiSizeLabel->setToolTip(QCoreApplication::translate("OcrForm", "\350\257\206\345\210\253\345\214\272\345\237\237\345\256\275\351\253\230\357\274\214\345\215\240\345\233\276\347\211\207\345\256\275/\351\253\230\347\232\204\347\231\276\345\210\206\346\257\224\357\274\233100%x100% \350\241\250\347\244\272\350\257\206\345\210\253\346\225\264\345\274\240\345\233\276\347\211\207", nullptr));
 #endif // QT_CONFIG(tooltip)
+        roiSizeLabel->setText(QCoreApplication::translate("OcrForm", "\345\214\272\345\237\237\345\256\275/\351\253\230(%)", nullptr));
         roiWBox->setSuffix(QCoreApplication::translate("OcrForm", "%", nullptr));
         roiHBox->setSuffix(QCoreApplication::translate("OcrForm", "%", nullptr));
+#if QT_CONFIG(tooltip)
+        enhanceLabel->setToolTip(QCoreApplication::translate("OcrForm", "\344\273\205\345\234\250\350\257\206\345\210\253\345\214\272\345\237\237\345\260\217\344\272\216\346\225\264\345\274\240\345\233\276\347\211\207\346\227\266\347\224\237\346\225\210\357\274\214\345\217\257\345\244\232\351\200\211\357\274\233\345\260\217\345\255\227\345\217\267/\346\232\227\345\272\225\346\226\207\345\255\227\345\273\272\350\256\256\345\205\250\351\203\250\345\274\200\345\220\257", nullptr));
+#endif // QT_CONFIG(tooltip)
+        enhanceLabel->setText(QCoreApplication::translate("OcrForm", "\350\257\206\345\210\253\345\242\236\345\274\272", nullptr));
+#if QT_CONFIG(tooltip)
+        enhanceUpscaleBox->setToolTip(QCoreApplication::translate("OcrForm", "\350\243\201\345\211\252\345\233\276\350\277\207\345\260\217\346\227\266\347\255\211\346\257\224\346\224\276\345\244\247\357\274\210\345\217\214\344\270\211\346\254\241\346\217\222\345\200\274\357\274\211\357\274\214\346\234\200\345\244\232 3 \345\200\215\357\274\233\350\257\206\345\210\253\346\225\264\345\274\240\345\233\276\347\211\207\346\227\266\344\270\215\347\224\237\346\225\210", nullptr));
+#endif // QT_CONFIG(tooltip)
+        enhanceUpscaleBox->setText(QCoreApplication::translate("OcrForm", "\346\224\276\345\244\247", nullptr));
+#if QT_CONFIG(tooltip)
+        enhanceGrayscaleBox->setToolTip(QCoreApplication::translate("OcrForm", "\350\275\254\344\270\272\347\201\260\345\272\246\345\233\276\357\274\214\345\216\273\346\216\211\345\275\251\350\211\262\350\203\214\346\231\257\345\271\262\346\211\260", nullptr));
+#endif // QT_CONFIG(tooltip)
+        enhanceGrayscaleBox->setText(QCoreApplication::translate("OcrForm", "\347\201\260\345\272\246", nullptr));
+#if QT_CONFIG(tooltip)
+        enhanceContrastBox->setToolTip(QCoreApplication::translate("OcrForm", "CLAHE \345\261\200\351\203\250\345\257\271\346\257\224\345\272\246\345\242\236\345\274\272\357\274\214\346\217\220\344\272\256\346\232\227\345\244\204\346\226\207\345\255\227\357\274\210\344\274\232\350\207\252\345\212\250\350\275\254\347\201\260\345\272\246\357\274\211", nullptr));
+#endif // QT_CONFIG(tooltip)
+        enhanceContrastBox->setText(QCoreApplication::translate("OcrForm", "\345\257\271\346\257\224\345\272\246", nullptr));
+#if QT_CONFIG(tooltip)
+        enhanceSharpenBox->setToolTip(QCoreApplication::translate("OcrForm", "USM \351\224\220\345\214\226\357\274\214\346\201\242\345\244\215\346\224\276\345\244\247\345\220\216\350\242\253\346\212\271\345\271\263\347\232\204\347\254\224\347\224\273\350\276\271\347\274\230", nullptr));
+#endif // QT_CONFIG(tooltip)
+        enhanceSharpenBox->setText(QCoreApplication::translate("OcrForm", "\351\224\220\345\214\226", nullptr));
+#if QT_CONFIG(tooltip)
+        enhanceInvertBox->setToolTip(QCoreApplication::translate("OcrForm", "\346\243\200\346\265\213\345\210\260\346\232\227\345\272\225\344\272\256\345\255\227\346\227\266\345\217\215\350\211\262\344\270\272\347\231\275\345\272\225\351\273\221\345\255\227\357\274\210\344\274\232\350\207\252\345\212\250\350\275\254\347\201\260\345\272\246\357\274\211", nullptr));
+#endif // QT_CONFIG(tooltip)
+        enhanceInvertBox->setText(QCoreApplication::translate("OcrForm", "\346\232\227\345\272\225\350\207\252\345\212\250\345\217\215\350\211\262", nullptr));
         label_4->setText(QCoreApplication::translate("OcrForm", "\350\257\206\345\210\253\345\244\261\350\264\245\345\244\204\347\220\206", nullptr));
         stepInputLabel->setText(QCoreApplication::translate("OcrForm", "\350\267\263\350\275\254\346\255\245\351\252\244", nullptr));
         label_6->setText(QCoreApplication::translate("OcrForm", "\346\230\257\345\220\246\351\232\217\346\234\272\347\202\271\345\207\273", nullptr));
         randomClickCheckBox->setText(QString());
         label_5->setText(QCoreApplication::translate("OcrForm", "\351\242\204\350\247\210", nullptr));
         btnUploadImage->setText(QCoreApplication::translate("OcrForm", "\344\270\212\344\274\240\345\233\276\347\211\207\346\237\245\347\234\213\345\214\272\345\237\237", nullptr));
+#if QT_CONFIG(tooltip)
+        btnCaptureImage->setToolTip(QString());
+#endif // QT_CONFIG(tooltip)
+        btnCaptureImage->setText(QCoreApplication::translate("OcrForm", "\346\210\252\345\233\276\350\216\267\345\217\226", nullptr));
     } // retranslateUi
 
 };

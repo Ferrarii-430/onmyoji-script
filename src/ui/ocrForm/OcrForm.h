@@ -26,9 +26,15 @@ public:
 
 private slots:
     void onUploadImageClicked();
+    void onCaptureImageClicked();
     void updateRoiPreview();
 
 private:
+    // 汇总各增强复选框，返回 ocr::Enhance 位掩码；未勾选任何项时为 0
+    int enhanceFlagsFromUi() const;
+    // 按位掩码回填各增强复选框
+    void setEnhanceFlagsToUi(int flags) const;
+
     Ui::OcrForm *ui;
     QString currentConfigId;
     QJsonObject stepDataCopy;

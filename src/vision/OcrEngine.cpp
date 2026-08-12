@@ -107,22 +107,22 @@ QJsonObject runRapidOCR(const QString& imagePath, int padding)
     arguments << ("--rec=" + rapidOCRRecPath);
     arguments << ("--keys=" + rapidOCRKeysPath);
     // 启用 ASCII 转义输出，避免中文在进程输出中因编码问题损坏
-    arguments << "--ensureAscii=1";
+    // arguments << "--ensureAscii=1";
     // 预处理白边，可优化窄边/裁剪图边缘文字的识别率
     arguments << ("--padding=" + QString::number(padding));
     // 0 表示不限制长边缩小；裁剪图本身不大，避免被错误缩小导致文字像素丢失
-    arguments << "--maxSideLen=0";
+    arguments << "--maxSideLen=3084";
     // 文字框置信度门限，适当默认值兼顾召回与精度
-    arguments << "--boxScoreThresh=0.5";
-    arguments << "--boxThresh=0.3";
+    // arguments << "--boxScoreThresh=0.5";
+    // arguments << "--boxThresh=0.3";
     // 单个文字框大小倍率，略放大以包容文字笔画
-    arguments << "--unClipRatio=1.6";
+    // arguments << "--unClipRatio=1.6";
     // 启用方向检测与角度投票，适应倾斜文字
-    arguments << "--doAngle=1";
-    arguments << "--mostAngle=1";
+    // arguments << "--doAngle=1";
+    // arguments << "--mostAngle=1";
 
-    qDebug() << "执行ocr识别命令:" << rapidOCRExe << arguments;
-    qDebug() << "ocr工作目录:" << QFileInfo(rapidOCRExe).absolutePath();
+    // qDebug() << "执行ocr识别命令:" << rapidOCRExe << arguments;
+    // qDebug() << "ocr工作目录:" << QFileInfo(rapidOCRExe).absolutePath();
 
     process.start(rapidOCRExe, arguments);
 
@@ -136,8 +136,8 @@ QJsonObject runRapidOCR(const QString& imagePath, int padding)
     QByteArray output = process.readAllStandardOutput();
     QByteArray errorOutput = process.readAllStandardError();
 
-    qDebug() << "ocr退出码:" << exitCode;
-    qDebug() << "ocr标准输出:" << output;
+    // qDebug() << "ocr退出码:" << exitCode;
+    // qDebug() << "ocr标准输出:" << output;
     if (!errorOutput.isEmpty()) {
         qDebug() << "ocr错误输出:" << errorOutput;
     }

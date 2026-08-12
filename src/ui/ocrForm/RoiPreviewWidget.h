@@ -9,8 +9,9 @@
 #include <QPixmap>
 
 // 识别区域预览控件：
-// - 上传了参考图片时，按图片比例展示图片，并在其上叠加 ROI 区域；
+// - 上传了参考图片时，按图片原始宽高比展示图片，并在其上叠加 ROI 区域；
 // - 未上传图片时，按 16:9 画一个占位画布（代表游戏窗口）再叠加 ROI；
+// 画布始终保持比例（多余方向留边），否则 ROI 百分比框出的形状会与实际截图区域不一致。
 // ROI 使用百分比(0~100)，与 ScriptActions::ocrRecognizesAndClick 的语义一致。
 class RoiPreviewWidget : public QWidget
 {

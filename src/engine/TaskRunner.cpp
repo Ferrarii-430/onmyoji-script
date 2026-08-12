@@ -66,8 +66,11 @@ QString TaskRunner::executeStep(const QJsonObject& step)
                 const bool randomClick = step["randomClick"].toBool();
                 const QRectF roiPercent(step["ocrRoiX"].toDouble(), step["ocrRoiY"].toDouble(),
                                         step["ocrRoiW"].toDouble(), step["ocrRoiH"].toDouble());
+                // 识别增强开关位掩码；旧配置无该字段时按「仅放大」处理，保持原有行为
+                const auto enhance = static_cast<ocr::Enhance>(
+                    step["ocrEnhance"].toInt(static_cast<int>(ocr::Enhance::Upscale)));
                 savePath = recognizeWithRetry([&]() {
-                    return actions.ocrRecognizesAndClick(ocrText, score, randomClick, roiPercent);
+                    return actions.ocrRecognizesAndClick(ocrText, score, randomClick, roiPercent, enhance);
                 });
                 break;
         }

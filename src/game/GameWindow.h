@@ -29,6 +29,11 @@ public:
     void setLastCaptureSize(const cv::Size& size) { lastCaptureSize_ = size; }
     cv::Size lastCaptureSize() const { return lastCaptureSize_; }
 
+    // 截图前确保窗口宽度不小于 minWidth（基于上次截图尺寸判断）。
+    // 仅在窗口最小化时通过"恢复→移至屏幕外改宽→恢复位置→重新最小化"
+    // 的无感流程调整；调整后窗口位置保持不变，下次用户打开仍在原位。
+    void ensureMinWidthForCapture(int minWidth);
+
     // 在窗口内执行点击（clickPoint 为截图坐标系）
     void clickInWindow(const cv::Point& clickPoint);
 

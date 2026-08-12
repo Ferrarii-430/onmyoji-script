@@ -9,10 +9,14 @@
 #include <QFileDialog>
 #include <QJsonObject>
 #include <QMessageBox>
+#include <opencv2/imgproc.hpp>
 
 #include "src/core/Logger.h"
 #include "ui_OcrForm.h"
 #include "src/core/ProfileStore.h"
+#include "src/engine/ScriptActions.h"
+#include "src/game/GameWindow.h"
+#include "src/game/capture/CaptureService.h"
 //TODO form窗体模板
 
 OcrForm::OcrForm(QWidget *parent) :
@@ -31,6 +35,7 @@ OcrForm::OcrForm(QWidget *parent) :
     ui->spinScoreBox->setValue(0.55);
 
     connect(ui->btnUploadImage, &QToolButton::clicked, this, &OcrForm::onUploadImageClicked);
+    connect(ui->btnCaptureImage, &QToolButton::clicked, this, &OcrForm::onCaptureImageClicked);
     connect(ui->roiXBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &OcrForm::updateRoiPreview);
     connect(ui->roiYBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &OcrForm::updateRoiPreview);
     connect(ui->roiWBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &OcrForm::updateRoiPreview);
@@ -72,6 +77,11 @@ void OcrForm::loadFromJson(const QString &configId, const QJsonObject &obj)
     ui->roiHBox->setValue(obj["ocrRoiH"].toDouble(100.0));
     updateRoiPreview();
 
+    // 识别增强开关。旧配置无该字段时按「仅放大」处理：小裁剪图自动放大是本就存在的
+    // 行为，若默认成 0 会让已有的 OCR 步骤失去放大，破坏旧逻辑。
+    setEnhanceFlagsToUi(obj["ocrEnhance"].toInt(
+        static_cast<int>(ocr::Enhance::Upscale)));
+
     QString currentIdentifyErrorHandle= obj["identifyErrorHandle"].toString();
     int identifyErrorHandleIndex = ui->opencvErrorHandle->findData(currentIdentifyErrorHandle);
     if (identifyErrorHandleIndex >= 0) {
@@ -98,6 +108,37 @@ void OcrForm::updateRoiPreview()
                                   ui->roiHBox->value());
 }
 
+int OcrForm::enhanceFlagsFromUi() const
+{
+    unsigned int flags = static_cast<unsigned int>(ocr::Enhance::None);
+    if (ui->enhanceUpscaleBox->isChecked()) {
+        flags |= static_cast<unsigned int>(ocr::Enhance::Upscale);
+    }
+    if (ui->enhanceGrayscaleBox->isChecked()) {
+        flags |= static_cast<unsigned int>(ocr::Enhance::Grayscale);
+    }
+    if (ui->enhanceContrastBox->isChecked()) {
+        flags |= static_cast<unsigned int>(ocr::Enhance::Contrast);
+    }
+    if (ui->enhanceSharpenBox->isChecked()) {
+        flags |= static_cast<unsigned int>(ocr::Enhance::Sharpen);
+    }
+    if (ui->enhanceInvertBox->isChecked()) {
+        flags |= static_cast<unsigned int>(ocr::Enhance::AutoInvert);
+    }
+    return static_cast<int>(flags);
+}
+
+void OcrForm::setEnhanceFlagsToUi(const int flags) const
+{
+    const auto enhance = static_cast<ocr::Enhance>(flags);
+    ui->enhanceUpscaleBox->setChecked(ocr::hasFlag(enhance, ocr::Enhance::Upscale));
+    ui->enhanceGrayscaleBox->setChecked(ocr::hasFlag(enhance, ocr::Enhance::Grayscale));
+    ui->enhanceContrastBox->setChecked(ocr::hasFlag(enhance, ocr::Enhance::Contrast));
+    ui->enhanceSharpenBox->setChecked(ocr::hasFlag(enhance, ocr::Enhance::Sharpen));
+    ui->enhanceInvertBox->setChecked(ocr::hasFlag(enhance, ocr::Enhance::AutoInvert));
+}
+
 void OcrForm::onUploadImageClicked()
 {
     const QString fileName = QFileDialog::getOpenFileName(
@@ -117,6 +158,31 @@ void OcrForm::onUploadImageClicked()
 
     ui->roiPreview->setImage(pix);
     updateRoiPreview();
+}
+
+void OcrForm::onCaptureImageClicked()
+{
+    if (!GameWindow::instance().locate()) {
+        QMessageBox::warning(this, tr("截图失败"), tr("未找到游戏窗口，请先启动游戏。"));
+        return;
+    }
+
+    const cv::Mat winImg = capture::captureGameWindow();
+    if (winImg.empty()) {
+        QMessageBox::warning(this, tr("截图失败"), tr("获取游戏画面失败，请检查截图模式设置。"));
+        return;
+    }
+
+    // 与识别链路使用同一份截图，因此预览比例即实际识别区域比例
+    cv::Mat rgb;
+    cv::cvtColor(winImg, rgb, cv::COLOR_BGR2RGB);
+    const QImage qimg(rgb.data, rgb.cols, rgb.rows,
+                      static_cast<int>(rgb.step), QImage::Format_RGB888);
+
+    // QImage 未拷贝 rgb 的数据，转成 QPixmap 前必须深拷贝，避免 rgb 析构后悬垂
+    ui->roiPreview->setImage(QPixmap::fromImage(qimg.copy()));
+    updateRoiPreview();
+    Logger::log(QString("已获取游戏截图作为预览底图：%1x%2").arg(winImg.cols).arg(winImg.rows));
 }
 
 void OcrForm::initStepInputBoxSelect(QString configId, const QString &stepsId)
@@ -163,6 +229,7 @@ QJsonObject OcrForm::toJson() const {
     obj["ocrRoiY"] = ui->roiYBox->value();
     obj["ocrRoiW"] = ui->roiWBox->value();
     obj["ocrRoiH"] = ui->roiHBox->value();
+    obj["ocrEnhance"] = enhanceFlagsFromUi();
     obj["identifyErrorHandle"] = ui->opencvErrorHandle->currentData().toString();
 
     //如果是跳转

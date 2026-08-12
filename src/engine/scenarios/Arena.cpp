@@ -1,5 +1,7 @@
 #include "src/engine/scenarios/Arena.h"
 
+#include <limits>
+
 #include <QJsonObject>
 #include <QString>
 #include <QStringList>
@@ -8,6 +10,8 @@
 #include "src/core/Logger.h"
 #include "src/core/ProfileStore.h"
 #include "src/engine/ScriptActions.h"
+#include "src/game/GameWindow.h"
+#include "src/vision/Geometry.h"
 
 using core::waitWithEventProcessing;
 
@@ -24,8 +28,8 @@ constexpr int kMatchPollInterval = 3000;
 constexpr int kMatchPollCount = 15;
 
 // 战斗结束最长等待：kBattlePollCount 次，每次 kBattlePollInterval 毫秒
-constexpr int kBattlePollInterval = 30000;
-constexpr int kBattlePollCount = 40;
+constexpr int kBattlePollInterval = 5000;
+constexpr int kBattlePollCount = 240;
 
 //是否随机点击
 constexpr bool randomClick = true;
@@ -78,7 +82,7 @@ void executeArena()
             readied = true;
             break;
         }
-        if (!actions.ocrRecognizesAndClick("自动", kOcrScore, randomClick, QRectF(0, 13, 13, 28)).isEmpty()) {
+        if (!actions.ocrRecognizesAndClick("上阵", kOcrScore, randomClick, QRectF(0, 13, 13, 28)).isEmpty()) {
             readied = true;
             break;
         }
@@ -89,9 +93,52 @@ void executeArena()
     }
 
     // 3. 进入战斗后确保开启「自动」,如果对面是手动上场，那就不管了，挂满30s会开自动的
+    Logger::log(QString("等待进入斗技战斗"));
     waitWithEventProcessing(8000);
-    if (actions.yoloContainsLabels(kYoloScore, {"battle-auto"}, false)) {
-        actions.clickDetectionByLabel("battle-auto", kYoloScore, 0.0, 0.0);
+    bool actionPosition = false;
+    for (int i = 40 - 1; i >= 0; --i)
+    {
+        waitWithEventProcessing(5000);
+        QJsonArray isAutoData = actions.ocrRecognizes(QRectF(0, 13, 13, 28));
+        //正常来说只会有一个文字
+        QJsonObject item = isAutoData[0].toObject();
+        const QString text = item["text"].toString();
+        if (text == "手动")
+        {
+            // box 格式: [[x1,y1],[x2,y2],[x3,y3],[x4,y4]]，ocrRecognizes 已映射回窗口坐标
+            QJsonArray box = item["box"].toArray();
+            if (box.size() == 4)
+            {
+                int minX = std::numeric_limits<int>::max();
+                int minY = std::numeric_limits<int>::max();
+                int maxX = std::numeric_limits<int>::min();
+                int maxY = std::numeric_limits<int>::min();
+                for (const QJsonValue& ptVal : box)
+                {
+                    QJsonArray pt = ptVal.toArray();
+                    if (pt.size() < 2) continue;
+                    const int px = pt[0].toInt();
+                    const int py = pt[1].toInt();
+                    minX = std::min(minX, px);
+                    minY = std::min(minY, py);
+                    maxX = std::max(maxX, px);
+                    maxY = std::max(maxY, py);
+                }
+                const cv::Rect matchRect(minX, minY, maxX - minX, maxY - minY);
+                const cv::Point clickPt = randomClick
+                                              ? vision::randomPointInRect(matchRect)
+                                              : cv::Point(matchRect.x + matchRect.width / 2,
+                                                          matchRect.y + matchRect.height / 2);
+                Logger::log(QString("已经进入战斗，点击切换自动: (%1, %2)").arg(clickPt.x).arg(clickPt.y));
+                GameWindow::instance().clickInWindow(clickPt);
+                actionPosition = true;
+                break;
+            }
+        }
+    }
+    if (!actionPosition)
+    {
+        Logger::log(QString("超时未进入战斗状态，自动斗技任务结束"));
     }
 
     // 4. 轮询等待战斗结束（胜利/失败结算界面），出现后点击结算继续
@@ -106,23 +153,24 @@ void executeArena()
             waitWithEventProcessing(2000);
             Logger::log(QString("斗技本轮完成（结算：%1）").arg(settled == QStringLiteral("胜利") ? "胜利" : "失败"));
             isEnd = true;
+            waitWithEventProcessing(5000);
             break;
         }
     }
     if (!isEnd) {
+        Logger::log(QString("等待战斗结束超时，结束本次执行"));
         return;
     }
-
-    Logger::log(QString("等待战斗结束超时，结束本次执行"));
 }
 
 bool getNumberOfFraction()
 {
     ScriptActions& actions = ScriptActions::instance();
-    QJsonArray fractionData = actions.ocrRecognizes(QRectF(8, 87, 10, 5));
+    // 荣誉值区域极小（约窗口高度 3%）且为暗底亮字，开启全部增强提高识别率
+    QJsonArray fractionData = actions.ocrRecognizes(QRectF(11, 87.8, 12, 3.2), ocr::Enhance::Upscale | ocr::Enhance::Grayscale);
     if (fractionData.empty())
     {
-        return 0;
+        return false;
     }
     //正常来说只会有一个文字
     QJsonObject item = fractionData[0].toObject();
