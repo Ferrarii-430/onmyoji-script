@@ -64,7 +64,7 @@ void executeArena()
     }
 
     // 1. 点击「开始匹配」（部分界面按钮文案仅为「匹配」，两者都尝试）
-    QString matchClick = actions.ocrRecognizesAndClick("战", kOcrScore, randomClick, QRectF(80, 65, 100, 100));
+    QString matchClick = actions.ocrRecognizesAndClick("战", kOcrScore, randomClick, QRectF(87.5, 72, 100, 100), ocr::Enhance::All);
     if (matchClick.isEmpty()) {
         Logger::log(QString("未找到匹配按钮，可能不在斗技界面，结束本次执行"));
         return;
@@ -101,7 +101,7 @@ void executeArena()
         waitWithEventProcessing(5000);
         QJsonArray isAutoData = actions.ocrRecognizes(QRectF(0, 13, 13, 28));
         //正常来说只会有一个文字
-        QJsonObject item = isAutoData[0].toObject();
+        QJsonObject item = isAutoData[0].toObject();//TODO 此处会异常闪退
         const QString text = item["text"].toString();
         if (text == "手动")
         {
@@ -167,7 +167,7 @@ bool getNumberOfFraction()
 {
     ScriptActions& actions = ScriptActions::instance();
     // 荣誉值区域极小（约窗口高度 3%）且为暗底亮字，开启全部增强提高识别率
-    QJsonArray fractionData = actions.ocrRecognizes(QRectF(11, 87.8, 12, 3.2), ocr::Enhance::Upscale | ocr::Enhance::Grayscale);
+    QJsonArray fractionData = actions.ocrRecognizes(QRectF(11, 87.8, 12, 3.2), ocr::Enhance::Upscale);
     if (fractionData.empty())
     {
         return false;
