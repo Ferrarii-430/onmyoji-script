@@ -13,6 +13,7 @@
 #include "src/engine/ScriptActions.h"
 #include "src/engine/scenarios/Arena.h"
 #include "src/engine/scenarios/BorderBreakthrough.h"
+#include "src/engine/scenarios/Budokai.h"
 #include "src/engine/scenarios/Mitama.h"
 #include "src/game/GameWindow.h"
 #include "src/game/capture/CaptureService.h"
@@ -125,6 +126,11 @@ QString TaskRunner::executeStep(const QJsonObject& step)
 
         case ConfigTypeEnum::SYSTEM_MITAMA: {
                 scenarios::executeMitama();
+                break;
+        }
+
+        case ConfigTypeEnum::SYSTEM_BUDOKAI: {
+                scenarios::executeBudokai();
                 break;
         }
 

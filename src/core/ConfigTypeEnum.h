@@ -14,6 +14,7 @@ enum class ConfigTypeEnum {
     SYSTEM_BORDER_BREAKTHROUGH,
     SYSTEM_ARENA,
     SYSTEM_MITAMA,
+    SYSTEM_BUDOKAI,
     UNKNOWN
 };
 

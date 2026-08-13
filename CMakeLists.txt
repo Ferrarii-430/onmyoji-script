@@ -99,6 +99,8 @@ add_executable(qtTest WIN32
         src/engine/scenarios/Arena.h
         src/engine/scenarios/BorderBreakthrough.cpp
         src/engine/scenarios/BorderBreakthrough.h
+        src/engine/scenarios/Budokai.cpp
+        src/engine/scenarios/Budokai.h
 
         # ui: 界面层
         src/ui/main/mainwindow.cpp
