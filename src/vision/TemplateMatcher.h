@@ -4,12 +4,20 @@
 #include <QString>
 #include <opencv2/core/mat.hpp>
 #include <opencv2/core/types.hpp>
+#include <vector>
 
 namespace vision {
 
 // 基准分辨率（所有模板与截图在匹配前都归一化到该尺寸）
 constexpr int BASE_MATCH_WIDTH = 1920;
 constexpr int BASE_MATCH_HEIGHT = 1080;
+
+// 单个模板匹配结果（基准坐标系）
+struct TemplateMatch {
+    cv::Rect rect;       // 基准坐标系下的矩形
+    double score = 0.0;  // 匹配分数
+    double fineScale = 1.0; // 命中的精细缩放比例
+};
 
 // 归一化过程的缩放信息：保持比例缩放 + 黑边 padding 后的坐标映射关系。
 // 通过该结构可以把基准坐标系(1920x1080)的点/矩形精确还原回 DX11 原始捕获坐标。
@@ -70,6 +78,14 @@ bool findTemplate(const cv::Mat& haystack, const cv::Mat& needle,
                   cv::Rect& outRect, double& outScore, double threshold,
                   ScaleInfo* info = nullptr, const cv::Mat& mask = cv::Mat(),
                   const cv::Size& templateCaptureSize = cv::Size());
+
+// 多目标模板匹配：找出截图中所有匹配模板的区域（经过 NMS 去重）。
+// outMatches 返回【基准坐标系】下的所有匹配结果，按分数降序排列。
+// info 若不为 nullptr，会写入本次匹配的 ScaleInfo 供调用方还原坐标使用。
+bool findTemplateAll(const cv::Mat& haystack, const cv::Mat& needle,
+                     std::vector<TemplateMatch>& outMatches, double threshold,
+                     ScaleInfo* info = nullptr, const cv::Mat& mask = cv::Mat(),
+                     const cv::Size& templateCaptureSize = cv::Size());
 
 // [兼容旧调用] 内部走归一化单次匹配流程，scaleMin/scaleMax/scaleStep 已废弃。
 // 返回的 outRect 已转换回【DX11 原始捕获坐标系】，便于旧调用方直接用于绘制/点击。

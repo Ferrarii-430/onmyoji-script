@@ -428,6 +428,96 @@ QString ScriptActions::opencvRecognizesAndClick(const QString& templPath, const 
     return savePath;
 }
 
+std::vector<OpenCvMatch> ScriptActions::opencvFindAll(const QString& templPath, const double threshold, const bool colorCheck)
+{
+    std::vector<OpenCvMatch> results;
+
+    cv::Mat winImg = capture::captureGameWindow();
+    if (winImg.empty()) {
+        Logger::log(QString("opencvFindAll: 截图失败"));
+        return results;
+    }
+
+    // 加载模板（灰度 + Alpha 掩码）
+    QString tempSavePath = resolveTemplatePath(templPath, AppPaths::instance().screenshotPath());
+    bool templateCacheHit = false;
+    const auto templWithMask = loadTemplateWithMask(tempSavePath, templateCacheHit);
+    if (templWithMask.gray.empty()) {
+        Logger::log("opencvFindAll: 模板图片加载失败: " + tempSavePath);
+        return results;
+    }
+    if (!templateCacheHit) {
+        Logger::log("opencvFindAll: 已加载模板图片: " + tempSavePath +
+                    (templWithMask.mask.empty() ? "" : " (含透明掩码)"));
+    }
+    const cv::Mat& templ = templWithMask.gray;
+    const cv::Mat& templMask = templWithMask.mask;
+
+    // 模板截取分辨率侧载
+    const cv::Size templCaptureSize = vision::loadTemplateCaptureSize(tempSavePath);
+    if (templCaptureSize.width > 0 && templCaptureSize.height > 0) {
+        Logger::log(QString("opencvFindAll: 使用模板截取分辨率: %1x%2")
+                    .arg(templCaptureSize.width).arg(templCaptureSize.height));
+    }
+
+    // 多目标匹配
+    Logger::log(QString("opencvFindAll 模板: %1  截图: %2x%3  阈值: %4")
+                .arg(tempSavePath).arg(winImg.cols).arg(winImg.rows).arg(threshold, 0, 'f', 2));
+
+    std::vector<vision::TemplateMatch> matches;
+    vision::ScaleInfo scaleInfo;
+    bool found = vision::findTemplateAll(winImg, templ, matches, threshold,
+                                         &scaleInfo, templMask, templCaptureSize);
+
+    if (!found || matches.empty()) {
+        Logger::log(QString("opencvFindAll: 未找到匹配区域"));
+        // 仍然回显截图，让用户看到当前画面
+        QString savePath = AppPaths::instance().matchResultPath();
+        vision::imwriteQt(savePath, winImg);
+        processAndShowImage(savePath);
+        return results;
+    }
+
+    // 加载彩色模板用于 HSV 颜色校验
+    cv::Mat templColor;
+    if (colorCheck) {
+        bool colorCacheHit = false;
+        templColor = loadTemplateColor(tempSavePath, colorCacheHit);
+    }
+
+    // 基准坐标 -> DX11 原始捕获坐标，并做 HSV 颜色校验
+    cv::Mat resultImg = winImg.clone();
+    for (const auto& m : matches) {
+        cv::Rect matchRect = vision::convertNormalizedRectToCapture(m.rect, scaleInfo);
+
+        // HSV 颜色校验：不通过则跳过该匹配
+        if (colorCheck && !vision::verifyHsvColorMatch(winImg, templColor, matchRect)) {
+            Logger::log(QString("opencvFindAll: score=%1 但 HSV 颜色校验不通过，跳过").arg(m.score, 0, 'f', 2));
+            continue;
+        }
+
+        cv::Point center(matchRect.x + matchRect.width / 2,
+                         matchRect.y + matchRect.height / 2);
+        results.push_back(OpenCvMatch{matchRect, m.score, center});
+
+        // 在结果图上绘制 ROI 框 + 分数标签
+        cv::rectangle(resultImg, matchRect, cv::Scalar(0, 255, 0), 2);
+        QString label = QString("%1").arg(m.score, 0, 'f', 2);
+        cv::putText(resultImg, label.toStdString(),
+                    cv::Point(matchRect.x, matchRect.y - 8),
+                    cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 255, 0), 2);
+    }
+
+    Logger::log(QString("opencvFindAll: 共识别到 %1 个目标").arg(results.size()));
+
+    // 保存并回显结果图（不点击）
+    QString savePath = AppPaths::instance().matchResultPath();
+    vision::imwriteQt(savePath, resultImg);
+    processAndShowImage(savePath);
+
+    return results;
+}
+
 QJsonArray ScriptActions::ocrRecognizes(const QRectF& roiPercent, const ocr::Enhance enhance)
 {
     cv::Mat winImg = capture::captureGameWindow();

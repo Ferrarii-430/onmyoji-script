@@ -11,6 +11,13 @@
 
 #include "src/vision/YOLODetector.h"
 
+// OpenCV 多目标识别结果（DX11 原始捕获坐标系，可直接用于点击）
+struct OpenCvMatch {
+    cv::Rect rect;      // 匹配区域矩形
+    double score = 0.0; // 匹配分数
+    cv::Point center;   // 矩形中心点
+};
+
 namespace ocr {
 
 // OCR 裁剪图预处理开关，可按位组合，仅在裁剪模式（roiPercent 有效）下生效。
@@ -66,6 +73,10 @@ public:
     QString opencvRecognizesAndClick(const QString& templPath, double threshold, bool randomClick, bool colorCheck = false);
     QString opencvRecognizesAndClickByBase64(const QString& base64, double threshold, bool randomClick,
                                              bool colorCheck = false, const cv::Size& captureSize = cv::Size());
+
+    // OpenCV 多目标识别：找出截图中所有匹配模板的区域，回显带 ROI 框的结果图，不点击。
+    // 返回所有匹配结果（DX11 原始捕获坐标系），按分数降序排列，供调用方做下一步判断。
+    std::vector<OpenCvMatch> opencvFindAll(const QString& templPath, double threshold, bool colorCheck = false);
 
     // OCR 识别；roiPercent 为识别区域（左/上/宽/高，单位为图片尺寸的百分比 0~100）；
     // 宽或高 <= 0 时表示识别整张图

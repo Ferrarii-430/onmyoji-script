@@ -476,6 +476,213 @@ bool findTemplate(const cv::Mat& haystack, const cv::Mat& needle,
     return true;
 }
 
+// 计算两个矩形的 IoU（交并比）
+static double rectIoU(const cv::Rect& a, const cv::Rect& b)
+{
+    const cv::Rect inter = a & b;
+    if (inter.width <= 0 || inter.height <= 0) return 0.0;
+    const double interArea = inter.width * inter.height;
+    const double unionArea = a.width * a.height + b.width * b.height - interArea;
+    return unionArea > 0.0 ? interArea / unionArea : 0.0;
+}
+
+// 多目标模板匹配：复用 findTemplate 的预处理逻辑，但在每个尺度上收集所有超过阈值的峰值，
+// 然后跨尺度做 NMS 去重，返回所有匹配结果。
+bool findTemplateAll(const cv::Mat& haystack, const cv::Mat& needle,
+                     std::vector<TemplateMatch>& outMatches, double threshold,
+                     ScaleInfo* info, const cv::Mat& mask,
+                     const cv::Size& templateCaptureSize)
+{
+    outMatches.clear();
+    if (info) *info = ScaleInfo{};
+
+    if (haystack.empty() || needle.empty()) {
+        Logger::log(QString("[ERROR] findTemplateAll 输入图像为空"));
+        return false;
+    }
+
+    QElapsedTimer timer;
+    timer.start();
+
+    // 1. 归一化目标分辨率
+    const bool hasCaptureSize = (templateCaptureSize.width > 0 && templateCaptureSize.height > 0);
+    const int targetWidth  = hasCaptureSize ? templateCaptureSize.width  : BASE_MATCH_WIDTH;
+    const int targetHeight = hasCaptureSize ? templateCaptureSize.height : BASE_MATCH_HEIGHT;
+
+    ScaleInfo localInfo;
+    cv::Mat normHay = normalizeGameFrame(haystack, localInfo, targetWidth, targetHeight);
+    if (normHay.empty()) {
+        Logger::log(QString("[ERROR] findTemplateAll 截图归一化失败"));
+        return false;
+    }
+    if (info) *info = localInfo;
+
+    // 2. 灰度化
+    cv::Mat gHay, gNeedle;
+    try {
+        if (normHay.channels() == 3) {
+            cv::cvtColor(normHay, gHay, cv::COLOR_BGR2GRAY);
+        } else {
+            gHay = normHay;
+        }
+        if (needle.channels() == 3) {
+            cv::cvtColor(needle, gNeedle, cv::COLOR_BGR2GRAY);
+        } else {
+            gNeedle = needle;
+        }
+    } catch (const cv::Exception& e) {
+        Logger::log(QString("[ERROR] findTemplateAll 图像转换失败: %1").arg(e.what()));
+        return false;
+    }
+
+    // 3. CLAHE 对比度增强
+    try {
+        cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE(2.0, cv::Size(8, 8));
+        clahe->apply(gHay, gHay);
+    } catch (const cv::Exception& e) {
+        Logger::log(QString("[WARN] findTemplateAll CLAHE 失败: %1").arg(e.what()));
+    }
+
+    // 4. mask 校验
+    cv::Mat validMask;
+    if (!mask.empty() && mask.size() == needle.size() && mask.type() == CV_8U) {
+        validMask = mask;
+    }
+
+    // 5. 模板基准化
+    cv::Mat baseNeedle;
+    cv::Mat baseMask;
+    if (hasCaptureSize) {
+        baseNeedle = gNeedle;
+        baseMask = validMask;
+    } else {
+        const double baseScale = localInfo.valid() ? localInfo.scale : 1.0;
+        if (std::abs(baseScale - 1.0) < 1e-3) {
+            baseNeedle = gNeedle;
+            baseMask = validMask;
+        } else {
+            cv::Size baseSize(static_cast<int>(std::round(gNeedle.cols * baseScale)),
+                              static_cast<int>(std::round(gNeedle.rows * baseScale)));
+            if (baseSize.width < 1 || baseSize.height < 1 ||
+                baseSize.width > gHay.cols || baseSize.height > gHay.rows) {
+                Logger::log(QString("[ERROR] findTemplateAll 模板映射越界"));
+                return false;
+            }
+            const int baseInterp = (baseScale < 1.0) ? cv::INTER_AREA : cv::INTER_CUBIC;
+            cv::resize(gNeedle, baseNeedle, baseSize, 0, 0, baseInterp);
+            if (!validMask.empty()) {
+                cv::resize(validMask, baseMask, baseSize, 0, 0, cv::INTER_NEAREST);
+            }
+        }
+    }
+
+    // 6. 多尺度扫描，收集所有候选匹配
+    const double scaleMin = 0.85;
+    const double scaleMax = 1.15;
+    const double scaleStep = 0.05;
+
+    struct Candidate {
+        cv::Rect rect;
+        double score;
+        double fineScale;
+    };
+    std::vector<Candidate> candidates;
+
+    for (double s = scaleMin; s <= scaleMax + 1e-6; s += scaleStep) {
+        cv::Size scaledSize(static_cast<int>(std::round(baseNeedle.cols * s)),
+                            static_cast<int>(std::round(baseNeedle.rows * s)));
+        if (scaledSize.width < 1 || scaledSize.height < 1) continue;
+        if (scaledSize.width > gHay.cols || scaledSize.height > gHay.rows) continue;
+
+        cv::Mat scaledNeedle;
+        const int needleInterp = (s < 1.0) ? cv::INTER_AREA : cv::INTER_CUBIC;
+        cv::resize(baseNeedle, scaledNeedle, scaledSize, 0, 0, needleInterp);
+        if (scaledNeedle.empty()) continue;
+
+        cv::Mat scaledMask;
+        if (!baseMask.empty()) {
+            cv::resize(baseMask, scaledMask, scaledSize, 0, 0, cv::INTER_NEAREST);
+        }
+
+        cv::Mat result;
+        try {
+            if (scaledMask.empty()) {
+                cv::matchTemplate(gHay, scaledNeedle, result, cv::TM_CCOEFF_NORMED);
+            } else {
+                cv::matchTemplate(gHay, scaledNeedle, result, cv::TM_CCOEFF_NORMED, scaledMask);
+            }
+        } catch (const cv::Exception& e) {
+            Logger::log(QString("[WARN] findTemplateAll matchTemplate 尺度 %1 异常: %2").arg(s).arg(e.what()));
+            continue;
+        }
+        if (result.empty()) continue;
+
+        // 在结果矩阵中找出所有超过阈值的局部峰值
+        // 方法：阈值化后逐个找最大值，找到后抑制其邻域，再找下一个
+        cv::Mat resultCopy = result.clone();
+        const int suppressRadius = std::max(scaledSize.width, scaledSize.height) / 2;
+
+        while (true) {
+            double maxVal;
+            cv::Point maxLoc;
+            cv::minMaxLoc(resultCopy, nullptr, &maxVal, nullptr, &maxLoc);
+            if (maxVal < threshold) break;
+
+            candidates.push_back(Candidate{
+                cv::Rect(maxLoc.x, maxLoc.y, scaledNeedle.cols, scaledNeedle.rows),
+                maxVal,
+                s
+            });
+
+            // 抑制该峰值周围区域，避免同一个目标被重复检测
+            const int x0 = std::max(0, maxLoc.x - suppressRadius);
+            const int y0 = std::max(0, maxLoc.y - suppressRadius);
+            const int x1 = std::min(resultCopy.cols, maxLoc.x + suppressRadius + 1);
+            const int y1 = std::min(resultCopy.rows, maxLoc.y + suppressRadius + 1);
+            cv::rectangle(resultCopy, cv::Rect(x0, y0, x1 - x0, y1 - y0),
+                          cv::Scalar(0.0), cv::FILLED);
+        }
+    }
+
+    // 7. 按分数降序排序
+    std::sort(candidates.begin(), candidates.end(),
+              [](const Candidate& a, const Candidate& b) { return a.score > b.score; });
+
+    // 8. NMS：跨尺度去重，IoU > 0.3 的低分候选被抑制
+    constexpr double NMS_IOU_THRESHOLD = 0.3;
+    std::vector<Candidate> accepted;
+    for (const auto& cand : candidates) {
+        bool suppressed = false;
+        for (const auto& acc : accepted) {
+            if (rectIoU(cand.rect, acc.rect) > NMS_IOU_THRESHOLD) {
+                suppressed = true;
+                break;
+            }
+        }
+        if (!suppressed) {
+            accepted.push_back(cand);
+        }
+    }
+
+    // 9. 裁剪到画布范围并输出
+    for (const auto& acc : accepted) {
+        cv::Rect r = acc.rect & cv::Rect(0, 0, gHay.cols, gHay.rows);
+        if (r.width > 0 && r.height > 0) {
+            outMatches.push_back(TemplateMatch{r, acc.score, acc.fineScale});
+        }
+    }
+
+    Logger::log(QString("[findAll] 候选=%1 去重后=%2 阈值=%3 耗时=%4ms "
+                        "(src=%5x%6 -> base %7x%8, scale=%9)")
+                .arg(candidates.size()).arg(outMatches.size())
+                .arg(threshold, 0, 'f', 2).arg(timer.elapsed())
+                .arg(localInfo.srcWidth).arg(localInfo.srcHeight)
+                .arg(targetWidth).arg(targetHeight)
+                .arg(localInfo.scale, 0, 'f', 4));
+
+    return !outMatches.empty();
+}
+
 // [兼容旧调用] 内部走归一化单次匹配，返回的 outRect 已转换回 DX11 原始捕获坐标系。
 // scaleMin/scaleMax/scaleStep 参数保留但已废弃，不再生效。
 bool findTemplateMultiScale(const cv::Mat& haystack, const cv::Mat& needle,
