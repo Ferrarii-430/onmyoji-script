@@ -275,6 +275,14 @@ void TaskRunner::run(const QJsonArray& steps, int cycleCount)
 
     } while (m_isRunning && (infiniteLoop || number > 0));
 
+    // 若运行的是武道大会方案，循环结束后重置状态
+    for (const QJsonValue& stepVal : steps) {
+        if (stringToConfigType(stepVal.toObject().value("type").toString()) == ConfigTypeEnum::SYSTEM_BUDOKAI) {
+            scenarios::resetBudokaiStatus();
+            break;
+        }
+    }
+
     m_isRunning = false;
     emit finished();
 

@@ -130,8 +130,8 @@ void GameWindow::ensureMinWidthForCapture(int minWidth)
             ShowWindow(hwnd_, SW_MINIMIZE);
             core::waitWithEventProcessing(50);
         }
-        Logger::log(QString("窗口宽度调整: 当前宽度 %1 >= %2，无需调整")
-                    .arg(currentWidth).arg(minWidth));
+        // Logger::log(QString("窗口宽度调整: 当前宽度 %1 >= %2，无需调整")
+        //             .arg(currentWidth).arg(minWidth));
         return;
     }
 

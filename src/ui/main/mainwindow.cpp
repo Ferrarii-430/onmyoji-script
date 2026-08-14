@@ -20,6 +20,7 @@
 #include <QDoubleSpinBox>
 #include <QFormLayout>
 #include <QLabel>
+#include <QLineEdit>
 #include <QSpinBox>
 #include <QVBoxLayout>
 #include "QMessageBox"
@@ -328,6 +329,17 @@ void mainwindow::showSystemConfigForm(const QString &configId)
             connect(combo, &QComboBox::currentTextChanged, this,
                     [=](const QString &v) { updateSystemConfigValue(configPath, configId, key, v); });
             fieldLayout->addWidget(combo);
+        } else if (control == "input") {
+            // 文本输入：QLineEdit
+            auto *edit = new QLineEdit(fieldWidget);
+            edit->setText(field.value("value").toString());
+            edit->setPlaceholderText(field.value("placeholder").toString());
+            if (field.contains("maxLength")) {
+                edit->setMaxLength(field.value("maxLength").toInt());
+            }
+            connect(edit, &QLineEdit::textChanged, this,
+                    [=](const QString &v) { updateSystemConfigValue(configPath, configId, key, v); });
+            fieldLayout->addWidget(edit);
         }
 
         // 配置项级 tip：单个选项的解释说明，显示在控件下方
