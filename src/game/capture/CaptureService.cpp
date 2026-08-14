@@ -26,18 +26,34 @@ cv::Mat captureGameWindow()
 
     GameWindow& window = GameWindow::instance();
 
-    // 所有截图模式前都按需无感调整窗口宽度至 600。
+    // 所有截图模式前都按需无感调整窗口宽度至 700。
     // PrintWindow 模式同样需要窗口尺寸足够大才能截到清晰画面。
-    window.ensureMinWidthForCapture(340);
+    constexpr int kMinCaptureWidth = 700;
+    window.ensureMinWidthForCapture(kMinCaptureWidth);
 
     QString screenshotMode = SETTING_CONFIG.getScreenshotMode();
-    if (screenshotMode == "PrintWindow") {
-        hasWinImg = captureByPrintWindow(window.handle(), winImg);
-    } else if (screenshotMode == "DirectX截图") {
-        hasWinImg = captureByDllInjection(window.processId(), winImg);
-    } else {
+    const bool usePrintWindow = (screenshotMode == "PrintWindow");
+    if (!usePrintWindow && screenshotMode != "DirectX截图") {
         Logger::log(QString("无法识别鼠标控制模式，默认使用DirectX截图"));
-        hasWinImg = captureByDllInjection(window.processId(), winImg);
+    }
+
+    auto doCapture = [&]() -> bool {
+        if (usePrintWindow) {
+            return captureByPrintWindow(window.handle(), winImg);
+        }
+        return captureByDllInjection(window.processId(), winImg);
+    };
+
+    hasWinImg = doCapture();
+
+    // 首次启动时 Unity 可能未处理窗口尺寸变化，swap chain 仍是旧的小尺寸
+    // 此时按真实捕获尺寸强制调整窗口并重试一次，避免第一次任务启动识别失败。
+    if (hasWinImg && winImg.cols < kMinCaptureWidth) {
+        Logger::log(QString("截图尺寸 %1x%2 低于最小宽度 %3，调整窗口后重试截图")
+                    .arg(winImg.cols).arg(winImg.rows).arg(kMinCaptureWidth));
+        window.setLastCaptureSize(winImg.size());
+        window.ensureMinWidthForCapture(kMinCaptureWidth);
+        hasWinImg = doCapture();
     }
 
     if (!hasWinImg)

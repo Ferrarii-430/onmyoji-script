@@ -148,11 +148,18 @@ void GameWindow::ensureMinWidthForCapture(int minWidth)
         Logger::log(QString("窗口宽度调整: 窗口已从最小化恢复（不激活）"));
     }
 
-    // 用当前真实窗口矩形确定临时高度（恢复后的实际尺寸，比 placement 更可靠）
-    RECT curRect{};
-    GetWindowRect(hwnd_, &curRect);
-    int curH = curRect.bottom - curRect.top;
-    if (curH < 100) curH = 450; // 极端情况下的安全兜底
+    // 阴阳师(Unity) 不接受外部直接指定的窗口尺寸，会按窗口高度自行推导 16:9 客户区：
+    //   客户高 = 窗口高 - 自定义边框(实测约 78px)，客户宽 = 客户高 * 16 / 9
+    // （实测: 窗口 998x622 -> 渲染 966x544；窗口 632x416 -> 渲染 600x338）
+    // 因此只设置"宽度"不会生效，必须通过设置高度间接控制渲染分辨率。
+    // 这里按最小渲染宽度反推固定目标尺寸（16 的倍数并留 16px 余量防止边框误差），
+    // 每次都设置为同一个值，保证调整后渲染分辨率稳定一致。
+    constexpr int kFrameW = 32; // 实测窗口外框与客户区的宽度差
+    constexpr int kFrameH = 78; // 实测窗口外框与客户区的高度差
+    const int clientW = ((minWidth + 31) / 16) * 16; // ≥ minWidth 且为 16 倍数
+    const int clientH = clientW * 9 / 16;
+    const int winW = clientW + kFrameW;
+    const int winH = clientH + kFrameH;
 
     // 先移到屏幕外避免用户看到闪烁
     SetWindowPos(hwnd_, HWND_BOTTOM,
@@ -165,15 +172,15 @@ void GameWindow::ensureMinWidthForCapture(int minWidth)
     SendMessage(hwnd_, WM_ENTERSIZEMOVE, 0, 0);
     SetWindowPos(hwnd_, nullptr,
                  -10000, -10000,
-                 minWidth, curH,
+                 winW, winH,
                  SWP_NOACTIVATE | SWP_NOZORDER);
     RECT newSize{};
     GetClientRect(hwnd_, &newSize);
     SendMessage(hwnd_, WM_SIZE, SIZE_RESTORED,
                 MAKELPARAM(newSize.right, newSize.bottom));
     SendMessage(hwnd_, WM_EXITSIZEMOVE, 0, 0);
-    Logger::log(QString("窗口宽度调整: 已发送尺寸调整消息 (目标宽度 %1, 临时高度 %2)")
-                .arg(minWidth).arg(curH));
+    Logger::log(QString("窗口宽度调整: 已发送尺寸调整消息 (客户区 %1x%2, 窗口 %3x%4)")
+                .arg(clientW).arg(clientH).arg(winW).arg(winH));
 
     // 等待 Unity 监听 WM_EXITSIZEMOVE 后调用 Screen.SetResolution 重建 swap chain
     core::waitWithEventProcessing(500);
@@ -182,16 +189,85 @@ void GameWindow::ensureMinWidthForCapture(int minWidth)
     int restoreX = placementRect.left;
     int restoreY = placementRect.top;
     if (isHiddenPlacement) {
-        restoreX = (GetSystemMetrics(SM_CXSCREEN) - minWidth) / 2;
-        restoreY = (GetSystemMetrics(SM_CYSCREEN) - curH) / 2;
+        restoreX = (GetSystemMetrics(SM_CXSCREEN) - winW) / 2;
+        restoreY = (GetSystemMetrics(SM_CYSCREEN) - winH) / 2;
         Logger::log(QString("窗口宽度调整: placement 在系统隐藏区，恢复位置改用屏幕中心 (%1, %2)")
                     .arg(restoreX).arg(restoreY));
+    } else {
+        // 窗口变宽后原位置可能超出屏幕（如原本贴近右缘）导致右侧被遮挡，需重新计算恢复位置。
+        // 注意两点：
+        // 1. 用显示器坐标（MonitorFromPoint）而不是 SM_CXSCREEN（后者仅主屏，多显示器不准）；
+        // 2. 游戏在尺寸调整后常自行把窗口恢复到原来的大小（如 752x483 -> 988x616），
+        //    因此用 max(临时尺寸, 原尺寸) 做边界校验，确保恢复后无论哪种尺寸都完整可见。
+        POINT anchor{placementRect.left + 1, placementRect.top + 1};
+        const HMONITOR hMon = MonitorFromPoint(anchor, MONITOR_DEFAULTTONEAREST);
+        MONITORINFO mi{};
+        mi.cbSize = sizeof(MONITORINFO);
+        if (hMon && GetMonitorInfo(hMon, &mi)) {
+            // 用 rcWork（工作区，已排除任务栏）而非 rcMonitor
+            Logger::log(QString("窗口宽度调整: 工作区 [%1,%2 - %3,%4], 预计恢复 X=%5, 预计宽=%6")
+                        .arg(mi.rcWork.left).arg(mi.rcWork.top)
+                        .arg(mi.rcWork.right).arg(mi.rcWork.bottom)
+                        .arg(restoreX).arg(qMax(winW, placementW)));
+            const int workLeft = mi.rcWork.left;
+            const int workRight = mi.rcWork.right;
+            const int workTop = mi.rcWork.top;
+            const int workBottom = mi.rcWork.bottom;
+            // 留 16px 余量，避免窗口边框正好压在工作区边缘或贴边任务栏
+            constexpr int kMargin = 16;
+            const int finalW = qMax(winW, placementW) + kMargin;
+            const int finalH = qMax(winH, placementH) + kMargin;
+            if (restoreX + finalW > workRight) {
+                restoreX = qMax(static_cast<int>(workLeft),
+                                static_cast<int>(workRight) - finalW);
+                Logger::log(QString("窗口宽度调整: 原位置贴右缘，横向位置修正为 (%1, %2)")
+                            .arg(restoreX).arg(restoreY));
+            }
+            if (restoreY + finalH > workBottom) {
+                restoreY = qMax(static_cast<int>(workTop),
+                                static_cast<int>(workBottom) - finalH);
+                Logger::log(QString("窗口宽度调整: 原位置贴下缘，纵向位置修正为 (%1, %2)")
+                            .arg(restoreX).arg(restoreY));
+            }
+        }
     }
     SetWindowPos(hwnd_, nullptr,
                  restoreX, restoreY,
                  0, 0,
                  SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOZORDER);
     Logger::log(QString("窗口宽度调整: 位置已恢复至 (%1, %2)").arg(restoreX).arg(restoreY));
+
+    // 二次校正：游戏(Unity)的 Screen.SetResolution 是异步的，恢复位置后才把窗口
+    // resize 回原尺寸，且该过程可能改变窗口位置（每次运行 placement 逐渐漂移）。
+    // 等游戏 resize 完成后读取实际窗口矩形，超出工作区则强制拉回。
+    core::waitWithEventProcessing(1000);
+    if (!IsIconic(hwnd_)) {
+        RECT actual{};
+        if (GetWindowRect(hwnd_, &actual)) {
+            const HMONITOR hMon = MonitorFromPoint(
+                POINT{(actual.left + actual.right) / 2, (actual.top + actual.bottom) / 2},
+                MONITOR_DEFAULTTONEAREST);
+            MONITORINFO mi{};
+            mi.cbSize = sizeof(MONITORINFO);
+            if (hMon && GetMonitorInfo(hMon, &mi)) {
+                const int aw = actual.right - actual.left;
+                const int ah = actual.bottom - actual.top;
+                int ax = actual.left;
+                int ay = actual.top;
+                if (ax + aw > mi.rcWork.right) ax = mi.rcWork.right - aw;
+                if (ay + ah > mi.rcWork.bottom) ay = mi.rcWork.bottom - ah;
+                if (ax < mi.rcWork.left) ax = mi.rcWork.left;
+                if (ay < mi.rcWork.top) ay = mi.rcWork.top;
+                if (ax != actual.left || ay != actual.top) {
+                    SetWindowPos(hwnd_, nullptr, ax, ay, 0, 0,
+                                 SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOZORDER);
+                    Logger::log(QString("窗口宽度调整: 二次校正，实际矩形 (%1,%2 %3x%4) 超出工作区，已移至 (%5, %6)")
+                                .arg(actual.left).arg(actual.top).arg(aw).arg(ah)
+                                .arg(ax).arg(ay));
+                }
+            }
+        }
+    }
 
     // 恢复最小化状态（hook 截图支持最小化，此后按新尺寸出帧）
     if (wasIconic) {
