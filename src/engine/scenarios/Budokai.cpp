@@ -115,10 +115,10 @@ bool executeBudokai()
             Logger::log(QString("未找到分组: %1").arg(schemeName));
             return false;
         }
-        waitWithEventProcessing(1000);
+        waitWithEventProcessing(1500);
 
         // 4. 识别队伍预设名称，记录目标预设的 box
-        QJsonArray presetData = actions.ocrRecognizes(QRectF(40, 19, 39, 70), ocr::Enhance::Upscale);
+        QJsonArray presetData = actions.ocrRecognizes(QRectF(40, 18, 27, 62), ocr::Enhance::Upscale);
         QJsonArray targetPresetBox; // {"box":[[47,120],[77,120],[77,136],[47,136]]}
         for (const QJsonValue& val : presetData) {
             const QJsonObject item = val.toObject();
@@ -276,7 +276,7 @@ bool executeBudokai()
         Logger::log(QString("无法识别当前的怪物状态: status=%1").arg(status));
         return false;
     }
-    QJsonArray presetData = actions.ocrRecognizes(QRectF(14, 30, 39, 60), ocr::Enhance::Upscale);
+    QJsonArray presetData = actions.ocrRecognizes(QRectF(14, 30, 32, 60), ocr::Enhance::Upscale);
     bool foundPreset = false;
     for (const QJsonValue& val : presetData) {
         const QJsonObject item = val.toObject();
@@ -331,12 +331,12 @@ bool executeBudokai()
     for (int i = 0; i < MAX_WAIT_NUM; ++i)
     {
         waitWithEventProcessing(MAX_WAIT_TIME);
-        if (actions.yoloContainsLabels(0.55, {"battle-victory"}, false))
+        if (actions.yoloContainsLabels(0.45, {"battle-victory"}, false))
         {
             //再多等一等，防止无效点击
             waitWithEventProcessing(2000);
             constexpr ClickExclude yoloBattleVictoryExclude{0.1, 0.1, 0.1, 0.2};
-            if (!actions.yoloRecognizesAndClick(0.55, randomClick, "battle-victory", yoloBattleVictoryExclude).isEmpty())
+            if (!actions.yoloRecognizesAndClick(0.45, randomClick, "battle-victory", yoloBattleVictoryExclude).isEmpty())
             {
                 awaitingBattle = true;
                 break;
