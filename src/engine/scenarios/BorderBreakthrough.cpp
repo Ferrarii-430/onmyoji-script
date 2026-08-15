@@ -119,7 +119,7 @@ bool executeBorderBreakthrough()
 
             Logger::log(QString("开始点击进攻"));
             //点击攻击
-            if (actions.ocrRecognizesAndClick("进攻",0.55,true) != nullptr)
+            if (actions.ocrRecognizesAndClick("进攻",0.55,true, QRectF(), ocr::Enhance::Upscale) != nullptr)
             {
                 const int MAX_ATTEMPTS = 5;  // 5次 * 1秒 = 5秒
                 int attempts = 0;
@@ -143,7 +143,7 @@ bool executeBorderBreakthrough()
 
                         Logger::log(QString("识别失败并点击"));
                         //识别战斗失败 并点击，成功则退出等待循环，否则结束任务
-                        QString savePath = actions.ocrRecognizesAndClick("失败", 0.5, true);
+                        QString savePath = actions.ocrRecognizesAndClick("失败", 0.5, true, QRectF(), ocr::Enhance::Upscale);
                         if (savePath.isEmpty()) {
                             Logger::log(QString("未识别到目标字段，结束任务"));
                             return false;
@@ -197,7 +197,7 @@ bool executeBorderBreakthrough()
 
         //点击攻击
         Logger::log(QString("开始点击进攻"));
-        if (actions.ocrRecognizesAndClick("进攻",0.55,true) != nullptr)
+        if (actions.ocrRecognizesAndClick("进攻",0.55,true, QRectF(), ocr::Enhance::Upscale) != nullptr)
         {
             // 循环等待直到找到战斗结束框，最多等待3分钟
             const int MAX_ATTEMPTS = 18;  // 18次 * 10秒 = 3分钟
@@ -246,7 +246,7 @@ bool executeBorderBreakthrough()
 int getNumberOfTickets()
 {
     ScriptActions& actions = ScriptActions::instance();
-    QJsonArray ticketsData = actions.ocrRecognizes(QRectF(60, 0, 100, 8));
+    QJsonArray ticketsData = actions.ocrRecognizes(QRectF(60, 0, 100, 8), ocr::Enhance::Upscale);
     if (ticketsData.empty())
     {
         qWarning() << "门票检测异常：" << ticketsData;

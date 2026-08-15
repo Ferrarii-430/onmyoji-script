@@ -97,7 +97,7 @@ bool executeBudokai()
         waitWithEventProcessing(1000);
 
         // 3. 切换分组：识别分组列表，点击匹配 schemeName 的项
-        QJsonArray groupingData = actions.ocrRecognizes(QRectF(83, 9, 16, 81));
+        QJsonArray groupingData = actions.ocrRecognizes(QRectF(83, 9, 16, 81), ocr::Enhance::Upscale);
         bool foundGrouping = false;
         for (const QJsonValue& val : groupingData) {
             const QJsonObject item = val.toObject();
@@ -118,7 +118,7 @@ bool executeBudokai()
         waitWithEventProcessing(1000);
 
         // 4. 识别队伍预设名称，记录目标预设的 box
-        QJsonArray presetData = actions.ocrRecognizes(QRectF(40, 19, 39, 70));
+        QJsonArray presetData = actions.ocrRecognizes(QRectF(40, 19, 39, 70), ocr::Enhance::Upscale);
         QJsonArray targetPresetBox; // {"box":[[47,120],[77,120],[77,136],[47,136]]}
         for (const QJsonValue& val : presetData) {
             const QJsonObject item = val.toObject();
@@ -196,7 +196,7 @@ bool executeBudokai()
     waitWithEventProcessing(5000);
 
     // 2. 识别怪物名称
-    QJsonArray monsterData = actions.ocrRecognizes(QRectF(26, 13, 7, 37));
+    QJsonArray monsterData = actions.ocrRecognizes(QRectF(26, 13, 7, 37), ocr::Enhance::Upscale | ocr::Enhance::Grayscale | ocr::Enhance::Contrast);
     if (monsterData.size() == 1) {
         monsterName = monsterData[0].toObject()["text"].toString();
     } else {
@@ -247,7 +247,7 @@ bool executeBudokai()
     }
 
     //7. 切换分组：识别分组列表，点击匹配 schemeName 的项
-    QJsonArray groupingData = actions.ocrRecognizes(QRectF(1, 28, 14, 72));
+    QJsonArray groupingData = actions.ocrRecognizes(QRectF(1, 28, 14, 72), ocr::Enhance::Upscale);
     bool foundGrouping = false;
     for (const QJsonValue& val : groupingData) {
         const QJsonObject item = val.toObject();
@@ -276,7 +276,7 @@ bool executeBudokai()
         Logger::log(QString("无法识别当前的怪物状态: status=%1").arg(status));
         return false;
     }
-    QJsonArray presetData = actions.ocrRecognizes(QRectF(14, 30, 39, 60));
+    QJsonArray presetData = actions.ocrRecognizes(QRectF(14, 30, 39, 60), ocr::Enhance::Upscale);
     bool foundPreset = false;
     for (const QJsonValue& val : presetData) {
         const QJsonObject item = val.toObject();

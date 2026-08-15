@@ -91,7 +91,7 @@ namespace scenarios
                 waitWithEventProcessing(2000);
 
                 //先判断是不是队长
-                QJsonArray teamData = actions.ocrRecognizes(QRectF(80, 65, 100, 100));
+                QJsonArray teamData = actions.ocrRecognizes(QRectF(80, 65, 100, 100), ocr::Enhance::Upscale);
                 isCaptain = false;
                 for (int i = 0; i < teamData.size(); ++i)
                 {
@@ -140,7 +140,7 @@ namespace scenarios
             {
                 //单人模式
                 isCaptain = true;
-                const QString settled = actions.ocrRecognizesAndClickAny({"挑战"}, 0.8, true, QRectF(80, 65, 100, 100));
+                const QString settled = actions.ocrRecognizesAndClickAny({"挑战"}, 0.8, true, QRectF(80, 65, 100, 100), ocr::Enhance::Upscale);
                 if (!settled.isEmpty())
                 {
                     Logger::log(QString("点击挑战"));
@@ -188,7 +188,7 @@ namespace scenarios
 
                 // 战斗结束结算：一次 OCR 识别，命中「生利(胜利)」或「失败」哪个就点哪个
                 const QString settled = actions.ocrRecognizesAndClickAny(QStringList{"胜利","生利", "失败"}, 0.55, true,
-                                                                         QRectF(16, 0, 69, 37));
+                                                                         QRectF(16, 0, 69, 37), ocr::Enhance::Upscale);
                 if (!settled.isEmpty()) {
                     Logger::log(QString("本轮御魂完成（结算：%1）").arg(
                         (settled == QStringLiteral("胜利") || settled == QStringLiteral("生利"))
@@ -247,7 +247,7 @@ namespace scenarios
                     } else
                     {
                         //自动发送邀请 等待队友入队 进入战斗
-                        QString savePathAutoSendRequestEnable = actions.ocrRecognizesAndClick("默认邀请队友", 0.55, true);
+                        QString savePathAutoSendRequestEnable = actions.ocrRecognizesAndClick("默认邀请队友", 0.55, true, QRectF(), ocr::Enhance::Upscale);
                         if (!savePathAutoSendRequestEnable.isEmpty())
                         {
                             waitWithEventProcessing(1000); // 等待刷新完成
@@ -323,7 +323,7 @@ namespace scenarios
     int getCurrentInterface()
     {
         //1.御魂副本选择界面 2.队伍界面 3.战斗界面 4.奖励领取界面 5.收到悬赏封印 6.其他界面(直接停止任务)
-        QJsonArray interfaceData = actions.ocrRecognizes(QRectF(0, 0, 20, 15));
+        QJsonArray interfaceData = actions.ocrRecognizes(QRectF(0, 0, 20, 15), ocr::Enhance::Upscale);
         for (int i = 0; i < interfaceData.size(); ++i)
         {
             QJsonObject item = interfaceData[i].toObject();

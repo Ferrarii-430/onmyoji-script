@@ -82,7 +82,7 @@ bool executeArena()
             readied = true;
             break;
         }
-        if (!actions.ocrRecognizesAndClick("上阵", kOcrScore, randomClick, QRectF(0, 13, 13, 28)).isEmpty()) {
+        if (!actions.ocrRecognizesAndClick("上阵", kOcrScore, randomClick, QRectF(0, 13, 13, 28), ocr::Enhance::Upscale).isEmpty()) {
             readied = true;
             break;
         }
@@ -99,7 +99,7 @@ bool executeArena()
     for (int i = 40 - 1; i >= 0; --i)
     {
         waitWithEventProcessing(5000);
-        QJsonArray isAutoData = actions.ocrRecognizes(QRectF(0, 13, 13, 28));
+        QJsonArray isAutoData = actions.ocrRecognizes(QRectF(0, 13, 13, 28), ocr::Enhance::Upscale);
         //正常来说只会有一个文字
         QJsonObject item = isAutoData[0].toObject();//TODO 此处会异常闪退
         const QString text = item["text"].toString();
@@ -148,7 +148,7 @@ bool executeArena()
 
         // 战斗结束结算：一次 OCR 识别，命中「生利(胜利)」或「失败」哪个就点哪个
         const QString settled = actions.ocrRecognizesAndClickAny(QStringList{"胜利", "失败"}, kOcrScore, randomClick,
-                                                                 QRectF(16, 0, 69, 37));
+                                                                 QRectF(16, 0, 69, 37), ocr::Enhance::Upscale);
         if (!settled.isEmpty()) {
             waitWithEventProcessing(2000);
             Logger::log(QString("斗技本轮完成（结算：%1）").arg(settled == QStringLiteral("胜利") ? "胜利" : "失败"));
