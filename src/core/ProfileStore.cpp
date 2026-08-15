@@ -140,6 +140,10 @@ void addConfigToJsonFile(const QString &filePath, const QString &configId, const
             newObj["ocrRoiW"]    = safeValue(json, "ocrRoiW");
             newObj["ocrRoiH"]    = safeValue(json, "ocrRoiH");
             newObj["ocrEnhance"] = safeValue(json, "ocrEnhance");
+            newObj["excludeLeft"]   = safeValue(json, "excludeLeft");
+            newObj["excludeRight"]  = safeValue(json, "excludeRight");
+            newObj["excludeTop"]    = safeValue(json, "excludeTop");
+            newObj["excludeBottom"] = safeValue(json, "excludeBottom");
 
             //获取原来的 steps 数组并修改
             QJsonArray stepsArray = obj.value("steps").toArray();
@@ -219,6 +223,10 @@ void updateConfigInJsonFile(const QString &filePath, const QString &configId, co
                     updatedStep["ocrRoiW"]    = safeValue(json, "ocrRoiW");
                     updatedStep["ocrRoiH"]    = safeValue(json, "ocrRoiH");
                     updatedStep["ocrEnhance"] = safeValue(json, "ocrEnhance");
+                    updatedStep["excludeLeft"]   = safeValue(json, "excludeLeft");
+                    updatedStep["excludeRight"]  = safeValue(json, "excludeRight");
+                    updatedStep["excludeTop"]    = safeValue(json, "excludeTop");
+                    updatedStep["excludeBottom"] = safeValue(json, "excludeBottom");
 
                     // 替换原来的步骤对象
                     stepsArray[j] = updatedStep;

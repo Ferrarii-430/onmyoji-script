@@ -18,6 +18,18 @@ struct OpenCvMatch {
     cv::Point center;   // 矩形中心点
 };
 
+// 点击位置的边框排除区域：相对匹配矩形的比例（0~1）。
+// 例如 left=0.3 表示匹配框左侧 30% 的竖条带内不取点击点。
+// 仅在随机点击（randomClick=true）时生效；全部为 0 表示不排除。
+struct ClickExclude {
+    double left = 0.0;   // 排除左侧 [0, left) 宽度比例的竖条带
+    double right = 0.0;  // 排除右侧 (1-right, 1] 宽度比例的竖条带
+    double top = 0.0;    // 排除上侧 [0, top) 高度比例的横条带
+    double bottom = 0.0; // 排除下侧 (1-bottom, 1] 高度比例的横条带
+
+    bool empty() const { return left <= 0.0 && right <= 0.0 && top <= 0.0 && bottom <= 0.0; }
+};
+
 namespace ocr {
 
 // OCR 裁剪图预处理开关，可按位组合，仅在裁剪模式（roiPercent 有效）下生效。
@@ -70,9 +82,12 @@ public:
 
     // OpenCV 模板匹配识别并点击，成功返回结果图路径，失败返回空
     // colorCheck 为是否做 HSV 颜色校验（用于区分同形状不同色的模板）
-    QString opencvRecognizesAndClick(const QString& templPath, double threshold, bool randomClick, bool colorCheck = false);
+    // exclude 为随机点击时排除的边框区域比例，仅在 randomClick=true 时生效
+    QString opencvRecognizesAndClick(const QString& templPath, double threshold, bool randomClick,
+                                     bool colorCheck = false, const ClickExclude& exclude = ClickExclude{});
     QString opencvRecognizesAndClickByBase64(const QString& base64, double threshold, bool randomClick,
-                                             bool colorCheck = false, const cv::Size& captureSize = cv::Size());
+                                             bool colorCheck = false, const cv::Size& captureSize = cv::Size(),
+                                             const ClickExclude& exclude = ClickExclude{});
 
     // OpenCV 多目标识别：找出截图中所有匹配模板的区域，回显带 ROI 框的结果图，不点击。
     // 返回所有匹配结果（DX11 原始捕获坐标系），按分数降序排列，供调用方做下一步判断。
@@ -99,7 +114,7 @@ public:
     // YOLO 是否包含指定标签；matchAll 为 false 时任一标签命中即返回 true
     bool yoloContainsLabels(double threshold, const QStringList& targetLabels, bool matchAll = false);
     QString yoloRecognizesAndClick(double threshold, bool randomClick, const QString& targetLabelName,
-                                   double excludeStartWidth, double excludeEndWidth);
+                                   const ClickExclude& exclude = ClickExclude{});
 
     // 在 YOLO 识别结果中点击指定标签，成功返回 true
     bool clickDetectionByLabel(const QString& targetLabel, double threshold,

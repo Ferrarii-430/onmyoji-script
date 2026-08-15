@@ -36,7 +36,7 @@ constexpr bool randomClick = true;
 
 } // namespace
 
-void executeArena()
+bool executeArena()
 {
     ScriptActions& actions = ScriptActions::instance();
     Logger::log(QString("开始执行自动挂机斗技"));
@@ -60,14 +60,14 @@ void executeArena()
     if (fraction && automaticStop)
     {
         Logger::log(QString("已刷满荣誉值，退出自动斗技任务"));
-        return;
+        return false;
     }
 
     // 1. 点击「开始匹配」（部分界面按钮文案仅为「匹配」，两者都尝试）
     QString matchClick = actions.ocrRecognizesAndClick("战", kOcrScore, randomClick, QRectF(87.5, 72, 100, 100), ocr::Enhance::All);
     if (matchClick.isEmpty()) {
         Logger::log(QString("未找到匹配按钮，可能不在斗技界面，结束本次执行"));
-        return;
+        return false;
     }
 
     waitWithEventProcessing(5000); // 等待进入战斗
@@ -89,7 +89,7 @@ void executeArena()
     }
     if (!readied) {
         Logger::log(QString("等待匹配/准备超时，结束本次执行"));
-        return;
+        return false;
     }
 
     // 3. 进入战斗后确保开启「自动」,如果对面是手动上场，那就不管了，挂满30s会开自动的
@@ -159,8 +159,10 @@ void executeArena()
     }
     if (!isEnd) {
         Logger::log(QString("等待战斗结束超时，结束本次执行"));
-        return;
+        return false;
     }
+
+    return true;
 }
 
 bool getNumberOfFraction()

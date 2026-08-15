@@ -31,6 +31,7 @@ OcrForm::OcrForm(QWidget *parent) :
     ui->opencvErrorHandle->addItem("跳过本次循环","continue");
     ui->opencvErrorHandle->addItem("停止执行任务","break");
     ui->opencvErrorHandle->addItem("重试","retry");
+    ui->opencvErrorHandle->setCurrentIndex(ui->opencvErrorHandle->findData("break"));
 
     ui->spinScoreBox->setValue(0.55);
 
@@ -91,8 +92,8 @@ void OcrForm::loadFromJson(const QString &configId, const QJsonObject &obj)
             initStepInputBoxSelect(configId,obj["stepsId"].toString());
         }
     } else {
-        // 如果配置值不在选项中，使用默认值
-        ui->opencvErrorHandle->setCurrentIndex(0);
+        // 如果配置值不在选项中，使用默认值（停止执行任务）
+        ui->opencvErrorHandle->setCurrentIndex(ui->opencvErrorHandle->findData("break"));
     }
 }
 

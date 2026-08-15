@@ -309,7 +309,7 @@ void ScriptActions::processAndShowImage(const QString& imagePath)
 
 QString ScriptActions::opencvRecognizesAndClickByBase64(const QString& base64, const double threshold,
                                                         const bool randomClick, const bool colorCheck,
-                                                        const cv::Size& captureSize)
+                                                        const cv::Size& captureSize, const ClickExclude& exclude)
 {
     if (base64.isEmpty()) {
         return "错误: base64 图像数据为空";
@@ -337,10 +337,11 @@ QString ScriptActions::opencvRecognizesAndClickByBase64(const QString& base64, c
         vision::saveTemplateCaptureSize(tempFile.fileName(), captureSize);
     }
 
-    return opencvRecognizesAndClick(tempFile.fileName(), threshold, randomClick, colorCheck);
+    return opencvRecognizesAndClick(tempFile.fileName(), threshold, randomClick, colorCheck, exclude);
 }
 
-QString ScriptActions::opencvRecognizesAndClick(const QString& templPath, const double threshold, const bool randomClick, const bool colorCheck)
+QString ScriptActions::opencvRecognizesAndClick(const QString& templPath, const double threshold, const bool randomClick,
+                                                const bool colorCheck, const ClickExclude& exclude)
 {
     cv::Mat winImg = capture::captureGameWindow();
     if (winImg.empty())
@@ -402,7 +403,26 @@ QString ScriptActions::opencvRecognizesAndClick(const QString& templPath, const 
 
     cv::Point clickPt;
     if (randomClick) {
-        clickPt = vision::randomPointInRect(matchRect);
+        if (exclude.empty()) {
+            clickPt = vision::randomPointInRect(matchRect);
+        } else {
+            // 按比例生成边框排除条带（同结界突破的排除逻辑），
+            // 超过最大尝试次数时备选中心点
+            std::vector<cv::Rect> excludeAreas;
+            if (exclude.left > 0.0) {
+                excludeAreas.push_back(vision::widthExcludeRect(matchRect, 0.0, exclude.left));
+            }
+            if (exclude.right > 0.0) {
+                excludeAreas.push_back(vision::widthExcludeRect(matchRect, 1.0 - exclude.right, 1.0));
+            }
+            if (exclude.top > 0.0) {
+                excludeAreas.push_back(vision::heightExcludeRect(matchRect, 0.0, exclude.top));
+            }
+            if (exclude.bottom > 0.0) {
+                excludeAreas.push_back(vision::heightExcludeRect(matchRect, 1.0 - exclude.bottom, 1.0));
+            }
+            clickPt = vision::randomPointInRectExcludeAreas(matchRect, excludeAreas);
+        }
     } else {
         clickPt = cv::Point(matchRect.x + matchRect.width / 2,
                            matchRect.y + matchRect.height / 2);
@@ -745,10 +765,10 @@ QString ScriptActions::ocrRecognizesAndClickAny(const QStringList& ocrTexts, con
  * @param threshold 得分
  * @param randomClick 是否随机点击
  * @param targetLabelName 需要识别的标签名称 名称列表参考 :resource/classes.txt，可以看缩略图
- * @param excludeStartWidth 排除区域起始宽度百分比 (0.0-1.0)
- * @param excludeEndWidth 排除区域结束宽度百分比 (0.0-1.0)
+ * @param exclude 随机点击时排除的边框区域比例，全部为 0 表示不排除
  */
-QString ScriptActions::yoloRecognizesAndClick(const double threshold, const bool randomClick, const QString& targetLabelName, double excludeStartWidth, double excludeEndWidth)
+QString ScriptActions::yoloRecognizesAndClick(const double threshold, const bool randomClick, const QString& targetLabelName,
+                                              const ClickExclude& exclude)
 {
     cv::Mat winImg = capture::captureGameWindow();
 
@@ -784,7 +804,26 @@ QString ScriptActions::yoloRecognizesAndClick(const double threshold, const bool
     if (!matchRect.empty())
     {
         if (randomClick) {
-            clickPt = vision::randomPointInRectExcludeWidth(matchRect, excludeStartWidth, excludeEndWidth, 10);
+            if (!exclude.empty()) {
+                // 四边排除：与 OpenCV 识别点击相同的边框排除逻辑，
+                // 超过最大尝试次数时备选中心点
+                std::vector<cv::Rect> excludeAreas;
+                if (exclude.left > 0.0) {
+                    excludeAreas.push_back(vision::widthExcludeRect(matchRect, 0.0, exclude.left));
+                }
+                if (exclude.right > 0.0) {
+                    excludeAreas.push_back(vision::widthExcludeRect(matchRect, 1.0 - exclude.right, 1.0));
+                }
+                if (exclude.top > 0.0) {
+                    excludeAreas.push_back(vision::heightExcludeRect(matchRect, 0.0, exclude.top));
+                }
+                if (exclude.bottom > 0.0) {
+                    excludeAreas.push_back(vision::heightExcludeRect(matchRect, 1.0 - exclude.bottom, 1.0));
+                }
+                clickPt = vision::randomPointInRectExcludeAreas(matchRect, excludeAreas);
+            } else {
+                clickPt = vision::randomPointInRect(matchRect);
+            }
         } else {
             clickPt = cv::Point(matchRect.x + matchRect.width / 2,
                                matchRect.y + matchRect.height / 2);
@@ -797,16 +836,6 @@ QString ScriptActions::yoloRecognizesAndClick(const double threshold, const bool
     }else
     {
         Logger::log(QString("未识别到指定目标"));
-    }
-
-    // 如果指定了排除区域，也在图像上标记出来（蓝色矩形）
-    if (excludeStartWidth < excludeEndWidth && matchRect.width > 0) {
-        int excludeX = matchRect.x + matchRect.width * excludeStartWidth;
-        int excludeWidth = matchRect.width * (excludeEndWidth - excludeStartWidth);
-        cv::Rect excludeRect(excludeX, matchRect.y, excludeWidth, matchRect.height);
-        cv::rectangle(captureImg, excludeRect, cv::Scalar(255, 0, 0), 2);
-        cv::putText(captureImg, "Exclude Area", cv::Point(excludeRect.x, excludeRect.y - 5),
-                   cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 0, 0), 1);
     }
 
     QString savePath = AppPaths::instance().matchResultPath();

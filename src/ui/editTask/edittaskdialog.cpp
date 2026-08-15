@@ -179,12 +179,18 @@ void EditTaskDialog::onTestButtonClick()
         const double score = json["score"].toDouble();
         const bool randomClick = json["randomClick"].toBool();
         const cv::Size captureSize(json["captureWidth"].toInt(0), json["captureHeight"].toInt(0));
+        const ClickExclude exclude{
+            json["excludeLeft"].toDouble(0.0),
+            json["excludeRight"].toDouble(0.0),
+            json["excludeTop"].toDouble(0.0),
+            json["excludeBottom"].toDouble(0.0)
+        };
         if (isBase64(imagePath))
         {
-            savePath  = ScriptActions::instance().opencvRecognizesAndClickByBase64(imagePath, score, randomClick, false, captureSize);
+            savePath  = ScriptActions::instance().opencvRecognizesAndClickByBase64(imagePath, score, randomClick, false, captureSize, exclude);
         }else
         {
-            savePath = ScriptActions::instance().opencvRecognizesAndClick(imagePath, score, randomClick);
+            savePath = ScriptActions::instance().opencvRecognizesAndClick(imagePath, score, randomClick, false, exclude);
         }
         if (savePath.isEmpty())
         {
@@ -213,7 +219,13 @@ void EditTaskDialog::onTestButtonClick()
         QString yoloLabel = json["yoloLabel"].toString();
         const double score = json["score"].toDouble();
         const bool randomClick = json["randomClick"].toBool();
-        QString savePath = ScriptActions::instance().yoloRecognizesAndClick(score, randomClick, yoloLabel, 0.0, 0.0);
+        const ClickExclude exclude{
+            json["excludeLeft"].toDouble(0.0),
+            json["excludeRight"].toDouble(0.0),
+            json["excludeTop"].toDouble(0.0),
+            json["excludeBottom"].toDouble(0.0)
+        };
+        QString savePath = ScriptActions::instance().yoloRecognizesAndClick(score, randomClick, yoloLabel, exclude);
         if (savePath.isEmpty())
         {
             Logger::log(QString("测试YOLO识别失败"));

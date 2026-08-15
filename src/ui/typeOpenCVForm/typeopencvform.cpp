@@ -28,12 +28,17 @@ TypeOpenCVForm::TypeOpenCVForm(QWidget *parent) :
 
     ui->spinScoreBox->setValue(0.55);
     ui->colorCheckCheckBox->setChecked(false); // 默认不开启颜色判断
+    ui->excludeLeftBox->setValue(0.0);   // 边框排除默认全 0（不排除）
+    ui->excludeRightBox->setValue(0.0);
+    ui->excludeTopBox->setValue(0.0);
+    ui->excludeBottomBox->setValue(0.0);
 
     ui->opencvErrorHandle->addItem("继续执行任务","next");
     ui->opencvErrorHandle->addItem("跳转步骤","jump");
     ui->opencvErrorHandle->addItem("跳过本次循环","continue");
     ui->opencvErrorHandle->addItem("停止执行任务","break");
     ui->opencvErrorHandle->addItem("重试","retry");
+    ui->opencvErrorHandle->setCurrentIndex(ui->opencvErrorHandle->findData("break"));
 
     connect(ui->btnCapture, &QPushButton::clicked, this, &TypeOpenCVForm::onCaptureButtonClicked);
 
@@ -63,6 +68,11 @@ void TypeOpenCVForm::loadFromJson(const QString &configId, const QJsonObject &ob
     ui->spinScoreBox->setValue(obj["score"].toDouble());
     ui->randomClickCheckBox->setChecked(obj["randomClick"].toBool());
     ui->colorCheckCheckBox->setChecked(obj["colorCheck"].toBool());
+    // 比值(0~0.9) -> 百分比(0~90)
+    ui->excludeLeftBox->setValue(qRound(obj["excludeLeft"].toDouble(0.0) * 100.0));
+    ui->excludeRightBox->setValue(qRound(obj["excludeRight"].toDouble(0.0) * 100.0));
+    ui->excludeTopBox->setValue(qRound(obj["excludeTop"].toDouble(0.0) * 100.0));
+    ui->excludeBottomBox->setValue(qRound(obj["excludeBottom"].toDouble(0.0) * 100.0));
     templateCaptureWidth_ = obj["captureWidth"].toInt(0);
     templateCaptureHeight_ = obj["captureHeight"].toInt(0);
 
@@ -86,8 +96,8 @@ void TypeOpenCVForm::loadFromJson(const QString &configId, const QJsonObject &ob
             }
         }
     } else {
-        // 如果配置值不在选项中，使用默认值
-        ui->opencvErrorHandle->setCurrentIndex(0);
+        // 如果配置值不在选项中，使用默认值（停止执行任务）
+        ui->opencvErrorHandle->setCurrentIndex(ui->opencvErrorHandle->findData("break"));
     }
 
     QString imagePath = obj["imagePath"].toString();
@@ -146,6 +156,14 @@ QJsonObject TypeOpenCVForm::toJson() const {
     obj["score"] = ui->spinScoreBox->value();
     obj["randomClick"] = ui->randomClickCheckBox->isChecked();
     obj["colorCheck"] = ui->colorCheckCheckBox->isChecked();
+    // 百分比(0~90) -> 比值(0~0.9)，保留两位小数，避免浮点尾数（如 0.15000000000000002）
+    auto percentToRatio = [](double percent) {
+        return QString::number(percent / 100.0, 'f', 2).toDouble();
+    };
+    obj["excludeLeft"] = percentToRatio(ui->excludeLeftBox->value());
+    obj["excludeRight"] = percentToRatio(ui->excludeRightBox->value());
+    obj["excludeTop"] = percentToRatio(ui->excludeTopBox->value());
+    obj["excludeBottom"] = percentToRatio(ui->excludeBottomBox->value());
     obj["identifyErrorHandle"] = ui->opencvErrorHandle->currentData().toString();
     obj["captureWidth"] = templateCaptureWidth_;
     obj["captureHeight"] = templateCaptureHeight_;

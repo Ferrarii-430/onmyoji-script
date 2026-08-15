@@ -63,7 +63,7 @@ cv::Point makeClickPoint(const cv::Rect& rect)
 
 } // namespace
 
-void executeBudokai()
+bool executeBudokai()
 {
     ScriptActions& actions = ScriptActions::instance();
     GameWindow& window = GameWindow::instance();
@@ -81,8 +81,9 @@ void executeBudokai()
 
     // ---- 切换阵容的通用流程，lineupName 为目标阵容名称 ----
     auto switchLineup = [&](const QString& lineupName) -> bool {
-        // 1. 点击式神录
-        if (actions.opencvRecognizesAndClick(screenshotPath + "shikigami-record.png", 0.65, randomClick, false).isEmpty()) {
+        // 1. 点击式神录（排除边框区域取点）
+        constexpr ClickExclude yoloShikigamiRecordExclude{0.3, 0.1, 0.1, 0.1};
+        if (actions.opencvRecognizesAndClick(screenshotPath + "shikigami-record.png", 0.65, randomClick, false, yoloShikigamiRecordExclude).isEmpty()) {
             Logger::log(QString("无法识别点击【式神录】"));
             return false;
         }
@@ -166,7 +167,7 @@ void executeBudokai()
         // 7. 点击确认切换御魂
         if (actions.yoloContainsLabels(0.60, {"common-popup-confirm"}, false))
         {
-            if (actions.yoloRecognizesAndClick(0.80, false, "common-btn-yellow_confirm", 0, 0).isEmpty())
+            if (actions.yoloRecognizesAndClick(0.80, false, "common-btn-yellow_confirm").isEmpty())
             {
                 Logger::log(QString("无法识别到【确定】按钮"));
                 return false;
@@ -177,7 +178,7 @@ void executeBudokai()
         waitWithEventProcessing(2000);
 
         // 8. 点击返回
-        if (actions.yoloRecognizesAndClick(0.60, randomClick, "common-exit-yellow", 0, 0).isEmpty())
+        if (actions.yoloRecognizesAndClick(0.60, randomClick, "common-exit-yellow").isEmpty())
         {
             Logger::log(QString("无法识别到【返回】按钮"));
             return false;
@@ -186,9 +187,10 @@ void executeBudokai()
     };
 
     // 1. 点击搜寻
-    if (actions.opencvRecognizesAndClick(screenshotPath + "search.png", 0.65, randomClick, false).isEmpty()) {
+    constexpr ClickExclude openCvSearchExclude{0.1, 0.1, 0.2, 0.2};
+    if (actions.opencvRecognizesAndClick(screenshotPath + "search.png", 0.65, randomClick, false, openCvSearchExclude).isEmpty()) {
         Logger::log(QString("无法点击搜寻"));
-        return;
+        return false;
     }
 
     waitWithEventProcessing(5000);
@@ -200,7 +202,7 @@ void executeBudokai()
     } else {
         Logger::log(QString("无法识别怪物种类"));
         qDebug() << "识别到的数据：" << monsterData;
-        return;
+        return false;
     }
 
     // 3. 判断是否要切换阵容
@@ -215,7 +217,7 @@ void executeBudokai()
             status = targetStatus;
         } else {
             Logger::log(QString("切换阵容失败"));
-            return;
+            return false;
         }
     }
 
@@ -231,16 +233,17 @@ void executeBudokai()
     if (actions.ocrRecognizesAndClick("挑战", kOcrScore, randomClick, QRectF(83, 70, 12, 16), ocr::Enhance::Upscale).isEmpty())
     {
         Logger::log(QString("无法进入战斗"));
-        return;
+        return false;
     }
 
     waitWithEventProcessing(3000);
 
     // 6. 切换阵容
-    if (actions.yoloRecognizesAndClick(0.50, randomClick, "battle-preset", 0, 0).isEmpty())
+    constexpr ClickExclude yoloBattlePresetExclude{0.1, 0.1, 0.3, 0.1};
+    if (actions.yoloRecognizesAndClick(0.50, randomClick, "battle-preset", yoloBattlePresetExclude).isEmpty())
     {
         Logger::log(QString("无法切换分组"));
-        return;
+        return false;
     }
 
     //7. 切换分组：识别分组列表，点击匹配 schemeName 的项
@@ -260,7 +263,7 @@ void executeBudokai()
     }
     if (!foundGrouping) {
         Logger::log(QString("未找到分组: %1").arg(schemeName));
-        return;
+        return false;
     }
 
     waitWithEventProcessing(2000);
@@ -271,7 +274,7 @@ void executeBudokai()
                              : QString();
     if (presetName.isEmpty()) {
         Logger::log(QString("无法识别当前的怪物状态: status=%1").arg(status));
-        return;
+        return false;
     }
     QJsonArray presetData = actions.ocrRecognizes(QRectF(14, 30, 39, 60));
     bool foundPreset = false;
@@ -289,25 +292,26 @@ void executeBudokai()
     }
     if (!foundPreset) {
         Logger::log(QString("未找到阵容预设: %1").arg(presetName));
-        return;
+        return false;
     }
 
     waitWithEventProcessing(2000);
 
     //8. 点击出战
-    if (actions.yoloRecognizesAndClick(0.8, false, "common-btn-yellow_confirm", 0, 0).isEmpty())
+    if (actions.yoloRecognizesAndClick(0.8, false, "common-btn-yellow_confirm").isEmpty())
     {
         Logger::log(QString("未识别到【出战】按钮"));
-        return;
+        return false;
     }
 
-    waitWithEventProcessing(2000);
+    waitWithEventProcessing(1000);
 
     //9. 点击准备
-    if (actions.yoloRecognizesAndClick(0.5, false, "battle-ready", 0, 0).isEmpty())
+    constexpr ClickExclude yoloBattleReadyExclude{0.1, 0.1, 0.3, 0.1};
+    if (actions.yoloRecognizesAndClick(0.5, randomClick, "battle-ready", yoloBattleReadyExclude).isEmpty())
     {
         Logger::log(QString("未识别到【准备】按钮"));
-        return;
+        return false;
     }
 
     waitWithEventProcessing(2000);
@@ -331,7 +335,8 @@ void executeBudokai()
         {
             //再多等一等，防止无效点击
             waitWithEventProcessing(2000);
-            if (!actions.yoloRecognizesAndClick(0.55, randomClick, "battle-victory", 0, 0).isEmpty())
+            constexpr ClickExclude yoloBattleVictoryExclude{0.1, 0.1, 0.1, 0.2};
+            if (!actions.yoloRecognizesAndClick(0.55, randomClick, "battle-victory", yoloBattleVictoryExclude).isEmpty())
             {
                 awaitingBattle = true;
                 break;
@@ -340,11 +345,12 @@ void executeBudokai()
     }
     if (!awaitingBattle) {
         Logger::log(QString("等待战斗超时"));
-        return;
+        return false;
     }
 
     Logger::log(QString("武道大会执行完毕"));
     waitWithEventProcessing(5000);
+    return true;
 }
 
 void resetBudokaiStatus()

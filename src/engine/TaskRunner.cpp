@@ -54,8 +54,15 @@ QString TaskRunner::executeStep(const QJsonObject& step)
                 const double score = step["score"].toDouble();
                 const bool randomClick = step["randomClick"].toBool();
                 const bool colorCheck = step["colorCheck"].toBool(false);
+                // 边框排除比例，旧配置无该字段时默认全 0（不排除）
+                const ClickExclude exclude{
+                    step["excludeLeft"].toDouble(0.0),
+                    step["excludeRight"].toDouble(0.0),
+                    step["excludeTop"].toDouble(0.0),
+                    step["excludeBottom"].toDouble(0.0)
+                };
                 savePath = recognizeWithRetry([&]() {
-                    return actions.opencvRecognizesAndClick(imagePath, score, randomClick, colorCheck);
+                    return actions.opencvRecognizesAndClick(imagePath, score, randomClick, colorCheck, exclude);
                 });
                 break;
         }
@@ -86,8 +93,15 @@ QString TaskRunner::executeStep(const QJsonObject& step)
                     yoloLabel = "common-btn-yellow_confirm";
                 }
                 Logger::log(QString("YOLO目标标签: %1").arg(yoloLabel));
+                // 边框排除比例，旧配置无该字段时默认全 0（不排除）
+                const ClickExclude exclude{
+                    step["excludeLeft"].toDouble(0.0),
+                    step["excludeRight"].toDouble(0.0),
+                    step["excludeTop"].toDouble(0.0),
+                    step["excludeBottom"].toDouble(0.0)
+                };
                 savePath = recognizeWithRetry([&]() {
-                    return actions.yoloRecognizesAndClick(score, randomClick, yoloLabel, 0.0, 0.0);
+                    return actions.yoloRecognizesAndClick(score, randomClick, yoloLabel, exclude);
                 });
                 break;
         }
@@ -115,22 +129,23 @@ QString TaskRunner::executeStep(const QJsonObject& step)
         }
 
         case ConfigTypeEnum::SYSTEM_BORDER_BREAKTHROUGH: {
-                scenarios::executeBorderBreakthrough();
+                // 系统方案：返回值表示本轮是否正常完成，非空 savePath 表示成功
+                savePath = scenarios::executeBorderBreakthrough() ? QStringLiteral("system-ok") : QString();
                 break;
         }
 
         case ConfigTypeEnum::SYSTEM_ARENA: {
-                scenarios::executeArena();
+                savePath = scenarios::executeArena() ? QStringLiteral("system-ok") : QString();
                 break;
         }
 
         case ConfigTypeEnum::SYSTEM_MITAMA: {
-                scenarios::executeMitama();
+                savePath = scenarios::executeMitama() ? QStringLiteral("system-ok") : QString();
                 break;
         }
 
         case ConfigTypeEnum::SYSTEM_BUDOKAI: {
-                scenarios::executeBudokai();
+                savePath = scenarios::executeBudokai() ? QStringLiteral("system-ok") : QString();
                 break;
         }
 
@@ -194,6 +209,20 @@ void TaskRunner::run(const QJsonArray& steps, int cycleCount)
             ConfigTypeEnum type = stringToConfigType(typeStr);
 
             QString savePath = executeStep(step);
+
+            // 系统方案步骤执行失败：内部流程已中断，直接终止整个任务循环，
+            // 防止剩余步骤继续执行及下一轮循环连环报错。
+            // identifyErrorHandle 仅对普通方案的识别步骤（OPENCV/OCR/YOLO）生效，逻辑保持不变。
+            if (savePath.isEmpty()
+                && (type == ConfigTypeEnum::SYSTEM_BORDER_BREAKTHROUGH
+                    || type == ConfigTypeEnum::SYSTEM_ARENA
+                    || type == ConfigTypeEnum::SYSTEM_MITAMA
+                    || type == ConfigTypeEnum::SYSTEM_BUDOKAI))
+            {
+                Logger::log(QString("系统方案执行失败，终止任务循环"));
+                stopDoLoop = true;
+                break;
+            }
 
             //识别错误处理
             if (savePath.isEmpty() && type != ConfigTypeEnum::WAIT)

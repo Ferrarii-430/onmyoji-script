@@ -41,6 +41,7 @@
 mainwindow::mainwindow(QWidget *parent) :
     QWidget(parent), ui(new Ui::mainwindow) {
     ui->setupUi(this);
+    setWindowTitle(QStringLiteral("onmyoji-script v1.5.4"));
 
     // 配合全局 QSS 的 alternate-background-color 显示斑马纹
     ui->listWidget->setAlternatingRowColors(true);

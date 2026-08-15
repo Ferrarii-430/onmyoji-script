@@ -18,7 +18,7 @@ using core::waitWithEventProcessing;
 
 namespace scenarios {
 
-void executeBorderBreakthrough()
+bool executeBorderBreakthrough()
 {
     ScriptActions& actions = ScriptActions::instance();
     GameWindow& window = GameWindow::instance();
@@ -36,7 +36,7 @@ void executeBorderBreakthrough()
 
     if (detections.empty()) {
         Logger::log(QString("识别失败，无法继续执行"));
-        return;
+        return false;
     }
 
     bool hasPenetrated = ScriptActions::hasDetectionWithLabel(detections, "realm_raid-realm-penetrated");
@@ -45,7 +45,7 @@ void executeBorderBreakthrough()
     if (hasPenetrated == false && hasNormal == false)
     {
         Logger::log(QString("当前不在结界突破场景，无法继续执行"));
-        return;
+        return false;
     }
 
     // 检查是否需要刷新
@@ -68,15 +68,14 @@ void executeBorderBreakthrough()
                 waitWithEventProcessing(4000); // 等待刷新完成
 
                 // 刷新后重新执行
-                executeBorderBreakthrough(); //此时会进入投4逻辑
-                return;
+                return executeBorderBreakthrough(); //此时会进入投4逻辑
             } else {
                 Logger::log(QString("未找到确认刷新按钮"));
             }
         } else {
             Logger::log(QString("未找到刷新按钮"));
         }
-        return;
+        return false;
     }
 
     //查看门票数量
@@ -84,7 +83,8 @@ void executeBorderBreakthrough()
     Logger::log("门票剩余:" + std::to_string(tickets));
     if (tickets == 0)
     {
-        return;
+        //门票耗尽属正常结束，继续循环等待门票恢复
+        return true;
     }
 
     //构建需要挑战点击的突破位置
@@ -146,7 +146,7 @@ void executeBorderBreakthrough()
                         QString savePath = actions.ocrRecognizesAndClick("失败", 0.5, true);
                         if (savePath.isEmpty()) {
                             Logger::log(QString("未识别到目标字段，结束任务"));
-                            return;
+                            return false;
                         }
                         waitWithEventProcessing(8000);
                         break;
@@ -154,14 +154,14 @@ void executeBorderBreakthrough()
 
                     if (attempts >= MAX_ATTEMPTS) {
                         qWarning() << "达到最大尝试次数" << MAX_ATTEMPTS << "，未找进入战斗，结束任务";
-                        return;
+                        return false;
                     }
                 }
             }else
             {
                 //找不到 可按下的攻击按钮，直接结束
                 Logger::log(QString("找不到 可按下的攻击按钮"));
-                return;
+                return false;
             }
         }
     }
@@ -176,7 +176,8 @@ void executeBorderBreakthrough()
         Logger::log("门票剩余:" + std::to_string(tickets));
         if (tickets == 0)
         {
-            return;
+            //门票耗尽属正常结束，继续循环等待门票恢复
+            return true;
         }
 
         waitWithEventProcessing(3000);
@@ -234,11 +235,12 @@ void executeBorderBreakthrough()
         {
             //找不到 可按下的攻击按钮 ，直接结束
             Logger::log(QString("找不到 可按下的攻击按钮"));
-            return;
+            return false;
         }
     }
 
     Logger::log(QString("结界突破执行完成"));
+    return true;
 }
 
 int getNumberOfTickets()

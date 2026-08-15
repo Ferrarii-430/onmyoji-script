@@ -28,7 +28,7 @@ namespace scenarios
     bool isCaptain = false; //是否为队长
     bool isCastingLocked = false; //阵容是否锁定
 
-    void executeMitama()
+    bool executeMitama()
     {
         Logger::log(QString("开始执行御魂副本"));
 
@@ -42,7 +42,7 @@ namespace scenarios
         if (currentInterface == 6)
         {
             Logger::log(QString("无法处理目前的场景，请从选择御魂副本、战斗、组队界面启动"));
-            return;
+            return false;
         }
 
         // 根据当前场景跳转到对应流程节点继续执行
@@ -54,7 +54,7 @@ namespace scenarios
                 if (teamPlay)
                 {
                     Logger::log(QString("组队模式无法从当前场景: %1 启动").arg(currentInterface));
-                    return;
+                    return false;
                 }
                 goto settle;
             case 2: // 队伍界面（组队模式起点）
@@ -64,7 +64,7 @@ namespace scenarios
             case 4: // 奖励领取界面，战斗已结束，进入组队/收尾流程
                 goto team;
             default:
-                return;
+                return false;
         }
 
     settle:
@@ -127,7 +127,7 @@ namespace scenarios
                     if (!enteredBattle)
                     {
                         Logger::log(QString("等待挑战按钮超时"));
-                        return;
+                        return false;
                     }
                 } else
                 {
@@ -155,7 +155,7 @@ namespace scenarios
         // 如果有准备按钮则点击，否则无视，因为正常会手动点锁定
         if (!isCastingLocked)
         {
-            actions.yoloRecognizesAndClick(0.60, false, "battle-ready", 0, 0);
+            actions.yoloRecognizesAndClick(0.60, false, "battle-ready");
             waitWithEventProcessing(2000);
         }
 
@@ -176,7 +176,7 @@ namespace scenarios
             if (!enteredBattleScene)
             {
                 Logger::log(QString("等待进入战斗场景超时"));
-                return;
+                return false;
             }
         }
 
@@ -199,7 +199,7 @@ namespace scenarios
             }
             if (isEnd) {
                 Logger::log(QString("获取御魂副本结算超时"));
-                return;
+                return false;
             }
         }
 
@@ -219,7 +219,7 @@ namespace scenarios
             if (isError)
             {
                 Logger::log(QString("等待战斗完成超时"));
-                return;
+                return false;
             }
         }
 
@@ -259,12 +259,12 @@ namespace scenarios
                             }else
                             {
                                 Logger::log(QString("未检测到自动邀请确认按钮"));
-                                return;
+                                return false;
                             }
                         }else
                         {
                             Logger::log(QString("未检测到自动邀请发起"));
-                            return;
+                            return false;
                         }
                     }
                 } else
@@ -307,12 +307,13 @@ namespace scenarios
             if (teamIsError)
             {
                 Logger::log(QString("组队等待超时"));
-                return;
+                return false;
             }
         }else
         {
             //单机模式下到这里就可以停止逻辑，会自动退到御魂副本界面，从头开始执行逻辑进入战斗即可
         }
+        return true;
     }
 
     /**
@@ -373,7 +374,7 @@ namespace scenarios
      */
     bool processingPopUpWindow()
     {
-        QString path = actions.yoloRecognizesAndClick(0.60, false, "common-btn-red_x_solid", 0, 0);
+        QString path = actions.yoloRecognizesAndClick(0.60, false, "common-btn-red_x_solid");
         waitWithEventProcessing(2000);
         return !path.isEmpty();
     }

@@ -4,6 +4,7 @@
 #include <QComboBox>
 #include <QDoubleSpinBox>
 #include <QFormLayout>
+#include <QHBoxLayout>
 #include <QJsonObject>
 #include <QLabel>
 #include <QLineEdit>
@@ -35,12 +36,58 @@ YoloForm::YoloForm(QWidget *parent) :
     randomClickCheckBox = new QCheckBox(this);
     layout->addRow(new QLabel("是否随机点击", this), randomClickCheckBox);
 
+    // 边框排除：随机点击时在匹配框内按比例排除四边区域，全 0 表示不排除。
+    // 界面用百分比（0~90%），保存时换算为 0~0.9 的两位小数比值。
+    auto makeExcludeBox = [this]() {
+        auto* box = new QDoubleSpinBox(this);
+        box->setDecimals(0);
+        box->setSuffix("%");
+        box->setMinimum(0.0);
+        box->setMaximum(90.0);
+        box->setSingleStep(5.0);
+        box->setValue(0.0);
+        return box;
+    };
+    excludeLeftBox = makeExcludeBox();
+    excludeRightBox = makeExcludeBox();
+    excludeTopBox = makeExcludeBox();
+    excludeBottomBox = makeExcludeBox();
+
+    // 左右边框一行
+    auto* lrLayout = new QHBoxLayout;
+    lrLayout->setContentsMargins(0, 0, 0, 0);
+    lrLayout->setSpacing(4);
+    lrLayout->addWidget(new QLabel("左", this));
+    lrLayout->addWidget(excludeLeftBox);
+    lrLayout->addWidget(new QLabel("右", this));
+    lrLayout->addWidget(excludeRightBox);
+    auto* lrWidget = new QWidget(this);
+    lrWidget->setLayout(lrLayout);
+    auto* lrLabel = new QLabel("左右边框排除", this);
+    lrLabel->setToolTip("随机点击时排除匹配框左/右两侧的比例区域（0~0.9），全 0 不排除");
+    layout->addRow(lrLabel, lrWidget);
+
+    // 上下边框一行
+    auto* tbLayout = new QHBoxLayout;
+    tbLayout->setContentsMargins(0, 0, 0, 0);
+    tbLayout->setSpacing(4);
+    tbLayout->addWidget(new QLabel("上", this));
+    tbLayout->addWidget(excludeTopBox);
+    tbLayout->addWidget(new QLabel("下", this));
+    tbLayout->addWidget(excludeBottomBox);
+    auto* tbWidget = new QWidget(this);
+    tbWidget->setLayout(tbLayout);
+    auto* tbLabel = new QLabel("上下边框排除", this);
+    tbLabel->setToolTip("随机点击时排除匹配框上/下两侧的比例区域（0~0.9），全 0 不排除");
+    layout->addRow(tbLabel, tbWidget);
+
     errorHandleBox = new QComboBox(this);
     errorHandleBox->addItem("继续执行任务","next");
     errorHandleBox->addItem("跳转步骤","jump");
     errorHandleBox->addItem("跳过本次循环","continue");
     errorHandleBox->addItem("停止执行任务","break");
     errorHandleBox->addItem("重试","retry");
+    errorHandleBox->setCurrentIndex(errorHandleBox->findData("break"));
     layout->addRow(new QLabel("识别失败处理", this), errorHandleBox);
 
     stepInputLabel = new QLabel("跳转步骤", this);
@@ -92,6 +139,11 @@ void YoloForm::loadFromJson(const QString &configId, const QJsonObject &obj)
     lineTaskNameEdit->setText(obj["taskName"].toString());
     spinScoreBox->setValue(obj["score"].toDouble());
     randomClickCheckBox->setChecked(obj["randomClick"].toBool());
+    // 比值(0~0.9) -> 百分比(0~90)
+    excludeLeftBox->setValue(qRound(obj["excludeLeft"].toDouble(0.0) * 100.0));
+    excludeRightBox->setValue(qRound(obj["excludeRight"].toDouble(0.0) * 100.0));
+    excludeTopBox->setValue(qRound(obj["excludeTop"].toDouble(0.0) * 100.0));
+    excludeBottomBox->setValue(qRound(obj["excludeBottom"].toDouble(0.0) * 100.0));
 
     const QString yoloLabel = obj["yoloLabel"].toString();
     int labelIndex = labelBox->findData(yoloLabel);
@@ -117,8 +169,8 @@ void YoloForm::loadFromJson(const QString &configId, const QJsonObject &obj)
             }
         }
     } else {
-        // 如果配置值不在选项中，使用默认值
-        errorHandleBox->setCurrentIndex(0);
+        // 如果配置值不在选项中，使用默认值（停止执行任务）
+        errorHandleBox->setCurrentIndex(errorHandleBox->findData("break"));
     }
 }
 
@@ -157,6 +209,14 @@ QJsonObject YoloForm::toJson() const {
     obj["yoloLabel"] = labelBox->currentData().toString();
     obj["score"] = spinScoreBox->value();
     obj["randomClick"] = randomClickCheckBox->isChecked();
+    // 百分比(0~90) -> 比值(0~0.9)，保留两位小数，避免浮点尾数（如 0.15000000000000002）
+    auto percentToRatio = [](double percent) {
+        return QString::number(percent / 100.0, 'f', 2).toDouble();
+    };
+    obj["excludeLeft"] = percentToRatio(excludeLeftBox->value());
+    obj["excludeRight"] = percentToRatio(excludeRightBox->value());
+    obj["excludeTop"] = percentToRatio(excludeTopBox->value());
+    obj["excludeBottom"] = percentToRatio(excludeBottomBox->value());
     obj["identifyErrorHandle"] = errorHandleBox->currentData().toString();
 
     //如果是跳转
