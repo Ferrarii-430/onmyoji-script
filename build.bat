@@ -267,7 +267,14 @@ if "%MISSING%"=="1" (
 )
 echo [校验通过] 关键文件齐全
 
-REM ---------- 8. 压缩 ----------
+REM ---------- 8 清空运行截图目录（避免旧截图混入压缩包） ----------
+echo [步骤 8/8] 清空 thumbnail 目录
+if exist "%BUILD_OUT%\src\resource\thumbnail" (
+    del /f /q "%BUILD_OUT%\src\resource\thumbnail\*" >nul 2>nul
+)
+echo [信息] 已清空: %BUILD_OUT%\src\resource\thumbnail
+
+REM ---------- 9. 压缩 ----------
 set "ZIP=%ROOT%\yys-script-%VERSION%-release.zip"
 echo.
 echo [压缩] 生成 %ZIP%
