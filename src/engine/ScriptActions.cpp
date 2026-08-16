@@ -413,13 +413,17 @@ QString ScriptActions::opencvRecognizesAndClick(const QString& templPath, const 
                 excludeAreas.push_back(vision::widthExcludeRect(matchRect, 0.0, exclude.left));
             }
             if (exclude.right > 0.0) {
-                excludeAreas.push_back(vision::widthExcludeRect(matchRect, 1.0 - exclude.right, 1.0));
+                // 右侧条带直接延伸到框边缘，+1 补偿整型截断，避免最右 1px 漏网
+                const int stripW = static_cast<int>(matchRect.width * exclude.right) + 1;
+                excludeAreas.emplace_back(matchRect.x + matchRect.width - stripW, matchRect.y, stripW, matchRect.height);
             }
             if (exclude.top > 0.0) {
                 excludeAreas.push_back(vision::heightExcludeRect(matchRect, 0.0, exclude.top));
             }
             if (exclude.bottom > 0.0) {
-                excludeAreas.push_back(vision::heightExcludeRect(matchRect, 1.0 - exclude.bottom, 1.0));
+                // 下侧条带同理延伸到框底边缘
+                const int stripH = static_cast<int>(matchRect.height * exclude.bottom) + 1;
+                excludeAreas.emplace_back(matchRect.x, matchRect.y + matchRect.height - stripH, matchRect.width, stripH);
             }
             clickPt = vision::randomPointInRectExcludeAreas(matchRect, excludeAreas);
         }
@@ -427,6 +431,11 @@ QString ScriptActions::opencvRecognizesAndClick(const QString& templPath, const 
         clickPt = cv::Point(matchRect.x + matchRect.width / 2,
                            matchRect.y + matchRect.height / 2);
     }
+
+    // 记录点击点在匹配框内的相对位置（百分比），用于验证边框排除是否生效
+    Logger::log(QString("OpenCV点击点相对匹配框: x=%1%% y=%2%%")
+                .arg(matchRect.width > 0 ? (clickPt.x - matchRect.x) * 100 / matchRect.width : 0)
+                .arg(matchRect.height > 0 ? (clickPt.y - matchRect.y) * 100 / matchRect.height : 0));
 
     // clickPt 为截图坐标系坐标，由 GameWindow::mapCapturePointToClient 负责
     // 截图坐标 -> 客户区坐标 的换算（基于实际捕获尺寸与客户区尺寸比例），
@@ -812,13 +821,17 @@ QString ScriptActions::yoloRecognizesAndClick(const double threshold, const bool
                     excludeAreas.push_back(vision::widthExcludeRect(matchRect, 0.0, exclude.left));
                 }
                 if (exclude.right > 0.0) {
-                    excludeAreas.push_back(vision::widthExcludeRect(matchRect, 1.0 - exclude.right, 1.0));
+                    // 右侧条带直接延伸到框边缘，+1 补偿整型截断，避免最右 1px 漏网
+                    const int stripW = static_cast<int>(matchRect.width * exclude.right) + 1;
+                    excludeAreas.emplace_back(matchRect.x + matchRect.width - stripW, matchRect.y, stripW, matchRect.height);
                 }
                 if (exclude.top > 0.0) {
                     excludeAreas.push_back(vision::heightExcludeRect(matchRect, 0.0, exclude.top));
                 }
                 if (exclude.bottom > 0.0) {
-                    excludeAreas.push_back(vision::heightExcludeRect(matchRect, 1.0 - exclude.bottom, 1.0));
+                    // 下侧条带同理延伸到框底边缘
+                    const int stripH = static_cast<int>(matchRect.height * exclude.bottom) + 1;
+                    excludeAreas.emplace_back(matchRect.x, matchRect.y + matchRect.height - stripH, matchRect.width, stripH);
                 }
                 clickPt = vision::randomPointInRectExcludeAreas(matchRect, excludeAreas);
             } else {
@@ -828,6 +841,11 @@ QString ScriptActions::yoloRecognizesAndClick(const double threshold, const bool
             clickPt = cv::Point(matchRect.x + matchRect.width / 2,
                                matchRect.y + matchRect.height / 2);
         }
+
+        // 记录点击点在匹配框内的相对位置（百分比），用于验证边框排除是否生效
+        Logger::log(QString("YOLO点击点相对匹配框: x=%1%% y=%2%%")
+                    .arg(matchRect.width > 0 ? (clickPt.x - matchRect.x) * 100 / matchRect.width : 0)
+                    .arg(matchRect.height > 0 ? (clickPt.y - matchRect.y) * 100 / matchRect.height : 0));
 
         // 在图像上标记点击点
         drawClickMarker(captureImg, clickPt);

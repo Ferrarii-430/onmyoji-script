@@ -106,11 +106,11 @@
     "systemConfig": [
       {
         "key": "schemeName",
-        "label": "方案名称",
+        "label": "预设分组名称",
         "control": "input",
         "value": "活动",
-        "placeholder": "输入方案名称",
-        "tip": "当前武道大会使用的方案分组名称。"
+        "placeholder": "预设分组名称",
+        "tip": "武道大会预设队伍所在的分组名称。"
       },
       {
         "key": "singleLineupName",

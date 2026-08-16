@@ -82,19 +82,19 @@ bool executeBudokai()
     // ---- 切换阵容的通用流程，lineupName 为目标阵容名称 ----
     auto switchLineup = [&](const QString& lineupName) -> bool {
         // 1. 点击式神录（排除边框区域取点）
-        constexpr ClickExclude yoloShikigamiRecordExclude{0.3, 0.1, 0.1, 0.1};
+        constexpr ClickExclude yoloShikigamiRecordExclude{0.3, 0.2, 0.1, 0.1};
         if (actions.opencvRecognizesAndClick(screenshotPath + "shikigami-record.png", 0.65, randomClick, false, yoloShikigamiRecordExclude).isEmpty()) {
             Logger::log(QString("无法识别点击【式神录】"));
             return false;
         }
-        waitWithEventProcessing(1000);
+        waitWithEventProcessing(2000);
 
         // 2. 点击预设
         if (actions.ocrRecognizesAndClick("预设", kOcrScore, randomClick, QRectF(19, 6, 21, 15), ocr::Enhance::All).isEmpty()) {
             Logger::log(QString("无法识别点击【预设】"));
             return false;
         }
-        waitWithEventProcessing(1000);
+        waitWithEventProcessing(1500);
 
         // 3. 切换分组：识别分组列表，点击匹配 schemeName 的项
         QJsonArray groupingData = actions.ocrRecognizes(QRectF(83, 9, 16, 81), ocr::Enhance::Upscale);
@@ -187,8 +187,8 @@ bool executeBudokai()
     };
 
     // 1. 点击搜寻
-    constexpr ClickExclude openCvSearchExclude{0.1, 0.1, 0.2, 0.2};
-    if (actions.opencvRecognizesAndClick(screenshotPath + "search.png", 0.65, randomClick, false, openCvSearchExclude).isEmpty()) {
+    if (actions.ocrRecognizesAndClick("搜寻", kOcrScore, randomClick, QRectF(83, 79.5, 12, 15), ocr::Enhance::Upscale).isEmpty())
+    {
         Logger::log(QString("无法点击搜寻"));
         return false;
     }
@@ -196,9 +196,10 @@ bool executeBudokai()
     waitWithEventProcessing(5000);
 
     // 2. 识别怪物名称
-    QJsonArray monsterData = actions.ocrRecognizes(QRectF(26, 13, 7, 37), ocr::Enhance::Upscale | ocr::Enhance::Grayscale | ocr::Enhance::Contrast);
+    QJsonArray monsterData = actions.ocrRecognizes(QRectF(26.8, 21, 5.5, 30), ocr::Enhance::Upscale | ocr::Enhance::Grayscale | ocr::Enhance::AutoInvert);
     if (monsterData.size() == 1) {
         monsterName = monsterData[0].toObject()["text"].toString();
+        Logger::log(QString("当前怪物名称: %1").arg(monsterName));
     } else {
         Logger::log(QString("无法识别怪物种类"));
         qDebug() << "识别到的数据：" << monsterData;
@@ -304,7 +305,7 @@ bool executeBudokai()
         return false;
     }
 
-    waitWithEventProcessing(1000);
+    waitWithEventProcessing(1500);
 
     //9. 点击准备
     constexpr ClickExclude yoloBattleReadyExclude{0.1, 0.1, 0.3, 0.1};
@@ -349,7 +350,7 @@ bool executeBudokai()
     }
 
     Logger::log(QString("武道大会执行完毕"));
-    waitWithEventProcessing(5000);
+    waitWithEventProcessing(4000);
     return true;
 }
 
