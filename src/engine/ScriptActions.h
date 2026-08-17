@@ -109,22 +109,23 @@ public:
                                      const QRectF& roiPercent = QRectF(),
                                      ocr::Enhance enhance = ocr::Enhance::Upscale);
 
-    // YOLO 识别
-    std::vector<Detection> yoloRecognizes(double threshold, double excludeStartWidth, double excludeEndWidth);
+    // YOLO 识别（纯识别，不点击）。返回所有检测结果，由调用方决定如何处理
+    std::vector<Detection> yoloRecognizes(double threshold);
     // YOLO 是否包含指定标签；matchAll 为 false 时任一标签命中即返回 true
     bool yoloContainsLabels(double threshold, const QStringList& targetLabels, bool matchAll = false);
     QString yoloRecognizesAndClick(double threshold, bool randomClick, const QString& targetLabelName,
                                    const ClickExclude& exclude = ClickExclude{});
 
     // 在 YOLO 识别结果中点击指定标签，成功返回 true
+    // exclude 为随机点击时排除的边框区域比例，仅在 randomClick=true 时生效
     bool clickDetectionByLabel(const QString& targetLabel, double threshold,
-                               double excludeStart, double excludeEnd,
-                               bool randomClick = true);
+                               bool randomClick = true,
+                               const ClickExclude& exclude = ClickExclude{});
     // 单次 YOLO 识别，多个标签按填入顺序作为优先级，命中首个即点击并返回命中的标签，
     // 全部未命中返回空。用于「只识别一次、多标签择一点击」的场景。
     QString clickFirstDetectionByLabels(const QStringList& targetLabels, double threshold,
-                                        double excludeStart, double excludeEnd,
-                                        bool randomClick = true);
+                                        bool randomClick = true,
+                                        const ClickExclude& exclude = ClickExclude{});
     static bool hasDetectionWithLabel(const std::vector<Detection>& detections, const QString& targetLabel);
 
     // 发射信号让 UI 显示识别结果图
@@ -139,7 +140,9 @@ private:
     static QString resolveTemplatePath(const QString& templatePath, const QString& basePath);
 
     // 命中某个 YOLO 检测框后：画框、保存调试图、回显并点击
-    void clickDetection(const Detection& det, bool randomClick = true);
+    // exclude 为随机点击时排除的边框区域比例，仅在 randomClick=true 时生效
+    void clickDetection(const Detection& det, bool randomClick = true,
+                        const ClickExclude& exclude = ClickExclude{});
     // 命中某条 OCR 文字后：换算坐标、画框、保存调试图、回显并点击，返回结果图路径
     // roiScale 为裁剪图送入 OCR 前的放大倍数，用于把 OCR 坐标还原回裁剪图原始像素
     QString ocrClickMatchedItem(const cv::Mat& winImg, const QJsonObject& item, const cv::Rect& roiRect,

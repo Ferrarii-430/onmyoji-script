@@ -870,11 +870,8 @@ QString ScriptActions::yoloRecognizesAndClick(const double threshold, const bool
 /**
  * 返回识别数据
  * @param threshold 得分
- * @param excludeStartWidth 排除区域起始宽度百分比 (0.0-1.0)
- * @param excludeEndWidth 排除区域结束宽度百分比 (0.0-1.0)
  */
-std::vector<Detection> ScriptActions::yoloRecognizes(const double threshold, double excludeStartWidth,
-                                                     double excludeEndWidth)
+std::vector<Detection> ScriptActions::yoloRecognizes(const double threshold)
 {
     cv::Mat winImg = capture::captureGameWindow();
 
@@ -886,7 +883,6 @@ std::vector<Detection> ScriptActions::yoloRecognizes(const double threshold, dou
 
     cv::Mat captureImg = winImg.clone();
 
-    cv::Rect matchRect;
     auto final_detections = YOLODetector::getInstance().detect(captureImg, threshold);
 
     // 在图像上绘制检测结果
@@ -900,25 +896,15 @@ std::vector<Detection> ScriptActions::yoloRecognizes(const double threshold, dou
     }
 
     // 输出识别结果日志（置信度阈值=threshold，低于该分数的已在检测阶段过滤）
-    // Logger::log(QString("YOLO 识别完成：共 %1 个目标（置信度阈值=%2）")
-    //                 .arg(final_detections.size())
-    //                 .arg(threshold, 0, 'f', 2));
+    Logger::log(QString("YOLO 识别完成：共 %1 个目标（置信度阈值=%2）")
+                    .arg(final_detections.size())
+                    .arg(threshold, 0, 'f', 2));
     for (const auto& det : final_detections) {
-        // Logger::log(QString("  - %1  置信度=%2  位置=[%3,%4,%5x%6]")
-        //                 .arg(det.className)
-        //                 .arg(det.confidence, 0, 'f', 4)
-        //                 .arg(det.bbox.x).arg(det.bbox.y)
-        //                 .arg(det.bbox.width).arg(det.bbox.height));
-    }
-
-    // 如果指定了排除区域，也在图像上标记出来（蓝色矩形）
-    if (excludeStartWidth < excludeEndWidth && matchRect.width > 0) {
-        int excludeX = matchRect.x + matchRect.width * excludeStartWidth;
-        int excludeWidth = matchRect.width * (excludeEndWidth - excludeStartWidth);
-        cv::Rect excludeRect(excludeX, matchRect.y, excludeWidth, matchRect.height);
-        cv::rectangle(captureImg, excludeRect, cv::Scalar(255, 0, 0), 2);
-        cv::putText(captureImg, "Exclude Area", cv::Point(excludeRect.x, excludeRect.y - 5),
-                   cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(255, 0, 0), 1);
+        Logger::log(QString("  - %1  置信度=%2  位置=[%3,%4,%5x%6]")
+                        .arg(det.className)
+                        .arg(det.confidence, 0, 'f', 4)
+                        .arg(det.bbox.x).arg(det.bbox.y)
+                        .arg(det.bbox.width).arg(det.bbox.height));
     }
 
     QString savePath = AppPaths::instance().matchResultPath();
@@ -940,7 +926,7 @@ bool ScriptActions::yoloContainsLabels(const double threshold, const QStringList
         return false;
     }
 
-    const auto detections = yoloRecognizes(threshold, 0.0, 0.0);
+    const auto detections = yoloRecognizes(threshold);
     const auto matchesLabel = [&detections](const QString& label) {
         return hasDetectionWithLabel(detections, label);
     };
@@ -963,11 +949,33 @@ bool ScriptActions::hasDetectionWithLabel(const std::vector<Detection>& detectio
         });
 }
 
-void ScriptActions::clickDetection(const Detection& det, bool randomClick)
+void ScriptActions::clickDetection(const Detection& det, bool randomClick, const ClickExclude& exclude)
 {
     cv::Point physicalClickPt;
     if (randomClick) {
-        physicalClickPt = vision::randomPointInRectExcludeWidth(det.bbox, 0.0, 0.0, 3);
+        if (!exclude.empty()) {
+            // 四边排除：与 yoloRecognizesAndClick 相同的边框排除逻辑
+            std::vector<cv::Rect> excludeAreas;
+            if (exclude.left > 0.0) {
+                excludeAreas.push_back(vision::widthExcludeRect(det.bbox, 0.0, exclude.left));
+            }
+            if (exclude.right > 0.0) {
+                // 右侧条带直接延伸到框边缘，+1 补偿整型截断，避免最右 1px 漏网
+                const int stripW = static_cast<int>(det.bbox.width * exclude.right) + 1;
+                excludeAreas.emplace_back(det.bbox.x + det.bbox.width - stripW, det.bbox.y, stripW, det.bbox.height);
+            }
+            if (exclude.top > 0.0) {
+                excludeAreas.push_back(vision::heightExcludeRect(det.bbox, 0.0, exclude.top));
+            }
+            if (exclude.bottom > 0.0) {
+                // 下侧条带同理延伸到框底边缘
+                const int stripH = static_cast<int>(det.bbox.height * exclude.bottom) + 1;
+                excludeAreas.emplace_back(det.bbox.x, det.bbox.y + det.bbox.height - stripH, det.bbox.width, stripH);
+            }
+            physicalClickPt = vision::randomPointInRectExcludeAreas(det.bbox, excludeAreas);
+        } else {
+            physicalClickPt = vision::randomPointInRect(det.bbox);
+        }
     } else {
         physicalClickPt = cv::Point(det.bbox.x + det.bbox.width / 2,
                                     det.bbox.y + det.bbox.height / 2);
@@ -993,16 +1001,15 @@ void ScriptActions::clickDetection(const Detection& det, bool randomClick)
 }
 
 QString ScriptActions::clickFirstDetectionByLabels(const QStringList& targetLabels, double threshold,
-                                                   double excludeStart, double excludeEnd,
-                                                   bool randomClick)
+                                                   bool randomClick, const ClickExclude& exclude)
 {
     // 只截图/识别一次，按 targetLabels 的填入顺序作为优先级，命中哪个就点哪个（只点一次）
-    const auto detections = yoloRecognizes(threshold, excludeStart, excludeEnd);
+    const auto detections = yoloRecognizes(threshold);
 
     for (const QString& targetLabel : targetLabels) {
         for (const auto& det : detections) {
             if (comparesEqual(det.className, targetLabel)) {
-                clickDetection(det, randomClick);
+                clickDetection(det, randomClick, exclude);
                 return targetLabel;
             }
         }
@@ -1012,10 +1019,9 @@ QString ScriptActions::clickFirstDetectionByLabels(const QStringList& targetLabe
 }
 
 bool ScriptActions::clickDetectionByLabel(const QString& targetLabel, double threshold,
-                                          double excludeStart, double excludeEnd,
-                                          bool randomClick)
+                                          bool randomClick, const ClickExclude& exclude)
 {
-    return !clickFirstDetectionByLabels(QStringList{targetLabel}, threshold, excludeStart, excludeEnd, randomClick).isEmpty();
+    return !clickFirstDetectionByLabels(QStringList{targetLabel}, threshold, randomClick, exclude).isEmpty();
 }
 
 // 智能路径处理：绝对路径直接使用，相对路径拼接基础路径

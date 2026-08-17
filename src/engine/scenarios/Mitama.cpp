@@ -251,7 +251,7 @@ namespace scenarios
                         if (!savePathAutoSendRequestEnable.isEmpty())
                         {
                             waitWithEventProcessing(1000); // 等待刷新完成
-                            if (actions.clickDetectionByLabel("common-btn-yellow_confirm", 0.5, 0.0, 0.0, false)) {
+                            if (actions.clickDetectionByLabel("common-btn-yellow_confirm", 0.5, false)) {
                                 Logger::log(QString("已开启自动邀请"));
                                 teamIsError = false;
                                 autoSendRequestEnable = true;
@@ -340,7 +340,7 @@ namespace scenarios
             }
         }
 
-        const auto detections = actions.yoloRecognizes(0.5, 0, 0);
+        const auto detections = actions.yoloRecognizes(0.5);
         for (const auto& det : detections) {
             if (comparesEqual(det.className, "common-exit-battle")) {
                 return 3; //战斗界面

@@ -18,13 +18,130 @@ using core::waitWithEventProcessing;
 
 namespace scenarios {
 
+namespace {
+
+// 结界正常为 3x3 共 9 个框
+constexpr int kRealmBoxCount = 9;
+// 投4策略固定对下标 1/3/5/7 的结界投降以保留当前等级
+constexpr int kSurrenderIndices[] = {1, 3, 5, 7};
+
+// 随机点击结界框内的可点区域（避开左侧守备阵容区域与四周边框）
+void clickRealmBox(const Detection& det)
+{
+    const cv::Rect& matchRect = det.bbox;
+    const std::vector<cv::Rect> excludes = {
+        vision::widthExcludeRect(matchRect, 0.0, 0.4),   // 左侧 40%
+        vision::heightExcludeRect(matchRect, 0.0, 0.1),  // 上边框 10%
+        vision::heightExcludeRect(matchRect, 0.9, 1.0),  // 下边框 10%
+        vision::widthExcludeRect(matchRect, 0.9, 1.0),   // 右侧 10%
+    };
+    GameWindow::instance().clickInWindow(
+        vision::randomPointInRectExcludeAreas(matchRect, excludes, 5));
+}
+
+// 点击结界框并点击“进攻”，返回 false 表示未找到可按下的进攻按钮
+bool openRealmAndAttack(const Detection& det)
+{
+    clickRealmBox(det);
+    waitWithEventProcessing(2000);
+
+    Logger::log(QString("开始点击进攻"));
+    if (ScriptActions::instance()
+            .ocrRecognizesAndClick("进攻", 0.55, true, QRectF(), ocr::Enhance::Upscale)
+            .isEmpty()) {
+        Logger::log(QString("找不到可按下的攻击按钮"));
+        return false;
+    }
+    return true;
+}
+
+// 投4用：等待进入战斗后 ESC+回车 立即投降，并点击“失败”结算
+bool surrenderBattle()
+{
+    constexpr int kEnterBattleAttempts = 5;  // 5次 * 1秒 = 5秒
+    for (int attempts = 0; attempts < kEnterBattleAttempts; ++attempts) {
+        waitWithEventProcessing(1000);
+
+        if (ScriptActions::instance().yoloContainsLabels(0.45, {"common-exit-battle"}, false)) {
+            Logger::log(QString("准备退出战斗"));
+            waitWithEventProcessing(500);
+
+            GameWindow::instance().postKey(VK_ESCAPE);
+            waitWithEventProcessing(200);
+            GameWindow::instance().postKey(VK_RETURN);
+
+            Logger::log(QString("识别失败并点击"));
+            bool isEnd = false;
+            for (int i = 0; i < 4; ++i)
+            {
+                waitWithEventProcessing(2000);
+                if (!ScriptActions::instance().ocrRecognizesAndClick("失败", 0.5, true, QRectF(), ocr::Enhance::Upscale).isEmpty()) {
+                    isEnd = true;
+                    break;
+                }
+            }
+            if (!isEnd)
+            {
+                Logger::log(QString("未识别到【失败】，结束任务"));
+                return false;
+            }
+            waitWithEventProcessing(8000);
+            return true;
+        }
+    }
+    qWarning() << "等待" << kEnterBattleAttempts << "秒未进入战斗，结束任务";
+    return false;
+}
+
+// 清票用：等待战斗结束并点击结算框（含 3/6/9 次连胜的额外奖励确认）
+bool waitForBattleEnd()
+{
+    constexpr int kBattleEndAttempts = 36;  // 36次 * 5秒 = 3分钟
+    const QString screenshotPath = AppPaths::instance().screenshotPath();
+    for (int attempts = 0; attempts < kBattleEndAttempts; ++attempts) {
+        waitWithEventProcessing(5000);
+
+        if (!ScriptActions::instance()
+                 .opencvRecognizesAndClick(screenshotPath + "battle_end.png", 0.65, true, true)
+                 .isEmpty()) {
+            qDebug() << "成功找到识别目标，完成战斗";
+            waitWithEventProcessing(6000);
+
+            // 3/6/9 次连胜可能出现额外奖励，需要再次确认结算
+            if (!ScriptActions::instance()
+                     .opencvRecognizesAndClick(screenshotPath + "battle_end.png", 0.65, true, true)
+                     .isEmpty()) {
+                waitWithEventProcessing(3000);
+            }
+            return true;
+        }
+    }
+    qWarning() << "达到最大尝试次数" << kBattleEndAttempts << "，未找到识别目标，结束任务";
+    return false;
+}
+
+} // namespace
+
+int getNumberOfTickets()
+{
+    ScriptActions& actions = ScriptActions::instance();
+    QJsonArray ticketsData = actions.ocrRecognizes(QRectF(82, 0, 100, 8), ocr::Enhance::Upscale);
+    if (ticketsData.isEmpty())
+    {
+        qWarning() << "门票检测异常：" << ticketsData;
+        return 0;
+    }
+    //正常来说只会有一个文字。at() 是 const 版本，越界返回 Undefined 而非触发
+    // Q_ASSERT_X 直接 abort（已通过上面的 isEmpty() 校验，这里双重保险）
+    const QJsonObject item = ticketsData.at(0).toObject();
+    const QString text = item["text"].toString();
+    const QString tickets = text.split("/").value(0);
+    return tickets.toInt();
+}
+
 bool executeBorderBreakthrough()
 {
     ScriptActions& actions = ScriptActions::instance();
-    GameWindow& window = GameWindow::instance();
-    int tickets; //门票数量
-
-    std::vector<Detection> vec;
     Logger::log(QString("开始执行结界突破"));
 
     const QString configId = currentItem.id;
@@ -32,135 +149,68 @@ bool executeBorderBreakthrough()
     Logger::log(QString("结界突破运行配置: 保留当前等级=%1").arg(retentionLevel));
 
     // 识别当前界面状态
-    auto detections = actions.yoloRecognizes(0.5, 0.0, 0.3);
-
+    std::vector<Detection> detections = actions.yoloRecognizes(0.5);
     if (detections.empty()) {
         Logger::log(QString("识别失败，无法继续执行"));
         return false;
     }
 
-    bool hasPenetrated = ScriptActions::hasDetectionWithLabel(detections, "realm_raid-realm-penetrated");
-    bool hasNormal = ScriptActions::hasDetectionWithLabel(detections, "realm_raid-realm-normal");
-
-    if (hasPenetrated == false && hasNormal == false)
-    {
+    const bool hasPenetrated = ScriptActions::hasDetectionWithLabel(detections, "realm_raid-realm-penetrated");
+    const bool hasNormal = ScriptActions::hasDetectionWithLabel(detections, "realm_raid-realm-normal");
+    if (!hasPenetrated && !hasNormal) {
         Logger::log(QString("当前不在结界突破场景，无法继续执行"));
         return false;
     }
 
-    // 检查是否需要刷新
+    // 存在已挑战结界时执行一次刷新，刷新后重新识别界面（游戏机制决定刷新只需一次）
     if (hasPenetrated) {
         Logger::log(QString("检测到已挑战结界，执行刷新"));
-
-        // 点击刷新按钮
-        if (actions.clickDetectionByLabel("common-btn-yellow_confirm", 0.5, 0.0, 0.0, false)) {
-            waitWithEventProcessing(3000); // 等待刷新确认界面出现
-            qWarning() << "等待3秒";
-            for (int i = 3 - 1; i >= 0; --i)
-            {
-                waitWithEventProcessing(1000);
-                qWarning() << "等待中：" << i;
-            }
-
-            // 点击确认刷新
-            if (actions.clickDetectionByLabel("common-btn-yellow_confirm", 0.5, 0.0, 0.0, false)) {
-                Logger::log(QString("刷新成功"));
-                waitWithEventProcessing(4000); // 等待刷新完成
-
-                // 刷新后重新执行
-                return executeBorderBreakthrough(); //此时会进入投4逻辑
-            } else {
-                Logger::log(QString("未找到确认刷新按钮"));
-            }
-        } else {
+        if (!actions.clickDetectionByLabel("common-btn-yellow_confirm", 0.5, false)) {
             Logger::log(QString("未找到刷新按钮"));
+            return false;
         }
-        return false;
+        waitWithEventProcessing(2000);  // 等待刷新确认界面出现
+
+        if (!actions.clickDetectionByLabel("common-btn-yellow_confirm", 0.5, false)) {
+            Logger::log(QString("未找到确认刷新按钮"));
+            return false;
+        }
+        Logger::log(QString("刷新成功"));
+        waitWithEventProcessing(2000);  // 等待刷新完成
+
+        // 刷新后重新识别，此时会进入投4逻辑
+        detections = actions.yoloRecognizes(0.5);
+        if (detections.empty()) {
+            Logger::log(QString("刷新后识别失败，无法继续执行"));
+            return false;
+        }
     }
 
-    //查看门票数量
-    tickets = getNumberOfTickets();
+    // 查看门票数量
+    int tickets = getNumberOfTickets();
     Logger::log("门票剩余:" + std::to_string(tickets));
-    if (tickets == 0)
-    {
-        //门票耗尽属正常结束，继续循环等待门票恢复
+    if (tickets == 0) {
+        // 门票耗尽属正常结束，继续循环等待门票恢复
         return true;
     }
 
-    //构建需要挑战点击的突破位置
-    for (auto& det : detections) {
-        if (comparesEqual(det.className, "realm_raid-realm-normal"))
-        {
-            //正常会有9个
+    // 收集可挑战的结界框
+    std::vector<Detection> vec;
+    for (const auto& det : detections) {
+        if (comparesEqual(det.className, "realm_raid-realm-normal")) {
             vec.push_back(det);
         }
     }
 
-    //判断是否需要进入保留等级
-    if (retentionLevel)
-    {
-        //开始进行投4
+    // 投4：保留等级，对固定下标的结界投降
+    if (retentionLevel) {
         Logger::log(QString("结界突破-等级保留-开始进行投4"));
-        int surrenderIndex[4] = {1,3,5,7};
-        for (int i : surrenderIndex)
-        {
-            cv::Rect matchRect = vec[i].bbox;
-            std::vector<cv::Rect> excludes = {
-                vision::widthExcludeRect(matchRect, 0.0, 0.4),    // 左侧 40%
-                vision::heightExcludeRect(matchRect, 0.0, 0.1),   // 上边框 10%
-                vision::heightExcludeRect(matchRect, 0.9, 1.0),   // 下边框 10%
-                vision::widthExcludeRect(matchRect, 0.9, 1.0),   // 右边框 10%
-            };
-            cv::Point clickPt = vision::randomPointInRectExcludeAreas(matchRect, excludes, 5);
-            // Logger::log(vec[i].className);
-            // std::cout << matchRect << std::endl;
-            window.clickInWindow(clickPt);
-            waitWithEventProcessing(2000);
-
-            Logger::log(QString("开始点击进攻"));
-            //点击攻击
-            if (!actions.ocrRecognizesAndClick("进攻",0.55,true, QRectF(), ocr::Enhance::Upscale).isEmpty())
-            {
-                const int MAX_ATTEMPTS = 5;  // 5次 * 1秒 = 5秒
-                int attempts = 0;
-                //进入10秒的等待，未进入战斗则结束任务
-                while (attempts < MAX_ATTEMPTS)
-                {
-                    waitWithEventProcessing(1000);  // 每次循环前等待1秒
-                    attempts++;
-
-                    //检查是否已经进入战斗 能否退出
-                    if (actions.yoloContainsLabels(0.55, {"common-exit-battle"}, false))
-                    {
-                        Logger::log(QString("准备退出战斗"));
-                        waitWithEventProcessing(500);
-
-                        //按下esc 再按下enter
-                        window.postKey(VK_ESCAPE);
-                        waitWithEventProcessing(200);
-                        window.postKey(VK_RETURN);
-                        waitWithEventProcessing(5000);
-
-                        Logger::log(QString("识别失败并点击"));
-                        //识别战斗失败 并点击，成功则退出等待循环，否则结束任务
-                        QString savePath = actions.ocrRecognizesAndClick("失败", 0.5, true, QRectF(), ocr::Enhance::Upscale);
-                        if (savePath.isEmpty()) {
-                            Logger::log(QString("未识别到目标字段，结束任务"));
-                            return false;
-                        }
-                        waitWithEventProcessing(8000);
-                        break;
-                    }
-
-                    if (attempts >= MAX_ATTEMPTS) {
-                        qWarning() << "达到最大尝试次数" << MAX_ATTEMPTS << "，未找进入战斗，结束任务";
-                        return false;
-                    }
-                }
-            }else
-            {
-                //找不到 可按下的攻击按钮，直接结束
-                Logger::log(QString("找不到 可按下的攻击按钮"));
+        if (static_cast<int>(vec.size()) < kRealmBoxCount) {
+            Logger::log(QString("可挑战结界数量异常: %1，结束任务").arg(vec.size()));
+            return false;
+        }
+        for (int index : kSurrenderIndices) {
+            if (!openRealmAndAttack(vec[index]) || !surrenderBattle()) {
                 return false;
             }
         }
@@ -169,95 +219,33 @@ bool executeBorderBreakthrough()
     waitWithEventProcessing(5000);
 
     Logger::log(QString("结界突破-开始进行清票操作"));
-    for (const Detection det : vec)
-    {
-        //查看门票数量
+    for (const auto & index : vec) {
+        // 查看门票数量
         tickets = getNumberOfTickets();
         Logger::log("门票剩余:" + std::to_string(tickets));
-        if (tickets == 0)
-        {
-            //门票耗尽属正常结束，继续循环等待门票恢复
+        if (tickets == 0) {
+            // 门票耗尽属正常结束，继续循环等待门票恢复
             return true;
         }
 
-        waitWithEventProcessing(3000);
-
-        //点击突破框
-        cv::Rect matchRect = det.bbox;
-        Logger::log(QString("开始点击突破框"));
-        std::vector<cv::Rect> excludes = {
-            vision::widthExcludeRect(matchRect, 0.0, 0.3),    // 左侧 30%
-            vision::heightExcludeRect(matchRect, 0.0, 0.1),   // 上边框 10%
-            vision::heightExcludeRect(matchRect, 0.9, 1.0),   // 下边框 10%
-            vision::widthExcludeRect(matchRect, 0.9, 1.0),   // 右边框 10%
-        };
-        cv::Point clickPt = vision::randomPointInRectExcludeAreas(matchRect, excludes, 5);
-        window.clickInWindow(clickPt);
-        waitWithEventProcessing(2000);
-
-        //点击攻击
-        Logger::log(QString("开始点击进攻"));
-        if (actions.ocrRecognizesAndClick("进攻",0.55,true, QRectF(), ocr::Enhance::Upscale) != nullptr)
-        {
-            // 循环等待直到找到战斗结束框，最多等待3分钟
-            const int MAX_ATTEMPTS = 36;  // 36次 * 5秒 = 3分钟
-            int attempts = 0;
-
-            while (attempts < MAX_ATTEMPTS) {
-                waitWithEventProcessing(5000);
-                attempts++;
-
-                qDebug() << "第" << attempts << "次尝试OpenCV识别...";
-
-                QString screenshotPath = AppPaths::instance().screenshotPath();
-                QString savePath = actions.opencvRecognizesAndClick(screenshotPath + "battle_end.png", 0.65, true);
-                if (!savePath.isEmpty())
-                {
-                    qDebug() << "成功找到识别目标，完成战斗";
-
-                    waitWithEventProcessing(6000);
-
-                    //此时需要再次判断一下，应为可能会出现 3 6 9次拿到的额外奖励
-                    QString savePathAdditional = actions.opencvRecognizesAndClick(screenshotPath + "battle_end.png", 0.65, true);
-                    if (!savePathAdditional.isEmpty())
-                    {
-                        waitWithEventProcessing(3000);
-                    }
-                    break;  // 找到目标后跳出外层循环
-                }
-
-                if (attempts >= MAX_ATTEMPTS) {
-                    qWarning() << "达到最大尝试次数" << MAX_ATTEMPTS << "，未找到识别目标，结束任务";
-                    break;
-                }
+        waitWithEventProcessing(500);
+        if (!openRealmAndAttack(index)) {
+            // 可能是上一次战斗的奖励画面未关闭导致找不到进攻按钮，先领取遗留奖励再重试
+            Logger::log(QString("进攻失败，尝试领取遗留奖励后重试"));
+            if (!waitForBattleEnd()) {
+                return false;
             }
-        }else
-        {
-            //找不到 可按下的攻击按钮 ，直接结束
-            Logger::log(QString("找不到 可按下的攻击按钮"));
+            // 领完遗留奖励后重新打当前框，避免丢失这一次战斗次数
+            if (!openRealmAndAttack(index) || !waitForBattleEnd()) {
+                return false;
+            }
+        } else if (!waitForBattleEnd()) {
             return false;
         }
     }
 
     Logger::log(QString("结界突破执行完成"));
     return true;
-}
-
-int getNumberOfTickets()
-{
-    ScriptActions& actions = ScriptActions::instance();
-    QJsonArray ticketsData = actions.ocrRecognizes(QRectF(60, 0, 100, 8), ocr::Enhance::Upscale);
-    if (ticketsData.empty())
-    {
-        qWarning() << "门票检测异常：" << ticketsData;
-        return 0;
-    }
-    //正常来说只会有一个文字。at() 是 const 版本，越界返回 Undefined 而非触发
-    // Q_ASSERT_X 直接 abort（已通过上面的 isEmpty() 校验，这里双重保险）
-    QJsonObject item = ticketsData.at(0).toObject();
-    const QString text = item["text"].toString();
-    const QString tickets = text.split("/")[0];
-    return tickets.toInt();
 }
 
 } // namespace scenarios

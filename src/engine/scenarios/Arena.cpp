@@ -78,7 +78,7 @@ bool executeArena()
         waitWithEventProcessing(kMatchPollInterval);
 
         // 优先用 YOLO 标签识别准备按钮（一次识别，多标签按优先级择一点击）；回退到 OCR 文字「自动」
-        if (!actions.clickFirstDetectionByLabels(QStringList{"battle-ready"}, kYoloScore, 0.0, 0.0).isEmpty()) {
+        if (!actions.clickFirstDetectionByLabels(QStringList{"battle-ready"}, kYoloScore).isEmpty()) {
             readied = true;
             break;
         }
