@@ -106,7 +106,7 @@ bool executeBorderBreakthrough()
         {
             cv::Rect matchRect = vec[i].bbox;
             std::vector<cv::Rect> excludes = {
-                vision::widthExcludeRect(matchRect, 0.0, 0.3),    // 左侧 30%
+                vision::widthExcludeRect(matchRect, 0.0, 0.4),    // 左侧 40%
                 vision::heightExcludeRect(matchRect, 0.0, 0.1),   // 上边框 10%
                 vision::heightExcludeRect(matchRect, 0.9, 1.0),   // 下边框 10%
                 vision::widthExcludeRect(matchRect, 0.9, 1.0),   // 右边框 10%
@@ -119,7 +119,7 @@ bool executeBorderBreakthrough()
 
             Logger::log(QString("开始点击进攻"));
             //点击攻击
-            if (actions.ocrRecognizesAndClick("进攻",0.55,true, QRectF(), ocr::Enhance::Upscale) != nullptr)
+            if (!actions.ocrRecognizesAndClick("进攻",0.55,true, QRectF(), ocr::Enhance::Upscale).isEmpty())
             {
                 const int MAX_ATTEMPTS = 5;  // 5次 * 1秒 = 5秒
                 int attempts = 0;
@@ -252,8 +252,9 @@ int getNumberOfTickets()
         qWarning() << "门票检测异常：" << ticketsData;
         return 0;
     }
-    //正常来说只会有一个文字
-    QJsonObject item = ticketsData[0].toObject(); //TODO 此处可能会有闪退风险
+    //正常来说只会有一个文字。at() 是 const 版本，越界返回 Undefined 而非触发
+    // Q_ASSERT_X 直接 abort（已通过上面的 isEmpty() 校验，这里双重保险）
+    QJsonObject item = ticketsData.at(0).toObject();
     const QString text = item["text"].toString();
     const QString tickets = text.split("/")[0];
     return tickets.toInt();

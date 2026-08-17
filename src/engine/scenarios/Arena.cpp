@@ -100,8 +100,13 @@ bool executeArena()
     {
         waitWithEventProcessing(5000);
         QJsonArray isAutoData = actions.ocrRecognizes(QRectF(0, 13, 13, 28), ocr::Enhance::Upscale);
-        //正常来说只会有一个文字
-        QJsonObject item = isAutoData[0].toObject();//TODO 此处会异常闪退
+        // OCR 未识别到文字时跳过本次轮询（QJsonArray::operator[] 越界在 Qt6 debug
+        // 构建会触发 Q_ASSERT_X 直接 abort，release 是 UB，必须先判空）
+        if (isAutoData.isEmpty()) {
+            continue;
+        }
+        //正常来说只会有一个文字，at() 是 const 版本，越界返回 Undefined 而非 abort
+        QJsonObject item = isAutoData.at(0).toObject();
         const QString text = item["text"].toString();
         if (text == "手动")
         {
