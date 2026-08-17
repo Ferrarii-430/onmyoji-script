@@ -32,7 +32,7 @@ find_package(OpenCV REQUIRED)
 # ------------------------------
 # Qt 组件
 # ------------------------------
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Network)
 
 link_directories(${CMAKE_SOURCE_DIR}/src/lib)
 
@@ -44,8 +44,9 @@ add_executable(qtTest WIN32
         src/app/main.cpp
         resources.qrc
 
-        # core: 基础设施（日志/配置/路径/事件循环工具）
+        # core: 基础设施（日志/配置/路径/事件循环工具/更新检查）
         src/core/AppPaths.h
+        src/core/AppVersion.h
         src/core/ConfigTypeEnum.cpp
         src/core/ConfigTypeEnum.h
         src/core/EventLoopUtils.cpp
@@ -56,6 +57,8 @@ add_executable(qtTest WIN32
         src/core/ProfileStore.h
         src/core/SettingManager.cpp
         src/core/SettingManager.h
+        src/core/UpdateChecker.cpp
+        src/core/UpdateChecker.h
 
         # platform: Windows 平台能力（进程/DPI/鼠标模拟）
         src/platform/DPIHelper.h
@@ -158,6 +161,7 @@ target_link_libraries(qtTest
         Qt6::Core
         Qt6::Gui
         Qt6::Widgets
+        Qt6::Network
         ${OpenCV_LIBS}
         onnxruntime
 )
@@ -191,7 +195,7 @@ if(WIN32 AND MINGW)
     set(QT_PLUGINS_DIR "D:/QT/6.9.2/mingw_64/plugins")
 
     # Qt 核心 DLL
-    foreach(QT_LIB Core Gui Widgets)
+    foreach(QT_LIB Core Gui Widgets Network)
         add_custom_command(TARGET qtTest POST_BUILD
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 "${QT_BIN_DIR}/Qt6${QT_LIB}.dll"
@@ -213,6 +217,19 @@ if(WIN32 AND MINGW)
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${QT_PLUGINS_DIR}/platforms/qwindows.dll"
             "$<TARGET_FILE_DIR:qtTest>/plugins/platforms/")
+
+    # TLS 后端插件：Qt6::Network 通过 QSslSocket 访问 https 时必须加载至少一个
+    # TLS 后端插件，否则报 "No functional TLS backend was found"。
+    # Windows 上使用 Schannel 后端（qschannelbackend.dll），调用系统 SChannel/CAPI，
+    # 复用 Windows 系统证书库，无需额外 OpenSSL DLL 依赖。
+    # 注意：qopensslbackend.dll 依赖 libssl/libcrypto DLL，未一同部署时无法加载，故不复制。
+    add_custom_command(TARGET qtTest POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory
+            "$<TARGET_FILE_DIR:qtTest>/plugins/tls")
+    add_custom_command(TARGET qtTest POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${QT_PLUGINS_DIR}/tls/qschannelbackend.dll"
+            "$<TARGET_FILE_DIR:qtTest>/plugins/tls/")
 endif()
 
 # ------------------------------

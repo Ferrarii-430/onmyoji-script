@@ -185,6 +185,20 @@ if errorlevel 1 (
     exit /b 1
 )
 
+REM --- TLS 后端插件兜底：Qt6::Network 访问 https 必须加载至少一个 TLS 后端插件 ---
+REM windeployqt 通常会随 Qt6Network.dll 一起部署 plugins\tls\qschannelbackend.dll，
+REM 但个别 Qt 版本/参数下会漏掉。这里显式补一次，避免 "No functional TLS backend was found"。
+if not exist "%BUILD_OUT%\plugins\tls\qschannelbackend.dll" (
+    if exist "%QT_DIR%\plugins\tls\qschannelbackend.dll" (
+        if not exist "%BUILD_OUT%\plugins\tls" mkdir "%BUILD_OUT%\plugins\tls"
+        copy /y "%QT_DIR%\plugins\tls\qschannelbackend.dll" "%BUILD_OUT%\plugins\tls\qschannelbackend.dll" >nul
+        if errorlevel 1 ( echo [错误] 复制 qschannelbackend.dll 失败 & exit /b 1 )
+        echo [信息] 已补复制 TLS 插件: qschannelbackend.dll
+    ) else (
+        echo [警告] 未找到 qschannelbackend.dll，HTTPS 请求将失败
+    )
+)
+
 REM ---------- 3. 复制 MinGW 运行时 DLL ----------
 echo [步骤 3/7] 复制 MinGW 运行时 DLL
 if defined MINGW_DIR (
@@ -245,8 +259,10 @@ for %%F in (
     "Qt6Core.dll"
     "Qt6Gui.dll"
     "Qt6Widgets.dll"
+    "Qt6Network.dll"
     "onnxruntime.dll"
     "platforms\qwindows.dll"
+    "plugins\tls\qschannelbackend.dll"
     "src\resource\config.json"
     "src\resource\setting.json"
     "src\resource\classes.txt"

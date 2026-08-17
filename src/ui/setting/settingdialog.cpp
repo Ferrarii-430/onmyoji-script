@@ -12,6 +12,7 @@
 
 #include "src/core/Logger.h"
 #include "src/core/SettingManager.h"
+#include "src/core/UpdateChecker.h"
 #include "ui_SettingDialog.h"
 
 
@@ -30,6 +31,20 @@ SettingDialog::SettingDialog(QWidget *parent) :
     githubLink->setToolTip("点击在浏览器中打开项目主页");
     githubLink->setGeometry(120, 210, 171, 20);
     githubLink->setAlignment(Qt::AlignCenter);
+
+    // 手动检查更新链接：调用 UpdateChecker 立即向 Gitee 查询最新发行版。
+    // setOpenExternalLinks(false) 让 linkActivated 信号在本进程内触发，而非打开浏览器。
+    auto *checkUpdateLink = new QLabel(this);
+    checkUpdateLink->setText("<a href=\"#\" "
+                             "style=\"color:#5b6cf0; text-decoration:none;\">检查更新</a>");
+    checkUpdateLink->setCursor(Qt::PointingHandCursor);
+    checkUpdateLink->setToolTip("立即向 Gitee 查询最新发行版");
+    checkUpdateLink->setGeometry(120, 235, 171, 20);
+    checkUpdateLink->setAlignment(Qt::AlignCenter);
+    connect(checkUpdateLink, &QLabel::linkActivated, this, [this]() {
+        // notifyOnNoUpdate=true：无论结果如何都弹窗提示用户
+        UpdateChecker::instance().checkAsync(true);
+    });
 
     // 连接信号槽
     connect(ui->btnSave, &QToolButton::clicked, this, &SettingDialog::onSaveClicked);

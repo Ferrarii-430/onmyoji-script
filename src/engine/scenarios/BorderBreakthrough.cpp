@@ -115,7 +115,7 @@ bool executeBorderBreakthrough()
             // Logger::log(vec[i].className);
             // std::cout << matchRect << std::endl;
             window.clickInWindow(clickPt);
-            waitWithEventProcessing(3000);
+            waitWithEventProcessing(2000);
 
             Logger::log(QString("开始点击进攻"));
             //点击攻击
@@ -139,7 +139,7 @@ bool executeBorderBreakthrough()
                         window.postKey(VK_ESCAPE);
                         waitWithEventProcessing(200);
                         window.postKey(VK_RETURN);
-                        waitWithEventProcessing(10000);
+                        waitWithEventProcessing(5000);
 
                         Logger::log(QString("识别失败并点击"));
                         //识别战斗失败 并点击，成功则退出等待循环，否则结束任务
@@ -193,18 +193,18 @@ bool executeBorderBreakthrough()
         };
         cv::Point clickPt = vision::randomPointInRectExcludeAreas(matchRect, excludes, 5);
         window.clickInWindow(clickPt);
-        waitWithEventProcessing(3000);
+        waitWithEventProcessing(2000);
 
         //点击攻击
         Logger::log(QString("开始点击进攻"));
         if (actions.ocrRecognizesAndClick("进攻",0.55,true, QRectF(), ocr::Enhance::Upscale) != nullptr)
         {
             // 循环等待直到找到战斗结束框，最多等待3分钟
-            const int MAX_ATTEMPTS = 18;  // 18次 * 10秒 = 3分钟
+            const int MAX_ATTEMPTS = 36;  // 36次 * 5秒 = 3分钟
             int attempts = 0;
 
             while (attempts < MAX_ATTEMPTS) {
-                waitWithEventProcessing(10000);  // 每次循环前等待10秒
+                waitWithEventProcessing(5000);
                 attempts++;
 
                 qDebug() << "第" << attempts << "次尝试OpenCV识别...";
@@ -253,7 +253,7 @@ int getNumberOfTickets()
         return 0;
     }
     //正常来说只会有一个文字
-    QJsonObject item = ticketsData[0].toObject();
+    QJsonObject item = ticketsData[0].toObject(); //TODO 此处可能会有闪退风险
     const QString text = item["text"].toString();
     const QString tickets = text.split("/")[0];
     return tickets.toInt();

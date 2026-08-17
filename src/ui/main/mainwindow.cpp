@@ -26,9 +26,11 @@
 #include "QMessageBox"
 
 #include "src/core/AppPaths.h"
+#include "src/core/AppVersion.h"
 #include "src/core/ConfigTypeEnum.h"
 #include "src/core/ProfileStore.h"
 #include "src/core/SettingManager.h"
+#include "src/core/UpdateChecker.h"
 #include "src/engine/ScriptActions.h"
 #include "src/engine/TaskRunner.h"
 #include "src/platform/DPIHelper.h"
@@ -41,7 +43,7 @@
 mainwindow::mainwindow(QWidget *parent) :
     QWidget(parent), ui(new Ui::mainwindow) {
     ui->setupUi(this);
-    setWindowTitle(QStringLiteral("onmyoji-script v1.5.4"));
+    setWindowTitle(QStringLiteral("onmyoji-script v") + APP_VERSION);
 
     // 配合全局 QSS 的 alternate-background-color 显示斑马纹
     ui->listWidget->setAlternatingRowColors(true);
@@ -148,6 +150,12 @@ mainwindow::mainwindow(QWidget *parent) :
 
     //设置DPI感知
     DPIHelper::SetProcessDPIAwareness();
+
+    // 启动后延迟 3 秒静默检查更新：等待 UI 完全绘制完成，避免阻塞首屏；
+    // 仅在发现新版本时弹窗，其它情况只写日志（不打扰用户）。
+    QTimer::singleShot(3000, this, []() {
+        UpdateChecker::instance().checkAsync(false);
+    });
 }
 
 mainwindow::~mainwindow() {
