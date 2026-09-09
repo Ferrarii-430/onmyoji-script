@@ -98,37 +98,25 @@ bool executeAnniversary999()
         }
     }
 
-    //步骤4 点击跳过获得奖励
-    waitRandomWithEventProcessing(2000,500);
-    if (actions.ocrContainsText("获得奖励", 0.75, QRectF(11, 9, 79, 83)))
+    //步骤4 判断是否有 获得奖励
+    waitRandomWithEventProcessing(2500,500);
+    if (actions.ocrContainsText("获得奖励", 0.7, QRectF(11, 9, 79, 83)))
     {
-        QString savePathReceiveRewards = actions.clickInRoi(QRectF(80, 15, 19, 70), true);
-        if (!savePathReceiveRewards.isEmpty())
-        {
-            Logger::log(QString("跳过获得奖励"));
-        }else
-        {
-            if (!hasCollaboration())
-            {
-                Logger::log(QString("跳过获得奖励失败"));
-                return false;
-            }else
-            {
-                //需要重试 判断是否正确跳过获得奖励
-                if (actions.ocrContainsText("获得奖励", 0.75, QRectF(11, 9, 79, 83)))
-                {
-                    QString savePathReceiveRewardsRe = actions.clickInRoi(QRectF(80, 15, 19, 70), true);
-                    if (!savePathReceiveRewardsRe.isEmpty())
-                    {
-                        Logger::log(QString("重试跳过获得奖励"));
-                    }else
-                    {
-                        Logger::log(QString("重试跳过获得奖励失败"));
-                        return false;
-                    }
-                }
-            }
-        }
+        Logger::log(QString("可以点击【获得奖励】"));
+    }else
+    {
+        hasCollaboration();
+    }
+
+    //步骤5 跳过获得奖励
+    QString savePathReceiveRewards = actions.clickInRoi(QRectF(80, 15, 19, 70), true);
+    if (!savePathReceiveRewards.isEmpty())
+    {
+        Logger::log(QString("跳过获得奖励"));
+    }else
+    {
+        //这里不需要重试
+        return false;
     }
 
     waitRandomWithEventProcessing(2000,1000);
