@@ -15,6 +15,7 @@ enum class ConfigTypeEnum {
     SYSTEM_ARENA,
     SYSTEM_MITAMA,
     SYSTEM_BUDOKAI,
+    SYSTEM_ANNIVERSARY_999,
     UNKNOWN
 };
 

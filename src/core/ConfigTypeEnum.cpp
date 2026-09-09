@@ -16,6 +16,7 @@ QString getConfigTypeEnumToQStringName(ConfigTypeEnum type) {
         case ConfigTypeEnum::SYSTEM_ARENA: return "SYSTEM_ARENA";
         case ConfigTypeEnum::SYSTEM_MITAMA: return "SYSTEM_MITAMA";
         case ConfigTypeEnum::SYSTEM_BUDOKAI: return "SYSTEM_BUDOKAI";
+        case ConfigTypeEnum::SYSTEM_ANNIVERSARY_999: return "SYSTEM_ANNIVERSARY_999";
         default: return "未知";
     }
 }
@@ -51,6 +52,9 @@ ConfigTypeEnum stringToConfigType(const QString& typeStr) {
     if (typeStr.compare("SYSTEM_BUDOKAI", Qt::CaseInsensitive) == 0) {
         return ConfigTypeEnum::SYSTEM_BUDOKAI;
     }
+    if (typeStr.compare("SYSTEM_ANNIVERSARY_999", Qt::CaseInsensitive) == 0) {
+        return ConfigTypeEnum::SYSTEM_ANNIVERSARY_999;
+    }
     return ConfigTypeEnum::UNKNOWN;
 }
 
@@ -65,6 +69,7 @@ QString configTypeToQString(ConfigTypeEnum type) {
         case ConfigTypeEnum::SYSTEM_ARENA: return "SYSTEM_ARENA";
         case ConfigTypeEnum::SYSTEM_MITAMA: return "SYSTEM_MITAMA";
         case ConfigTypeEnum::SYSTEM_BUDOKAI: return "SYSTEM_BUDOKAI";
+        case ConfigTypeEnum::SYSTEM_ANNIVERSARY_999: return "SYSTEM_ANNIVERSARY_999";
         default: return "UNKNOWN";
     }
 }

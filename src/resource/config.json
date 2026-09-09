@@ -99,36 +99,10 @@
     ]
   },
   {
-    "id": "D942C777-2449-41D2-A794-055586E39BUDO",
-    "name": "系统方案-武道大会",
+    "id": "D942C999-2449-41D2-A794-055586E3ANN99",
+    "name": "系统方案-十周年999",
     "type": "system",
-    "tip": "从武道大会可以点击搜寻的位置，点击启动即可，右边设置次数。",
-    "systemConfig": [
-      {
-        "key": "schemeName",
-        "label": "预设分组名称",
-        "control": "input",
-        "value": "活动",
-        "placeholder": "预设分组名称",
-        "tip": "武道大会预设队伍所在的分组名称。"
-      },
-      {
-        "key": "singleLineupName",
-        "label": "单体阵容名称",
-        "control": "input",
-        "value": "单体",
-        "placeholder": "输入单体阵容名称",
-        "tip": "单体输出阵容的名称，用于自动选择阵容。"
-      },
-      {
-        "key": "groupLineupName",
-        "label": "群体阵容名称",
-        "control": "input",
-        "value": "群体",
-        "placeholder": "输入群体阵容名称",
-        "tip": "群体输出阵容的名称，用于自动选择阵容。"
-      }
-    ],
+    "tip": "十周年999全自动，在挑战界面启动即可。支持功能：随机点击，随机等待，自动取消协作，背包爆满自动跳过。",
     "steps": [
       {
         "identifyErrorHandle": "next",
@@ -139,10 +113,10 @@
         "randomClick": true,
         "randomWait": null,
         "score": 0.55,
-        "stepsId": "D942C777-b290-4245-9076-56695uBUDO",
-        "taskName": "自动武道大会",
+        "stepsId": "D942C999-b290-4245-9076-56695uANN99",
+        "taskName": "十周年999",
         "time": null,
-        "type": "SYSTEM_BUDOKAI"
+        "type": "SYSTEM_ANNIVERSARY_999"
       }
     ]
   }

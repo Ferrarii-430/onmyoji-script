@@ -769,6 +769,105 @@ QString ScriptActions::ocrRecognizesAndClickAny(const QStringList& ocrTexts, con
     return QString();
 }
 
+bool ScriptActions::ocrContainsText(const QString& ocrText, const double threshold,
+                                    const QRectF& roiPercent, const ocr::Enhance enhance)
+{
+    // 完全匹配下空目标串只会命中 OCR 识别出的空文本，无意义，直接判为未命中
+    if (ocrText.isEmpty()) {
+        Logger::log(QString("[OCR] 目标文字为空，直接判为未命中"));
+        return false;
+    }
+
+    cv::Mat winImg = capture::captureGameWindow();
+    if (winImg.empty())
+    {
+        return false;
+    }
+
+    const QString saveDir = AppPaths::instance().thumbnailPath();
+
+    QString ocrImagePath;
+    double ignoredScale = 1.0;
+    bool cropped = false;
+    // 纯检测不点击，无需坐标还原，roiRect/roiScale 仅占位传参
+    const cv::Rect ignoredRoi = computeOcrRoi(winImg, roiPercent, saveDir, ocrImagePath, ignoredScale, cropped, enhance);
+    Q_UNUSED(ignoredRoi)
+    Q_UNUSED(ignoredScale)
+
+    // 只做一次 OCR，存在「与目标文字完全相等(==)且分数达标」的条目即返回 true
+    const QJsonObject result = vision::runRapidOCR(ocrImagePath, cropped ? OCR_PADDING_ROI : OCR_PADDING_FULL);
+    if (result.isEmpty()) {
+        return false;
+    }
+
+    const QJsonArray dataArray = result["data"].toArray();
+    for (int i = 0; i < dataArray.size(); ++i) {
+        const QJsonObject item = dataArray[i].toObject();
+        if (item["text"].toString() != ocrText) {
+            continue;
+        }
+        if (item["score"].toDouble() < threshold) {
+            Logger::log(QString("[OCR] 已识别到:" + ocrText + " 但分数过低"));
+            return false;
+        }
+        return true;
+    }
+
+    Logger::log(QString("[OCR] 未识别到文字：" + ocrText));
+    return false;
+}
+
+QString ScriptActions::clickInRoi(const QRectF& roiPercent, const bool randomClick)
+{
+    cv::Mat winImg = capture::captureGameWindow();
+    if (winImg.empty())
+    {
+        Logger::log(QString("clickInRoi: 截图失败"));
+        return QString();
+    }
+
+    // 百分比 -> 像素，与 OCR 识别区域相同的换算方式，并裁剪到图片范围内
+    const cv::Rect fullRect(0, 0, winImg.cols, winImg.rows);
+    const int x = static_cast<int>(std::round(winImg.cols * roiPercent.x() / 100.0));
+    const int y = static_cast<int>(std::round(winImg.rows * roiPercent.y() / 100.0));
+    const int w = static_cast<int>(std::round(winImg.cols * roiPercent.width() / 100.0));
+    const int h = static_cast<int>(std::round(winImg.rows * roiPercent.height() / 100.0));
+    const cv::Rect roiRect = cv::Rect(x, y, w, h) & fullRect;
+
+    if (roiRect.width <= 0 || roiRect.height <= 0) {
+        Logger::log(QString("clickInRoi: 点击区域无效: 百分比(%1%%,%2%%,%3%%,%4%%)")
+                        .arg(roiPercent.x()).arg(roiPercent.y())
+                        .arg(roiPercent.width()).arg(roiPercent.height()));
+        return QString();
+    }
+
+    cv::Point clickPt;
+    if (randomClick) {
+        clickPt = vision::randomPointInRect(roiRect);
+    } else {
+        clickPt = cv::Point(roiRect.x + roiRect.width / 2,
+                            roiRect.y + roiRect.height / 2);
+    }
+
+    Logger::log(QString("clickInRoi: 区域 百分比(%1%,%2%,%3%,%4%) -> 像素(%5,%6,%7x%8) 点击(%9,%10)")
+                    .arg(roiPercent.x()).arg(roiPercent.y())
+                    .arg(roiPercent.width()).arg(roiPercent.height())
+                    .arg(roiRect.x).arg(roiRect.y).arg(roiRect.width).arg(roiRect.height)
+                    .arg(clickPt.x).arg(clickPt.y));
+
+    // 保存带区域框和点击标记的结果图
+    cv::Mat resultImg = winImg.clone();
+    cv::rectangle(resultImg, roiRect, cv::Scalar(0, 255, 0), 2);
+    drawClickMarker(resultImg, clickPt);
+
+    QString savePath = AppPaths::instance().matchResultPath();
+    vision::imwriteQt(savePath, resultImg);
+
+    GameWindow::instance().clickInWindow(clickPt);
+    processAndShowImage(savePath);
+    return savePath;
+}
+
 /**
  *
  * @param threshold 得分

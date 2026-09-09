@@ -100,6 +100,8 @@ add_executable(qtTest WIN32
         src/engine/TaskRunner.h
         src/engine/scenarios/Arena.cpp
         src/engine/scenarios/Arena.h
+        src/engine/scenarios/Anniversary999.cpp
+        src/engine/scenarios/Anniversary999.h
         src/engine/scenarios/BorderBreakthrough.cpp
         src/engine/scenarios/BorderBreakthrough.h
         src/engine/scenarios/Budokai.cpp

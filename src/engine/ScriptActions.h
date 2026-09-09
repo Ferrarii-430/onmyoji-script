@@ -109,6 +109,18 @@ public:
                                      const QRectF& roiPercent = QRectF(),
                                      ocr::Enhance enhance = ocr::Enhance::Upscale);
 
+    // 判断区域内是否出现目标文字（纯检测，不点击）：
+    // 识别结果与 ocrText 完全相等（== 全等匹配，非子串）且分数 >= threshold 时返回 true；
+    // 未命中、命中但分数不足或截图失败返回 false。命名参考 yoloContainsLabels。
+    bool ocrContainsText(const QString& ocrText, double threshold,
+                         const QRectF& roiPercent = QRectF(),
+                         ocr::Enhance enhance = ocr::Enhance::Upscale);
+
+    // 按百分比区域直接点击（无任何识别）：roiPercent 为点击区域（左/上/宽/高，单位为图片尺寸的百分比 0~100），
+    // randomClick 为 true 时在矩形内随机取点，否则点击矩形中心。
+    // 成功返回带区域框和点击标记的结果图路径，截图失败或区域无效返回空。
+    QString clickInRoi(const QRectF& roiPercent, bool randomClick = true);
+
     // YOLO 识别（纯识别，不点击）。返回所有检测结果，由调用方决定如何处理
     std::vector<Detection> yoloRecognizes(double threshold);
     // YOLO 是否包含指定标签；matchAll 为 false 时任一标签命中即返回 true

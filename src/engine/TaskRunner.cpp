@@ -12,6 +12,7 @@
 #include "src/core/Logger.h"
 #include "src/engine/ScriptActions.h"
 #include "src/engine/scenarios/Arena.h"
+#include "src/engine/scenarios/Anniversary999.h"
 #include "src/engine/scenarios/BorderBreakthrough.h"
 #include "src/engine/scenarios/Budokai.h"
 #include "src/engine/scenarios/Mitama.h"
@@ -149,6 +150,11 @@ QString TaskRunner::executeStep(const QJsonObject& step)
                 break;
         }
 
+        case ConfigTypeEnum::SYSTEM_ANNIVERSARY_999: {
+                savePath = scenarios::executeAnniversary999() ? QStringLiteral("system-ok") : QString();
+                break;
+        }
+
         default: {
                 Logger::log(QString("未知的命令：%1").arg(typeStr));
                 break;
@@ -217,7 +223,8 @@ void TaskRunner::run(const QJsonArray& steps, int cycleCount)
                 && (type == ConfigTypeEnum::SYSTEM_BORDER_BREAKTHROUGH
                     || type == ConfigTypeEnum::SYSTEM_ARENA
                     || type == ConfigTypeEnum::SYSTEM_MITAMA
-                    || type == ConfigTypeEnum::SYSTEM_BUDOKAI))
+                    || type == ConfigTypeEnum::SYSTEM_BUDOKAI
+                    || type == ConfigTypeEnum::SYSTEM_ANNIVERSARY_999))
             {
                 Logger::log(QString("系统方案执行失败，终止任务循环"));
                 stopDoLoop = true;
