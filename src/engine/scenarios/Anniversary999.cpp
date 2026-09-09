@@ -143,6 +143,7 @@ bool hasCollaboration()
 {
     ScriptActions& actions = ScriptActions::instance();
     QString path = actions.yoloRecognizesAndClick(0.50, false, "common-btn-red_x_transparent");
+    waitWithEventProcessing(2000);
     if (!path.isEmpty())
     {
         Logger::log(QString("点击取消协作"));
