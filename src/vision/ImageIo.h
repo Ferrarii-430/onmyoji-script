@@ -7,6 +7,7 @@
 
 #include <vector>
 #include <QString>
+#include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QByteArray>
@@ -69,6 +70,12 @@ inline bool imwriteQt(const QString& path, const cv::Mat& img,
                       const std::vector<int>& params = std::vector<int>())
 {
     if (img.empty()) {
+        return false;
+    }
+
+    // cv::imwrite / QFile 都不会自动创建父目录，目录缺失时写入会静默失败
+    // （如构建产物中不存在 thumbnail/ 目录），这里先确保父目录存在
+    if (!QDir().mkpath(QFileInfo(path).absolutePath())) {
         return false;
     }
 

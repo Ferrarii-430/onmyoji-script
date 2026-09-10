@@ -250,12 +250,9 @@ void mainwindow::showSystemConfigForm(const QString &configId)
         m_systemConfigForm = nullptr;
     }
 
+    // systemConfig 为空(如十周年999)时同样生成表单：显示标题与方案级 tip，只是没有配置项。
+    // 不再用 systemConfigTips 静态提示兜底——它被 raise 后的 tableWidget 盖住，永远不可见。
     const QJsonArray systemConfig = getSystemConfig(configId);
-    if (systemConfig.isEmpty()) {
-        // 该系统方案没有自定义配置，退回原来的静态提示
-        ui->systemConfigTips->show();
-        return;
-    }
     ui->systemConfigTips->hide();
 
     // 表单容器，位置对齐任务表格区域

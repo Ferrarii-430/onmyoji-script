@@ -35,7 +35,7 @@ OcrLite& ocrLite()
                         (modelsPath + AppPaths::instance().rapidOCRRecPathV4()).toStdString(),
                         (modelsPath + AppPaths::instance().rapidOCRKeysPath()).toStdString());
         initialized = true;
-        Logger::log(QString("进程内RapidOCR模型加载完成"));
+        // Logger::log(QString("进程内RapidOCR模型加载完成"));
     }
     return lite;
 }
