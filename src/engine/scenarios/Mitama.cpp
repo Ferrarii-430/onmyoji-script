@@ -26,7 +26,7 @@ namespace scenarios
     int MAX_WAIT_TIME = 2000; //最长25秒
     bool autoSendRequestEnable = false; //是否开启自动发送 组队/入队 请求
     bool isCaptain = false; //是否为队长
-    bool isCastingLocked = false; //阵容是否锁定
+    static bool isCastingLocked = false; //阵容是否锁定
 
     bool executeMitama()
     {

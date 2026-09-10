@@ -88,6 +88,19 @@ add_executable(qtTest WIN32
         src/vision/ImageIo.h
         src/vision/OcrEngine.cpp
         src/vision/OcrEngine.h
+        src/vision/ocr/clipper.cpp
+        src/vision/ocr/clipper.hpp
+        src/vision/ocr/OcrUtils.cpp
+        src/vision/ocr/OcrUtils.h
+        src/vision/ocr/OcrStruct.h
+        src/vision/ocr/DbNet.cpp
+        src/vision/ocr/DbNet.h
+        src/vision/ocr/AngleNet.cpp
+        src/vision/ocr/AngleNet.h
+        src/vision/ocr/CrnnNet.cpp
+        src/vision/ocr/CrnnNet.h
+        src/vision/ocr/OcrLite.cpp
+        src/vision/ocr/OcrLite.h
         src/vision/TemplateMatcher.cpp
         src/vision/TemplateMatcher.h
         src/vision/YOLODetector.cpp
@@ -127,6 +140,10 @@ add_executable(qtTest WIN32
         src/ui/ocrForm/RoiPreviewWidget.cpp
         src/ui/ocrForm/RoiPreviewWidget.h
         src/ui/ocrForm/ui_OcrForm.h
+        src/ui/roiClickForm/RoiClickForm.cpp
+        src/ui/roiClickForm/RoiClickForm.h
+        src/ui/roiClickForm/RoiClickForm.ui
+        src/ui/roiClickForm/ui_RoiClickForm.h
         src/ui/yoloForm/YoloForm.cpp
         src/ui/yoloForm/YoloForm.h
         src/ui/theme/Theme.cpp

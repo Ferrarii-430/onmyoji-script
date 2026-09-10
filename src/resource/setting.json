@@ -1,7 +1,7 @@
 {
   "mouseClickMode": "Hook",
-  "mouseControlMode": "BEZIER",
+  "mouseControlMode": "RANDOM_WALK",
   "mouseSpeed": 7,
   "screenshotMode": "DirectX截图",
-  "persistScreenshot": true
+  "persistScreenshot": false
 }

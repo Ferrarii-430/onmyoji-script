@@ -12,6 +12,7 @@ QString getConfigTypeEnumToQStringName(ConfigTypeEnum type) {
         case ConfigTypeEnum::WAIT: return "等待";
         case ConfigTypeEnum::OCR: return "OCR识别";
         case ConfigTypeEnum::YOLO: return "YOLO";
+        case ConfigTypeEnum::CLICK_ROI: return "范围点击";
         case ConfigTypeEnum::SYSTEM_BORDER_BREAKTHROUGH: return "SYSTEM_BORDER_BREAKTHROUGH";
         case ConfigTypeEnum::SYSTEM_ARENA: return "SYSTEM_ARENA";
         case ConfigTypeEnum::SYSTEM_MITAMA: return "SYSTEM_MITAMA";
@@ -40,6 +41,9 @@ ConfigTypeEnum stringToConfigType(const QString& typeStr) {
     if (typeStr.compare("YOLO", Qt::CaseInsensitive) == 0) {
         return ConfigTypeEnum::YOLO;
     }
+    if (typeStr.compare("CLICK_ROI", Qt::CaseInsensitive) == 0) {
+        return ConfigTypeEnum::CLICK_ROI;
+    }
     if (typeStr.compare("SYSTEM_BORDER_BREAKTHROUGH", Qt::CaseInsensitive) == 0) {
         return ConfigTypeEnum::SYSTEM_BORDER_BREAKTHROUGH;
     }
@@ -65,6 +69,7 @@ QString configTypeToQString(ConfigTypeEnum type) {
         case ConfigTypeEnum::WAIT: return "WAIT";
         case ConfigTypeEnum::OCR: return "OCR";
         case ConfigTypeEnum::YOLO: return "YOLO";
+        case ConfigTypeEnum::CLICK_ROI: return "CLICK_ROI";
         case ConfigTypeEnum::SYSTEM_BORDER_BREAKTHROUGH: return "SYSTEM_BORDER_BREAKTHROUGH";
         case ConfigTypeEnum::SYSTEM_ARENA: return "SYSTEM_ARENA";
         case ConfigTypeEnum::SYSTEM_MITAMA: return "SYSTEM_MITAMA";

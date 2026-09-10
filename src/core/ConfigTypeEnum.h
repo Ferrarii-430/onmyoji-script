@@ -11,6 +11,7 @@ enum class ConfigTypeEnum {
     WAIT,
     OCR,
     YOLO,
+    CLICK_ROI,
     SYSTEM_BORDER_BREAKTHROUGH,
     SYSTEM_ARENA,
     SYSTEM_MITAMA,

@@ -38,6 +38,7 @@
 #include "src/ui/setting/settingdialog.h"
 #include "src/vision/ClassNameCache.h"
 #include "src/vision/ImageIo.h"
+#include "src/vision/OcrEngine.h"
 #include "src/vision/YOLODetector.h"
 
 mainwindow::mainwindow(QWidget *parent) :
@@ -129,6 +130,12 @@ mainwindow::mainwindow(QWidget *parent) :
     if (initSuccess)
     {
         Logger::log(QString("onmyoji-yolo-v5 加载成功！"));
+    }
+
+    // OCR 引擎模型常驻：启动时预加载，避免首次 OCR 识别卡顿
+    if (vision::initInProcessOcr())
+    {
+        Logger::log(QString("RapidOCR 进程内引擎加载成功！"));
     }
 
     ui->taskCycleNumber->setValue(1);
@@ -652,8 +659,14 @@ void mainwindow::showOpenCVIdentifyImage(const QString& savePath) const
         return;
     }
 
-    // 用 OpenCV 读取图像
-    cv::Mat img = vision::imreadQt(savePath);
+    // 内存回显模式：persistScreenshot 关闭时 ScriptActions 不落盘，
+    // 收到内存 key 直接取缓存图像，避免磁盘读写；否则按路径读文件
+    cv::Mat img;
+    if (savePath == ScriptActions::memoryResultKey()) {
+        img = ScriptActions::instance().memoryResultImage();
+    } else {
+        img = vision::imreadQt(savePath);
+    }
     if (img.empty()) {
         qWarning() << "[ERROR] 无法加载图片:" << savePath;
         ui->openCVIdentifyLabel->clear();

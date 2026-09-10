@@ -51,6 +51,7 @@ EditTaskDialog::EditTaskDialog(EditMode mode, const QJsonObject &stepData, const
     waitForm = new WaitForm(this);
     ocrForm = new OcrForm(this);
     yoloForm = new YoloForm(this);
+    roiClickForm = new RoiClickForm(this);
 
     // 下拉项、步骤类型、表单页在此处一一对应；调整顺序只改这里即可，
     // 其余逻辑均按类型字符串（itemData）分发，不依赖下拉项下标
@@ -58,6 +59,7 @@ EditTaskDialog::EditTaskDialog(EditMode mode, const QJsonObject &stepData, const
         {"OpenCV识图", "OPENCV"},
         {"OCR识别", "OCR"},
         {"YOLO识别", "YOLO"},
+        {"范围点击", "CLICK_ROI"},
         {"等待", "WAIT"},
     };
     for (const auto& page : pages) {
@@ -80,6 +82,7 @@ EditTaskDialog::EditTaskDialog(EditMode mode, const QJsonObject &stepData, const
             if (type == "OPENCV") typeForm->loadFromJson(configId, stepData);
             else if (type == "OCR") ocrForm->loadFromJson(configId, stepData);
             else if (type == "YOLO") yoloForm->loadFromJson(configId, stepData);
+            else if (type == "CLICK_ROI") roiClickForm->loadFromJson(configId, stepData);
             else if (type == "WAIT") waitForm->loadFromJson(configId, stepData);
         }
     }
@@ -108,6 +111,7 @@ QJsonObject EditTaskDialog::collectData() const {
     if (type == "OPENCV") obj = typeForm->toJson();
     else if (type == "OCR") obj = ocrForm->toJson();
     else if (type == "YOLO") obj = yoloForm->toJson();
+    else if (type == "CLICK_ROI") obj = roiClickForm->toJson();
     else if (type == "WAIT") obj = waitForm->toJson();
 
     // 编辑模式下保留原始 stepsId，防止切换类型后各表单 stepDataCopy 为空而生成新 UUID
@@ -126,6 +130,7 @@ QWidget* EditTaskDialog::formForType(const QString& type) const {
     if (type == "OPENCV") return typeForm;
     if (type == "OCR") return ocrForm;
     if (type == "YOLO") return yoloForm;
+    if (type == "CLICK_ROI") return roiClickForm;
     if (type == "WAIT") return waitForm;
     return nullptr;
 }
@@ -232,6 +237,18 @@ void EditTaskDialog::onTestButtonClick()
             return;
         }
         emit imagePathRequested(savePath); // 发射信号
+    } else if (type == "CLICK_ROI") {
+        QJsonObject json = roiClickForm->toJson();
+        const bool randomClick = json["randomClick"].toBool();
+        const QRectF roiPercent(json["clickRoiX"].toDouble(), json["clickRoiY"].toDouble(),
+                                json["clickRoiW"].toDouble(), json["clickRoiH"].toDouble());
+        QString savePath = ScriptActions::instance().clickInRoi(roiPercent, randomClick);
+        if (savePath.isEmpty())
+        {
+            Logger::log(QString("测试范围点击失败"));
+            return;
+        }
+        emit imagePathRequested(savePath); // 发射信号
     }
     // 等待（WAIT）无可测试动作
 }
@@ -326,6 +343,24 @@ bool EditTaskDialog::validateYoloFormData(const QJsonObject &data)
     return true;
 }
 
+bool EditTaskDialog::validateRoiClickFormData(const QJsonObject &data)
+{
+    QString taskName = data["taskName"].toString().trimmed();
+
+    if (taskName.isEmpty()) {
+        QMessageBox::warning(this, "警告", "任务名称不能为空！");
+        return false;
+    }
+
+    // 与 ScriptActions::clickInRoi 相同的有效性判断：区域宽高百分比必须 > 0
+    if (data["clickRoiW"].toDouble() <= 0 || data["clickRoiH"].toDouble() <= 0) {
+        QMessageBox::warning(this, "警告", "点击区域的宽/高必须 > 0！");
+        return false;
+    }
+
+    return true;
+}
+
 // 在 EditTaskDialog 中添加验证方法
 bool EditTaskDialog::validateData() {
     QJsonObject data = resultData();
@@ -344,6 +379,9 @@ bool EditTaskDialog::validateData() {
     }else if (comparesEqual(type, "YOLO"))
     {
         isValidate = validateYoloFormData(data);
+    }else if (comparesEqual(type, "CLICK_ROI"))
+    {
+        isValidate = validateRoiClickFormData(data);
     }
 
     return isValidate;

@@ -9,6 +9,6 @@
 #ifndef APPVERSION_H
 #define APPVERSION_H
 
-#define APP_VERSION "1.5.4"
+#define APP_VERSION "1.5.5"
 
 #endif // APPVERSION_H

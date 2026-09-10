@@ -73,10 +73,6 @@ public:
         return applicationDirPath() + "/src/resource/config.json";
     }
 
-    QString rapidOCRExePath() const {
-        return applicationDirPath() + "/src/resource/RapidOCR/RapidOCR-json.exe";
-    }
-
     QString classesNamePath() const {
         return applicationDirPath() + "/src/resource/classes.txt";
     }

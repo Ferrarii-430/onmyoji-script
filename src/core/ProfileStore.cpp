@@ -140,6 +140,10 @@ void addConfigToJsonFile(const QString &filePath, const QString &configId, const
             newObj["ocrRoiW"]    = safeValue(json, "ocrRoiW");
             newObj["ocrRoiH"]    = safeValue(json, "ocrRoiH");
             newObj["ocrEnhance"] = safeValue(json, "ocrEnhance");
+            newObj["clickRoiX"]   = safeValue(json, "clickRoiX");
+            newObj["clickRoiY"]   = safeValue(json, "clickRoiY");
+            newObj["clickRoiW"]   = safeValue(json, "clickRoiW");
+            newObj["clickRoiH"]   = safeValue(json, "clickRoiH");
             newObj["excludeLeft"]   = safeValue(json, "excludeLeft");
             newObj["excludeRight"]  = safeValue(json, "excludeRight");
             newObj["excludeTop"]    = safeValue(json, "excludeTop");
@@ -223,6 +227,10 @@ void updateConfigInJsonFile(const QString &filePath, const QString &configId, co
                     updatedStep["ocrRoiW"]    = safeValue(json, "ocrRoiW");
                     updatedStep["ocrRoiH"]    = safeValue(json, "ocrRoiH");
                     updatedStep["ocrEnhance"] = safeValue(json, "ocrEnhance");
+                    updatedStep["clickRoiX"]   = safeValue(json, "clickRoiX");
+                    updatedStep["clickRoiY"]   = safeValue(json, "clickRoiY");
+                    updatedStep["clickRoiW"]   = safeValue(json, "clickRoiW");
+                    updatedStep["clickRoiH"]   = safeValue(json, "clickRoiH");
                     updatedStep["excludeLeft"]   = safeValue(json, "excludeLeft");
                     updatedStep["excludeRight"]  = safeValue(json, "excludeRight");
                     updatedStep["excludeTop"]    = safeValue(json, "excludeTop");

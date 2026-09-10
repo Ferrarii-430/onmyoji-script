@@ -16,6 +16,7 @@
 #include "src/core/AppPaths.h"
 #include "src/core/EventLoopUtils.h"
 #include "src/core/Logger.h"
+#include "src/core/SettingManager.h"
 #include "src/game/GameWindow.h"
 #include "src/game/capture/CaptureService.h"
 #include "src/vision/ClassNameCache.h"
@@ -204,53 +205,43 @@ cv::Mat enhanceOcrRoiImage(const cv::Mat& roiImg, const ocr::Enhance enhance, do
     return img;
 }
 
-// 识别整张图片时按开关做逐像素增强并落盘，返回可送入 OCR 的图片路径。
-// 未开启任何逐像素项时返回空字符串，调用方沿用原有的整图识别路径（不改变旧行为）。
+// 识别整张图片时按开关做逐像素增强，返回送入 OCR 的图像。
+// 未开启任何逐像素项时返回空 Mat，调用方直接用原始截图（不改变旧行为）。
 // 整图不做放大：截图本身尺寸足够，放大只会拖慢识别且无收益。
-QString prepareFullImageForOcr(const cv::Mat& winImg, const ocr::Enhance enhance,
-                               const QString& saveDir)
+cv::Mat prepareFullImageForOcr(const cv::Mat& winImg, const ocr::Enhance enhance)
 {
     const ocr::Enhance pixelEnhance = enhance & ocr::PixelEnhanceMask;
     if (pixelEnhance == ocr::Enhance::None) {
-        return QString();
-    }
-
-    QDir dir(saveDir);
-    if (!dir.exists()) {
-        dir.mkpath(".");
+        return cv::Mat();
     }
 
     double ignoredScale = 1.0;
     QStringList applied;
     const cv::Mat ocrImg = enhanceOcrRoiImage(winImg, pixelEnhance, ignoredScale, applied);
-    const QString ocrImagePath = saveDir + "ocr_full_capture.png";
-    if (!vision::imwriteQt(ocrImagePath, ocrImg)) {
-        Logger::log(QString("整图增强图片保存失败，改用原始截图识别"));
-        return QString();
-    }
 
     Logger::log(QString("OCR识别整张图片: 像素(%1x%2) 增强[%3]")
                     .arg(winImg.cols).arg(winImg.rows)
                     .arg(applied.join(" + ")));
-    return ocrImagePath;
+    return ocrImg;
 }
 
-// 按百分比(0~100)计算 OCR 识别区域并在需要裁剪时保存裁剪图。
+// 按百分比(0~100)计算 OCR 识别区域并生成送入 OCR 的图像（进程内推理，不落盘）。
 // 返回换算回全图坐标所需的 roiRect（未裁剪时为整张图，原点为 0）。
-// ocrImagePath 为送入 OCR 的图片路径；为空表示直接识别原始截图。
+// outOcrImg 输出送入 OCR 的图像：裁剪模式下为增强后的裁剪图；
+// 整图模式下为增强后的整图；无任何处理时为空 Mat，调用方直接用原始截图。
 // outScale 输出裁剪图送入 OCR 前的放大倍数（坐标还原需除以该值）；未裁剪时为 1.0。
 // outCropped 输出是否真的裁剪了（决定 padding 与坐标偏移），整图增强时为 false。
 // enhance 为预处理开关组合：裁剪模式下全部项生效；识别整图时只应用逐像素项（不放大）。
 cv::Rect computeOcrRoi(const cv::Mat& winImg, const QRectF& roiPercent,
-                       const QString& saveDir, QString& ocrImagePath, double& outScale,
-                       bool& outCropped, const ocr::Enhance enhance)
+                       double& outScale, bool& outCropped, const ocr::Enhance enhance,
+                       cv::Mat& outOcrImg)
 {
-    ocrImagePath.clear();
+    outOcrImg = cv::Mat();
     outScale = 1.0;
     outCropped = false;
     const cv::Rect fullRect(0, 0, winImg.cols, winImg.rows);
     if (roiPercent.width() <= 0.0 || roiPercent.height() <= 0.0) {
-        ocrImagePath = prepareFullImageForOcr(winImg, enhance, saveDir);
+        outOcrImg = prepareFullImageForOcr(winImg, enhance);
         return fullRect;
     }
 
@@ -264,25 +255,18 @@ cv::Rect computeOcrRoi(const cv::Mat& winImg, const QRectF& roiPercent,
         Logger::log(QString("OCR识别区域无效: (%1%%,%2%%,%3%%,%4%%)，改为识别整张图片")
                         .arg(roiPercent.x()).arg(roiPercent.y())
                         .arg(roiPercent.width()).arg(roiPercent.height()));
-        ocrImagePath = prepareFullImageForOcr(winImg, enhance, saveDir);
+        outOcrImg = prepareFullImageForOcr(winImg, enhance);
         return fullRect;
     }
     if (roiRect == fullRect) {
         // 区域即整张图，无需裁剪，但仍按开关做逐像素增强
-        ocrImagePath = prepareFullImageForOcr(winImg, enhance, saveDir);
+        outOcrImg = prepareFullImageForOcr(winImg, enhance);
         return fullRect;
     }
 
-    QDir dir(saveDir);
-    if (!dir.exists()) {
-        dir.mkpath(".");
-    }
-
-    ocrImagePath = saveDir + "ocr_roi_capture.png";
     outCropped = true;
     QStringList applied;
-    const cv::Mat ocrImg = enhanceOcrRoiImage(winImg(roiRect), enhance, outScale, applied);
-    vision::imwriteQt(ocrImagePath, ocrImg);
+    outOcrImg = enhanceOcrRoiImage(winImg(roiRect), enhance, outScale, applied);
     Logger::log(QString("OCR识别区域: 百分比(%1%,%2%,%3%,%4%) -> 像素(%5,%6,%7x%8) 增强[%9]")
                     .arg(roiPercent.x()).arg(roiPercent.y())
                     .arg(roiPercent.width()).arg(roiPercent.height())
@@ -305,6 +289,36 @@ void ScriptActions::processAndShowImage(const QString& imagePath)
     qDebug() << imagePath;
     core::waitWithEventProcessing(500);
     emit requestShowImage(imagePath);
+}
+
+const QString& ScriptActions::memoryResultKey()
+{
+    // 内存回显的伪路径标识，磁盘上不会存在同名文件，避免与真实路径冲突
+    static const QString key = QStringLiteral("memory://debug_match_result");
+    return key;
+}
+
+cv::Mat ScriptActions::memoryResultImage() const
+{
+    if (m_memoryResultImage.empty()) {
+        return cv::Mat();
+    }
+    return m_memoryResultImage.clone();
+}
+
+QString ScriptActions::saveResultAndShow(const cv::Mat& resultImg)
+{
+    const QString savePath = AppPaths::instance().matchResultPath();
+    if (SETTING_CONFIG.getPersistScreenshot()) {
+        vision::imwriteQt(savePath, resultImg);
+        processAndShowImage(savePath);
+        return savePath;
+    }
+
+    // 关闭持久化：结果图只存内存，回显走内存 key，省去每次识别的磁盘读写
+    m_memoryResultImage = resultImg.clone();
+    processAndShowImage(memoryResultKey());
+    return memoryResultKey();
 }
 
 QString ScriptActions::opencvRecognizesAndClickByBase64(const QString& base64, const double threshold,
@@ -447,14 +461,10 @@ QString ScriptActions::opencvRecognizesAndClick(const QString& templPath, const 
     cv::rectangle(resultImg, matchRect, cv::Scalar(0, 255, 0), 2);
     drawClickMarker(resultImg, clickPt);
 
-    QString savePath = AppPaths::instance().matchResultPath();
-    vision::imwriteQt(savePath, resultImg);
-
     Logger::log(QString("转换后点击点: (%1, %2)").arg(clickPt.x).arg(clickPt.y));
     GameWindow::instance().clickInWindow(clickPt);
-    processAndShowImage(savePath);
 
-    return savePath;
+    return saveResultAndShow(resultImg);
 }
 
 std::vector<OpenCvMatch> ScriptActions::opencvFindAll(const QString& templPath, const double threshold, const bool colorCheck)
@@ -501,9 +511,7 @@ std::vector<OpenCvMatch> ScriptActions::opencvFindAll(const QString& templPath, 
     if (!found || matches.empty()) {
         Logger::log(QString("opencvFindAll: 未找到匹配区域"));
         // 仍然回显截图，让用户看到当前画面
-        QString savePath = AppPaths::instance().matchResultPath();
-        vision::imwriteQt(savePath, winImg);
-        processAndShowImage(savePath);
+        saveResultAndShow(winImg);
         return results;
     }
 
@@ -540,9 +548,7 @@ std::vector<OpenCvMatch> ScriptActions::opencvFindAll(const QString& templPath, 
     Logger::log(QString("opencvFindAll: 共识别到 %1 个目标").arg(results.size()));
 
     // 保存并回显结果图（不点击）
-    QString savePath = AppPaths::instance().matchResultPath();
-    vision::imwriteQt(savePath, resultImg);
-    processAndShowImage(savePath);
+    saveResultAndShow(resultImg);
 
     return results;
 }
@@ -556,15 +562,16 @@ QJsonArray ScriptActions::ocrRecognizes(const QRectF& roiPercent, const ocr::Enh
         return QJsonArray();
     }
 
-    const QString saveDir = AppPaths::instance().thumbnailPath();
-
-    QString ocrImagePath;
+    cv::Mat ocrImg;
     double roiScale = 1.0;
     bool cropped = false;
-    const cv::Rect roiRect = computeOcrRoi(winImg, roiPercent, saveDir, ocrImagePath, roiScale, cropped, enhance);
+    const cv::Rect roiRect = computeOcrRoi(winImg, roiPercent, roiScale, cropped, enhance, ocrImg);
+    if (ocrImg.empty()) {
+        ocrImg = winImg; // 无裁剪无增强：直接识别原始截图
+    }
 
     // 裁剪模式增大 padding，给检测网络更多边缘上下文
-    QJsonObject result = vision::runRapidOCR(ocrImagePath, cropped ? OCR_PADDING_ROI : OCR_PADDING_FULL);
+    QJsonObject result = vision::runRapidOCR(ocrImg, cropped ? OCR_PADDING_ROI : OCR_PADDING_FULL);
     QJsonArray dataArray = result["data"].toArray();
 
     if (cropped) {
@@ -603,7 +610,7 @@ QJsonArray ScriptActions::ocrRecognizes(const QRectF& roiPercent, const ocr::Enh
 
 QString ScriptActions::ocrClickMatchedItem(const cv::Mat& winImg, const QJsonObject& item, const cv::Rect& roiRect,
                                            const bool useRoi, const double roiScale,
-                                           const bool randomClick, const QString& saveDir)
+                                           const bool randomClick)
 {
     QJsonArray box = item["box"].toArray();
     if (box.size() != 4) {
@@ -652,17 +659,8 @@ QString ScriptActions::ocrClickMatchedItem(const cv::Mat& winImg, const QJsonObj
     cv::rectangle(resultImg, matchRect, cv::Scalar(0, 255, 0), 2);
     drawClickMarker(resultImg, clickPt);
 
-    QDir dir(saveDir);
-    if (!dir.exists()) {
-        dir.mkpath(".");
-    }
-
-    QString savePath = AppPaths::instance().matchResultPath();
-    vision::imwriteQt(savePath, resultImg);
-
     GameWindow::instance().clickInWindow(clickPt);
-    processAndShowImage(savePath);
-    return savePath;
+    return saveResultAndShow(resultImg);
 }
 
 QString ScriptActions::ocrRecognizesAndClick(const QString& ocrText, const double threshold, const bool randomClick,
@@ -676,15 +674,16 @@ QString ScriptActions::ocrRecognizesAndClick(const QString& ocrText, const doubl
         return nullptr;
     }
 
-    const QString saveDir = AppPaths::instance().thumbnailPath();
-
-    QString ocrImagePath;
+    cv::Mat ocrImg;
     double roiScale = 1.0;
     bool cropped = false;
-    const cv::Rect roiRect = computeOcrRoi(winImg, roiPercent, saveDir, ocrImagePath, roiScale, cropped, enhance);
+    const cv::Rect roiRect = computeOcrRoi(winImg, roiPercent, roiScale, cropped, enhance, ocrImg);
+    if (ocrImg.empty()) {
+        ocrImg = winImg; // 无裁剪无增强：直接识别原始截图
+    }
 
     // 裁剪模式增大 padding，给检测网络更多边缘上下文
-    QJsonObject result = vision::runRapidOCR(ocrImagePath, cropped ? OCR_PADDING_ROI : OCR_PADDING_FULL);
+    QJsonObject result = vision::runRapidOCR(ocrImg, cropped ? OCR_PADDING_ROI : OCR_PADDING_FULL);
     QString savePath;
 
     if (!result.isEmpty()) {
@@ -700,7 +699,7 @@ QString ScriptActions::ocrRecognizesAndClick(const QString& ocrText, const doubl
                 hasOcrText = true;
                 if (score >= threshold)
                 {
-                    savePath = ocrClickMatchedItem(winImg, item, roiRect, cropped, roiScale, randomClick, saveDir);
+                    savePath = ocrClickMatchedItem(winImg, item, roiRect, cropped, roiScale, randomClick);
                     if (!savePath.isEmpty()) {
                         break;
                     }
@@ -732,16 +731,17 @@ QString ScriptActions::ocrRecognizesAndClickAny(const QStringList& ocrTexts, con
         return QString();
     }
 
-    const QString saveDir = AppPaths::instance().thumbnailPath();
-
-    QString ocrImagePath;
+    cv::Mat ocrImg;
     double roiScale = 1.0;
     bool cropped = false;
-    const cv::Rect roiRect = computeOcrRoi(winImg, roiPercent, saveDir, ocrImagePath, roiScale, cropped, enhance);
+    const cv::Rect roiRect = computeOcrRoi(winImg, roiPercent, roiScale, cropped, enhance, ocrImg);
+    if (ocrImg.empty()) {
+        ocrImg = winImg; // 无裁剪无增强：直接识别原始截图
+    }
 
     // 只做一次 OCR，多个文字按填入顺序作为优先级，命中首个即点击并返回命中的文字
     // 裁剪模式增大 padding，给检测网络更多边缘上下文
-    QJsonObject result = vision::runRapidOCR(ocrImagePath, cropped ? OCR_PADDING_ROI : OCR_PADDING_FULL);
+    QJsonObject result = vision::runRapidOCR(ocrImg, cropped ? OCR_PADDING_ROI : OCR_PADDING_FULL);
     if (result.isEmpty()) {
         return QString();
     }
@@ -758,7 +758,7 @@ QString ScriptActions::ocrRecognizesAndClickAny(const QStringList& ocrTexts, con
                 Logger::log(QString("[OCR] 已识别到:" + item["text"].toString() + " 但分数过低"));
                 continue;
             }
-            if (!ocrClickMatchedItem(winImg, item, roiRect, cropped, roiScale, randomClick, saveDir).isEmpty()) {
+            if (!ocrClickMatchedItem(winImg, item, roiRect, cropped, roiScale, randomClick).isEmpty()) {
                 return ocrText;
             }
         }
@@ -784,18 +784,19 @@ bool ScriptActions::ocrContainsText(const QString& ocrText, const double thresho
         return false;
     }
 
-    const QString saveDir = AppPaths::instance().thumbnailPath();
-
-    QString ocrImagePath;
+    cv::Mat ocrImg;
     double ignoredScale = 1.0;
     bool cropped = false;
     // 纯检测不点击，无需坐标还原，roiRect/roiScale 仅占位传参
-    const cv::Rect ignoredRoi = computeOcrRoi(winImg, roiPercent, saveDir, ocrImagePath, ignoredScale, cropped, enhance);
+    const cv::Rect ignoredRoi = computeOcrRoi(winImg, roiPercent, ignoredScale, cropped, enhance, ocrImg);
     Q_UNUSED(ignoredRoi)
     Q_UNUSED(ignoredScale)
+    if (ocrImg.empty()) {
+        ocrImg = winImg; // 无裁剪无增强：直接识别原始截图
+    }
 
     // 只做一次 OCR，存在「与目标文字完全相等(==)且分数达标」的条目即返回 true
-    const QJsonObject result = vision::runRapidOCR(ocrImagePath, cropped ? OCR_PADDING_ROI : OCR_PADDING_FULL);
+    const QJsonObject result = vision::runRapidOCR(ocrImg, cropped ? OCR_PADDING_ROI : OCR_PADDING_FULL);
     if (result.isEmpty()) {
         return false;
     }
@@ -860,12 +861,8 @@ QString ScriptActions::clickInRoi(const QRectF& roiPercent, const bool randomCli
     cv::rectangle(resultImg, roiRect, cv::Scalar(0, 255, 0), 2);
     drawClickMarker(resultImg, clickPt);
 
-    QString savePath = AppPaths::instance().matchResultPath();
-    vision::imwriteQt(savePath, resultImg);
-
     GameWindow::instance().clickInWindow(clickPt);
-    processAndShowImage(savePath);
-    return savePath;
+    return saveResultAndShow(resultImg);
 }
 
 /**
@@ -955,9 +952,7 @@ QString ScriptActions::yoloRecognizesAndClick(const double threshold, const bool
         Logger::log(QString("未识别到指定目标"));
     }
 
-    QString savePath = AppPaths::instance().matchResultPath();
-    vision::imwriteQt(savePath, captureImg);
-    processAndShowImage(savePath);
+    QString savePath = saveResultAndShow(captureImg);
 
     if (matchRect.empty())
     {
@@ -995,20 +990,21 @@ std::vector<Detection> ScriptActions::yoloRecognizes(const double threshold)
     }
 
     // 输出识别结果日志（置信度阈值=threshold，低于该分数的已在检测阶段过滤）
-    Logger::log(QString("YOLO 识别完成：共 %1 个目标（置信度阈值=%2）")
-                    .arg(final_detections.size())
-                    .arg(threshold, 0, 'f', 2));
-    for (const auto& det : final_detections) {
-        Logger::log(QString("  - %1  置信度=%2  位置=[%3,%4,%5x%6]")
-                        .arg(det.className)
-                        .arg(det.confidence, 0, 'f', 4)
-                        .arg(det.bbox.x).arg(det.bbox.y)
-                        .arg(det.bbox.width).arg(det.bbox.height));
+    if (false)
+    {
+        Logger::log(QString("YOLO 识别完成：共 %1 个目标（置信度阈值=%2）")
+                      .arg(final_detections.size())
+                      .arg(threshold, 0, 'f', 2));
+        for (const auto& det : final_detections) {
+            Logger::log(QString("  - %1  置信度=%2  位置=[%3,%4,%5x%6]")
+                            .arg(det.className)
+                            .arg(det.confidence, 0, 'f', 4)
+                            .arg(det.bbox.x).arg(det.bbox.y)
+                            .arg(det.bbox.width).arg(det.bbox.height));
+        }
     }
 
-    QString savePath = AppPaths::instance().matchResultPath();
-    vision::imwriteQt(savePath, captureImg);
-    processAndShowImage(savePath);
+    saveResultAndShow(captureImg);
 
     return final_detections;
 }
@@ -1081,7 +1077,6 @@ void ScriptActions::clickDetection(const Detection& det, bool randomClick, const
     }
 
     QString capturePath = AppPaths::instance().dx11CapturePath();
-    QString matchPath = AppPaths::instance().matchResultPath();
     cv::Mat captureImg = vision::imreadQt(capturePath);
     QString labelName = ClassNameCache::getClassName(det.class_id);
     if (!captureImg.empty()) {
@@ -1090,8 +1085,7 @@ void ScriptActions::clickDetection(const Detection& det, bool randomClick, const
         cv::putText(captureImg, label, cv::Point(det.bbox.x, det.bbox.y - 10),
                    cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 0), 1);
         drawClickMarker(captureImg, physicalClickPt);
-        vision::imwriteQt(matchPath, captureImg);
-        processAndShowImage(matchPath);
+        saveResultAndShow(captureImg);
     } else {
         Logger::log(QString("共享内存截图缺失，跳过调试图保存"));
     }

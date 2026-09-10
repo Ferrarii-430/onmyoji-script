@@ -107,6 +107,18 @@ QString TaskRunner::executeStep(const QJsonObject& step)
                 break;
         }
 
+        case ConfigTypeEnum::CLICK_ROI: {
+                Logger::log(QString("开始进行范围点击"));
+                const bool randomClick = step["randomClick"].toBool(true);
+                // 点击区域（百分比），左/上/宽/高；字段缺失时默认整张图片
+                const QRectF roiPercent(step["clickRoiX"].toDouble(0.0), step["clickRoiY"].toDouble(0.0),
+                                        step["clickRoiW"].toDouble(100.0), step["clickRoiH"].toDouble(100.0));
+                savePath = recognizeWithRetry([&]() {
+                    return actions.clickInRoi(roiPercent, randomClick);
+                });
+                break;
+        }
+
         case ConfigTypeEnum::WAIT: {
                 int waitTime = step["time"].toInt();
                 bool randomWait = step["randomWait"].toBool();

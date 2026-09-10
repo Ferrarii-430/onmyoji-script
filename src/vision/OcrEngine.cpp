@@ -1,154 +1,102 @@
 #include "src/vision/OcrEngine.h"
 
-#include <QCoreApplication>
 #include <QDebug>
-#include <QDir>
-#include <QFile>
-#include <QFileInfo>
-#include <QJsonDocument>
-#include <QJsonParseError>
-#include <QProcess>
-#include <QProcessEnvironment>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <QString>
 
 #include "src/core/AppPaths.h"
+#include "src/core/Logger.h"
+#include "src/vision/ocr/OcrLite.h"
 
 namespace vision {
 
 namespace {
 
-QJsonObject parseOcrOutput(const QString& ocrOutput)
+// 推理参数与原 RapidOCR-json.exe 的调用参数保持一致（见旧 QProcess 实现与 cmd.txt）
+constexpr int kOcrNumThread = 4;
+constexpr float kBoxScoreThresh = 0.5f;
+constexpr float kBoxThresh = 0.3f;
+constexpr float kUnClipRatio = 1.6f;
+constexpr int kMaxSideLen = 3084;
+constexpr bool kDoAngle = false;
+constexpr bool kMostAngle = false;
+
+// OCR 引擎单例：模型常驻，只加载一次；加载失败抛异常并保持未初始化，下次调用重试
+OcrLite& ocrLite()
 {
-    QString jsonStr = ocrOutput;
-
-    // 查找JSON开始位置
-    int jsonStart = jsonStr.indexOf('{');
-    if (jsonStart == -1) {
-        qWarning() << "未找到JSON数据";
-        return QJsonObject();
+    static OcrLite lite;
+    static bool initialized = false;
+    if (!initialized) {
+        lite.setNumThread(kOcrNumThread);
+        const QString modelsPath = AppPaths::instance().rapidOCRModelsPath();
+        lite.initModels((modelsPath + AppPaths::instance().rapidOCRDetPathV4()).toStdString(),
+                        (modelsPath + AppPaths::instance().rapidOCRClsPathV4()).toStdString(),
+                        (modelsPath + AppPaths::instance().rapidOCRRecPathV4()).toStdString(),
+                        (modelsPath + AppPaths::instance().rapidOCRKeysPath()).toStdString());
+        initialized = true;
+        Logger::log(QString("进程内RapidOCR模型加载完成"));
     }
+    return lite;
+}
 
-    jsonStr = jsonStr.mid(jsonStart);
-    jsonStr = jsonStr.trimmed();
-
-    // 将 \xE8\x8C\xB6 这种十六进制编码的中文字符转换为 Unicode
-    QString processedStr;
-    for (int i = 0; i < jsonStr.length(); ++i) {
-        if (jsonStr[i] == '\\' && i + 3 < jsonStr.length() && jsonStr[i+1] == 'x') {
-            QString hexStr = jsonStr.mid(i+2, 2);
-            bool ok;
-            ushort unicodeChar = hexStr.toUShort(&ok, 16);
-            if (ok) {
-                processedStr += QChar(unicodeChar);
-                i += 3; // 跳过 \xXX
-            } else {
-                processedStr += jsonStr[i];
-            }
-        } else {
-            processedStr += jsonStr[i];
+// OcrResult -> 与 exe stdout JSON 同构的 QJsonObject
+QJsonObject ocrResultToJson(const OcrResult& result)
+{
+    QJsonArray dataArray;
+    for (const auto& block : result.textBlocks) {
+        QJsonObject item;
+        QJsonArray box;
+        for (const auto& point : block.boxPoint) {
+            QJsonArray p;
+            p.append(point.x);
+            p.append(point.y);
+            box.append(p);
         }
+        item["box"] = box;
+        item["score"] = static_cast<double>(block.boxScore);
+        item["text"] = QString::fromStdString(block.text);
+        dataArray.append(item);
     }
-
-    QJsonParseError parseError;
-    QJsonDocument jsonDoc = QJsonDocument::fromJson(processedStr.toUtf8(), &parseError);
-
-    if (parseError.error != QJsonParseError::NoError) {
-        qWarning() << "JSON解析错误:" << parseError.errorString();
-        qWarning() << "错误位置:" << parseError.offset;
-        qWarning() << "处理后的字符串:" << processedStr;
-        return QJsonObject();
-    }
-
-    if (!jsonDoc.isObject()) {
-        qWarning() << "解析结果不是JSON对象";
-        return QJsonObject();
-    }
-
-    return jsonDoc.object();
+    QJsonObject root;
+    root["data"] = dataArray;
+    return root;
 }
 
 } // namespace
 
-QJsonObject runRapidOCR(const QString& imagePath, int padding)
+bool initInProcessOcr()
 {
-    QJsonObject result;
+    try {
+        ocrLite();
+        return true;
+    } catch (const Ort::Exception& e) {
+        qWarning() << "进程内RapidOCR模型加载失败:" << e.what();
+        return false;
+    } catch (const std::exception& e) {
+        qWarning() << "进程内RapidOCR初始化异常:" << e.what();
+        return false;
+    }
+}
 
-    QString DX11_CAPTURE_PATH = imagePath.isEmpty() ? AppPaths::instance().dx11CapturePath() : imagePath;
-    QString rapidOCRExe = AppPaths::instance().rapidOCRExePath();
-    QString rapidOCRModelsPath = AppPaths::instance().rapidOCRModelsPath();
-    QString rapidOCRDetPath = AppPaths::instance().rapidOCRDetPathV4();
-    QString rapidOCRClsPath = AppPaths::instance().rapidOCRClsPathV4();
-    QString rapidOCRRecPath = AppPaths::instance().rapidOCRRecPathV4();
-    QString rapidOCRKeysPath = AppPaths::instance().rapidOCRKeysPath();
-
-    QDir captureDir = QFileInfo(DX11_CAPTURE_PATH).absoluteDir();
-    if (!captureDir.exists()) {
-        captureDir.mkpath(".");
+QJsonObject runRapidOCR(const cv::Mat& image, int padding)
+{
+    if (image.empty()) {
+        return QJsonObject();
     }
 
-    if (!QFile::exists(rapidOCRExe)) {
-        qWarning() << "rapidOCR-json.exe 不存在:" << rapidOCRExe;
-        return result;
+    try {
+        const OcrResult result = ocrLite().detect(image, padding, kMaxSideLen,
+                                                   kBoxScoreThresh, kBoxThresh, kUnClipRatio,
+                                                   kDoAngle, kMostAngle);
+        return ocrResultToJson(result);
+    } catch (const Ort::Exception& e) {
+        qWarning() << "OCR推理失败:" << e.what();
+        return QJsonObject();
+    } catch (const std::exception& e) {
+        qWarning() << "OCR推理异常:" << e.what();
+        return QJsonObject();
     }
-
-    QProcess process;
-    process.setWorkingDirectory(QFileInfo(rapidOCRExe).absolutePath());
-
-    // 让 RapidOCR-json.exe 能找到主程序目录下的 onnxruntime.dll 等依赖
-    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
-    QString currentPath = env.value("PATH");
-    env.insert("PATH", QCoreApplication::applicationDirPath() + ";" + currentPath);
-    process.setProcessEnvironment(env);
-
-    QStringList arguments;
-    arguments << ("--image_path=" + DX11_CAPTURE_PATH);
-    arguments << ("--models=" + rapidOCRModelsPath);
-    arguments << ("--det=" + rapidOCRDetPath);
-    arguments << ("--cls=" + rapidOCRClsPath);
-    arguments << ("--rec=" + rapidOCRRecPath);
-    arguments << ("--keys=" + rapidOCRKeysPath);
-    // 启用 ASCII 转义输出，避免中文在进程输出中因编码问题损坏
-    // arguments << "--ensureAscii=1";
-    // 预处理白边，可优化窄边/裁剪图边缘文字的识别率
-    arguments << ("--padding=" + QString::number(padding));
-    // 0 表示不限制长边缩小；裁剪图本身不大，避免被错误缩小导致文字像素丢失
-    arguments << "--maxSideLen=3084";
-    // 文字框置信度门限，适当默认值兼顾召回与精度
-    // arguments << "--boxScoreThresh=0.5";
-    // arguments << "--boxThresh=0.3";
-    // 单个文字框大小倍率，略放大以包容文字笔画
-    // arguments << "--unClipRatio=1.6";
-    // 启用方向检测与角度投票，适应倾斜文字
-    // arguments << "--doAngle=1";
-    // arguments << "--mostAngle=1";
-
-    // qDebug() << "执行ocr识别命令:" << rapidOCRExe << arguments;
-    // qDebug() << "ocr工作目录:" << QFileInfo(rapidOCRExe).absolutePath();
-
-    process.start(rapidOCRExe, arguments);
-
-    if (!process.waitForFinished(5000)) {
-        qWarning() << "ocr识别命令执行超时";
-        process.kill();
-        return result;
-    }
-
-    int exitCode = process.exitCode();
-    QByteArray output = process.readAllStandardOutput();
-    QByteArray errorOutput = process.readAllStandardError();
-
-    // qDebug() << "ocr退出码:" << exitCode;
-    // qDebug() << "ocr标准输出:" << output;
-    if (!errorOutput.isEmpty()) {
-        qDebug() << "ocr错误输出:" << errorOutput;
-    }
-
-    if (exitCode != 0) {
-        qWarning() << "ocr识别命令执行失败，退出码:" << exitCode;
-        qWarning() << "错误输出:" << errorOutput;
-        return result;
-    }
-
-    return parseOcrOutput(output);
 }
 
 } // namespace vision

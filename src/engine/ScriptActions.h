@@ -143,6 +143,12 @@ public:
     // 发射信号让 UI 显示识别结果图
     void processAndShowImage(const QString& imagePath);
 
+    // persistScreenshot 关闭时的内存回显：结果图不落盘，只存内存，
+    // 信号/返回值中用该 key 标识缓存图像，UI 侧据此从内存取图显示
+    static const QString& memoryResultKey();
+    // 取最近一次缓存的结果图（无缓存返回空 Mat）；返回深拷贝，调用方可安全使用
+    cv::Mat memoryResultImage() const;
+
 signals:
     void requestShowImage(const QString& imagePath);
 
@@ -158,7 +164,15 @@ private:
     // 命中某条 OCR 文字后：换算坐标、画框、保存调试图、回显并点击，返回结果图路径
     // roiScale 为裁剪图送入 OCR 前的放大倍数，用于把 OCR 坐标还原回裁剪图原始像素
     QString ocrClickMatchedItem(const cv::Mat& winImg, const QJsonObject& item, const cv::Rect& roiRect,
-                                bool useRoi, double roiScale, bool randomClick, const QString& saveDir);
+                                bool useRoi, double roiScale, bool randomClick);
+
+    // 统一处理识别结果图：persistScreenshot 开启时写盘并回显文件路径，
+    // 关闭时只存内存并回显内存 key，替代每次识别的磁盘 IO。
+    // 返回值：文件模式为结果图路径，内存模式为 memoryResultKey()；非空均表示成功
+    QString saveResultAndShow(const cv::Mat& resultImg);
+
+    // persistScreenshot 关闭时缓存最近一次的结果图，供 UI 内存回显
+    cv::Mat m_memoryResultImage;
 };
 
 #endif // SCRIPTACTIONS_H
