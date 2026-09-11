@@ -13,7 +13,14 @@ using core::waitRandomWithEventProcessing;
 
 namespace scenarios {
 
-    static bool isCastingLocked = false;
+    bool anniversary_isCastingLocked = false;
+
+    // 重置跨轮次状态：阵容锁定标记只在单次任务运行内保持，
+    // 任务结束/停止后重置，下次启动任务重新执行锁定流程
+    void resetAnniversary999Status()
+    {
+        anniversary_isCastingLocked = false;
+    }
 
     bool executeAnniversary999()
     {
@@ -21,37 +28,28 @@ namespace scenarios {
         Logger::log(QString("开始执行十周年999"));
         QString screenshotPath = AppPaths::instance().screenshotPath();
 
-        // //步骤0 判断是否锁定
-        // if (!isCastingLocked)
-        // {
-        //     QString savePathCommonUnlock = actions.opencvRecognizesAndClick(screenshotPath + "common-unlock.png", 0.65, false, true);
-        //     if (!savePathCommonUnlock.isEmpty())
-        //     {
-        //         Logger::log(QString("阵容已锁定"));
-        //     }else
-        //     {
-        //         if (!hasCollaboration())
-        //         {
-        //             Logger::log(QString("【阵容锁定】失败"));
-        //             return false;
-        //         }else
-        //         {
-        //             QString savePathCommonUnlockRe = actions.opencvRecognizesAndClick(screenshotPath + "common-unlock.png", 0.65, false, true);
-        //             if (!savePathCommonUnlockRe.isEmpty())
-        //             {
-        //                 Logger::log(QString("重试 阵容已锁定"));
-        //             }else
-        //             {
-        //                 {
-        //                     Logger::log(QString("重试 【阵容锁定】失败"));
-        //                     return false;
-        //                 }
-        //             }
-        //         }
-        //     }
-        //     isCastingLocked = true;
-        //     waitRandomWithEventProcessing(1000,200);
-        // }
+        //步骤0 判断是否锁定
+        if (!anniversary_isCastingLocked)
+        {
+            QString savePathCommonUnlock = actions.opencvRecognizesAndClick(screenshotPath + "anniversary-unlock.png", 0.75, false, true);
+            if (!savePathCommonUnlock.isEmpty())
+            {
+                Logger::log(QString("点击【阵容锁定】"));
+            }else
+            {
+                if (hasCollaboration())
+                {
+                    QString savePathCommonUnlockRe = actions.opencvRecognizesAndClick(screenshotPath + "anniversary-unlock.png", 0.75, false, true);
+                    if (!savePathCommonUnlockRe.isEmpty())
+                    {
+                        Logger::log(QString("重试 点击【阵容锁定】"));
+                    }
+                }
+            }
+            anniversary_isCastingLocked = true;
+            Logger::log(QString("阵容已锁定"));
+            waitRandomWithEventProcessing(1000,200);
+        }
 
         //步骤1 点击挑战进入战斗
         constexpr ClickExclude openCvAnniversaryChallengeRecordExclude{0.1, 0.1, 0.1, 0.1};
@@ -113,9 +111,9 @@ namespace scenarios {
 
         //步骤3 循环等待战斗结束
         bool isBattleOfEnd = false;
-        for (int i = 0; i < 5; ++i)
+        for (int i = 0; i < 10; ++i)
         {
-            Logger::log(QString("等待战斗结束...(%1/5)").arg(i+1));
+            Logger::log(QString("等待战斗结束...(%1/10)").arg(i+1));
             waitRandomWithEventProcessing(1000,200);
             if (actions.yoloContainsLabels(0.55, {"common-popup-reward"}, false))
             {

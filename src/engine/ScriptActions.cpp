@@ -310,9 +310,12 @@ QString ScriptActions::saveResultAndShow(const cv::Mat& resultImg)
 {
     const QString savePath = AppPaths::instance().matchResultPath();
     if (SETTING_CONFIG.getPersistScreenshot()) {
-        vision::imwriteQt(savePath, resultImg);
-        processAndShowImage(savePath);
-        return savePath;
+        if (vision::imwriteQt(savePath, resultImg)) {
+            processAndShowImage(savePath);
+            return savePath;
+        }
+        // 写盘失败（目录无法创建/文件被占用等）时回退内存回显，保证 UI 回显不断
+        Logger::log(QString("结果图写入失败: %1，回退为内存回显").arg(savePath));
     }
 
     // 关闭持久化：结果图只存内存，回显走内存 key，省去每次识别的磁盘读写

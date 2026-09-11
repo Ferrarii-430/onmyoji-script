@@ -26,7 +26,14 @@ namespace scenarios
     int MAX_WAIT_TIME = 2000; //最长25秒
     bool autoSendRequestEnable = false; //是否开启自动发送 组队/入队 请求
     bool isCaptain = false; //是否为队长
-    static bool isCastingLocked = false; //阵容是否锁定
+    bool mitama_isCastingLocked = false; //阵容是否锁定
+
+    // 重置跨轮次状态：阵容锁定标记只在单次任务运行内保持，
+    // 任务结束/停止后重置，下次启动任务重新执行锁定流程
+    void resetMitamaStatus()
+    {
+        mitama_isCastingLocked = false;
+    }
 
     bool executeMitama()
     {
@@ -78,12 +85,12 @@ namespace scenarios
                 //此时需要判断能否点击 组队模式下要等人齐才能点挑战
 
                 //先开锁定
-                if (!isCastingLocked)
+                if (!mitama_isCastingLocked)
                 {
                     QString savePathCommonUnlock = actions.opencvRecognizesAndClick(screenshotPath + "common-unlock.png", 0.65, true, true);
                     if (!savePathCommonUnlock.isEmpty())
                     {
-                        isCastingLocked = true;
+                        mitama_isCastingLocked = true;
                         Logger::log(QString("锁定阵容"));
                     }
                 }
@@ -153,7 +160,7 @@ namespace scenarios
     ready:
         waitWithEventProcessing(3000);
         // 如果有准备按钮则点击，否则无视，因为正常会手动点锁定
-        if (!isCastingLocked)
+        if (!mitama_isCastingLocked)
         {
             actions.yoloRecognizesAndClick(0.60, false, "battle-ready");
             waitWithEventProcessing(2000);
