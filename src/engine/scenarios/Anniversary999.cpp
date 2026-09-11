@@ -28,6 +28,8 @@ namespace scenarios {
         Logger::log(QString("开始执行十周年999"));
         QString screenshotPath = AppPaths::instance().screenshotPath();
 
+        hasCollaboration();
+
         //步骤0 判断是否锁定
         if (!anniversary_isCastingLocked)
         {
@@ -51,6 +53,8 @@ namespace scenarios {
             waitRandomWithEventProcessing(1000,200);
         }
 
+        hasCollaboration();
+
         //步骤1 点击挑战进入战斗
         constexpr ClickExclude openCvAnniversaryChallengeRecordExclude{0.1, 0.1, 0.1, 0.1};
         QString savePathAnniversaryChallenge = actions.opencvRecognizesAndClick(screenshotPath + "anniversary-challenge.png", 0.65, true, false, openCvAnniversaryChallengeRecordExclude);
@@ -66,7 +70,7 @@ namespace scenarios {
             }else
             {
                 //重试执行步骤1
-                QString savePathAnniversaryChallengeRe = actions.opencvRecognizesAndClick(screenshotPath + "anniversary-challenge.png", 0.65, true, false);
+                QString savePathAnniversaryChallengeRe = actions.opencvRecognizesAndClick(screenshotPath + "anniversary-challenge.png", 0.65, true, false, openCvAnniversaryChallengeRecordExclude);
                 if (!savePathAnniversaryChallengeRe.isEmpty())
                 {
                     Logger::log(QString("重试 点击【挑战】成功"));
@@ -111,7 +115,7 @@ namespace scenarios {
 
         //步骤3 循环等待战斗结束
         bool isBattleOfEnd = false;
-        for (int i = 0; i < 10; ++i)
+        for (int i = 0; i < 30; ++i)
         {
             Logger::log(QString("等待战斗结束...(%1/10)").arg(i+1));
             waitRandomWithEventProcessing(1000,200);
@@ -150,7 +154,7 @@ namespace scenarios {
         // 随机生成 0 或 1
         if (QRandomGenerator::global()->bounded(2) == 0)
         {
-            savePathReceiveRewards = actions.clickInRoi(QRectF(80, 15, 19, 70), true);
+            savePathReceiveRewards = actions.clickInRoi(QRectF(81, 15, 18, 70), true);
         }else
         {
             savePathReceiveRewards = actions.clickInRoi(QRectF(7, 10, 16, 79), true);
@@ -177,13 +181,14 @@ namespace scenarios {
     {
         ScriptActions& actions = ScriptActions::instance();
         QString path = actions.yoloRecognizesAndClick(0.50, false, "common-btn-red_x_transparent");
+        // actions.yoloContainsLabels(0.50, {"common-btn-red_x_solid", "common-btn-red_x_transparent"}, false);
         if (!path.isEmpty())
         {
             Logger::log(QString("点击取消协作"));
-            waitWithEventProcessing(2000);
+            waitWithEventProcessing(1000);
             return true;
         }
-        waitWithEventProcessing(1000);
+        waitWithEventProcessing(500);
         return false;
     }
 

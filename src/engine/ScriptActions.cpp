@@ -1033,9 +1033,9 @@ bool ScriptActions::yoloContainsLabels(const double threshold, const QStringList
         ? std::all_of(targetLabels.cbegin(), targetLabels.cend(), matchesLabel)
         : std::any_of(targetLabels.cbegin(), targetLabels.cend(), matchesLabel);
 
-    Logger::log(QString("YOLO标签%1: %2")
-                    .arg(matched ? "命中" : "未命中")
-                    .arg(targetLabels.join(", ")));
+    // Logger::log(QString("YOLO标签%1: %2")
+    //                 .arg(matched ? "命中" : "未命中")
+    //                 .arg(targetLabels.join(", ")));
     return matched;
 }
 
