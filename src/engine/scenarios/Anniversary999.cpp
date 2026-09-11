@@ -115,7 +115,7 @@ namespace scenarios {
 
         //步骤3 循环等待战斗结束
         bool isBattleOfEnd = false;
-        for (int i = 0; i < 30; ++i)
+        for (int i = 0; i < 10; ++i)
         {
             Logger::log(QString("等待战斗结束...(%1/10)").arg(i+1));
             waitRandomWithEventProcessing(1000,200);
