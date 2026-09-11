@@ -86,7 +86,15 @@ QJsonObject runRapidOCR(const cv::Mat& image, int padding)
     }
 
     try {
-        const OcrResult result = ocrLite().detect(image, padding, kMaxSideLen,
+        cv::Mat bgr;
+        if (image.channels() == 1) {
+            cv::cvtColor(image, bgr, cv::COLOR_GRAY2BGR);
+        } else if (image.channels() == 4) {
+            cv::cvtColor(image, bgr, cv::COLOR_BGRA2BGR);
+        } else {
+            bgr = image;
+        }
+        const OcrResult result = ocrLite().detect(bgr, padding, kMaxSideLen,
                                                    kBoxScoreThresh, kBoxThresh, kUnClipRatio,
                                                    kDoAngle, kMostAngle);
         return ocrResultToJson(result);

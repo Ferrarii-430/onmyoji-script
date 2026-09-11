@@ -183,9 +183,13 @@ bool getNumberOfFraction()
     QJsonObject item = fractionData[0].toObject();
     const QString text = item["text"].toString();
     Logger::log(QString("当前斗技荣誉值：") + text);
-    const QString fraction = text.split("/")[0];
-    const QString total = text.split("/")[1];
-    return comparesEqual(fraction, total);
+    const QStringList parts = text.split("/");
+    if (parts.size() < 2)
+    {
+        Logger::log(QString("荣誉值文本缺少「/」，解析失败：") + text);
+        return false;
+    }
+    return comparesEqual(parts[0], parts[1]);
     // return fraction.toInt();
 }
 
