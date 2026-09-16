@@ -129,6 +129,7 @@ int getNumberOfTickets()
     if (ticketsData.isEmpty())
     {
         qWarning() << "门票检测异常：" << ticketsData;
+        Logger::log(QString("门票检测异常"));
         return 0;
     }
     //正常来说只会有一个文字。at() 是 const 版本，越界返回 Undefined 而非触发
