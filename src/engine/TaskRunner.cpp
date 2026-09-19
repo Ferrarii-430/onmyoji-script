@@ -214,6 +214,7 @@ void TaskRunner::run(const QJsonArray& steps, int cycleCount)
     int total = number;
     const bool infiniteLoop = (number <= 0);
     Logger::log(QString("任务循环次数: %1").arg(infiniteLoop ? "无限" : QString::number(number)));
+    emit cycleProgress(0, total);
 
     do {
         // 用于跟踪每个步骤的错误重试次数
@@ -316,6 +317,7 @@ void TaskRunner::run(const QJsonArray& steps, int cycleCount)
         if (!infiniteLoop) {
             number--;
             Logger::log(QString("当前任务执行次数:(%1/%2)").arg(QString::number(total-number), QString::number(total)));
+            emit cycleProgress(total - number, total);
         }
 
         //每次任务结束都固定休眠1秒，防止无限循环一直执行
@@ -327,6 +329,11 @@ void TaskRunner::run(const QJsonArray& steps, int cycleCount)
     for (const QJsonValue& stepVal : steps) {
         if (stringToConfigType(stepVal.toObject().value("type").toString()) == ConfigTypeEnum::SYSTEM_BUDOKAI) {
             scenarios::resetBudokaiStatus();
+            break;
+        }
+
+        if (stringToConfigType(stepVal.toObject().value("type").toString()) == ConfigTypeEnum::SYSTEM_ANNIVERSARY_999) {
+            scenarios::resetAnniversary999Status();
             break;
         }
     }

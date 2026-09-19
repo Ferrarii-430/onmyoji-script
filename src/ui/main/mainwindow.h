@@ -13,6 +13,8 @@ QT_BEGIN_NAMESPACE
 namespace Ui { class mainwindow; }
 QT_END_NAMESPACE
 
+class QLabel;
+
 class mainwindow : public QWidget {
 Q_OBJECT
 
@@ -34,7 +36,13 @@ public:
 private:
     // 系统方案的动态配置表单容器(按 systemConfig 描述生成，改动即持久化)
     QWidget *m_systemConfigForm = nullptr;
+
+    // 任务运行期间替换 QSpinBox 的循环进度标签，停止后销毁恢复默认
+    QLabel *m_cycleProgressLabel = nullptr;
+
     void showSystemConfigForm(const QString &configId);
+    void setTaskRunningState(bool running);
+    void showCycleProgress(int completed, int total);
 
     void loadListWidgetData();
     void onItemClicked(QListWidgetItem *item);

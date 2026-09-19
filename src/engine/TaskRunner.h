@@ -29,6 +29,9 @@ signals:
     void started();
     void finished();
 
+    // 每完成一轮循环上报一次进度；total <= 0 表示无限循环
+    void cycleProgress(int completed, int total);
+
 private:
     TaskRunner() = default;
 

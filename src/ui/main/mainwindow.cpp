@@ -147,13 +147,12 @@ mainwindow::mainwindow(QWidget *parent) :
     TaskRunner& runner = TaskRunner::instance();
     connect(&runner, &TaskRunner::showImage, this, &mainwindow::showOpenCVIdentifyImage);
     connect(&runner, &TaskRunner::started, this, [this]() {
-        ui->startTaskButton->setEnabled(false);
-        ui->stopTaskButton->setEnabled(true);
+        setTaskRunningState(true);
     });
     connect(&runner, &TaskRunner::finished, this, [this]() {
-        ui->startTaskButton->setEnabled(true);
-        ui->stopTaskButton->setEnabled(false);
+        setTaskRunningState(false);
     });
+    connect(&runner, &TaskRunner::cycleProgress, this, &mainwindow::showCycleProgress);
 
     //设置DPI感知
     DPIHelper::SetProcessDPIAwareness();
@@ -510,7 +509,59 @@ void mainwindow::startTaskButtonClick()
 //关闭当前选中的任务
 void mainwindow::stopTaskButtonClick()
 {
+    // 停止是「协作式」的：TaskRunner 只在当前步骤执行完后才退出循环，
+    // 因此按钮先反馈等待状态，避免用户重复点击或误以为没生效。
+    ui->stopTaskButton->setText(QStringLiteral("正在停止..."));
+    ui->stopTaskButton->setEnabled(false);
     TaskRunner::instance().stop();
+}
+
+// 任务运行状态切换：控制按钮可用性与循环次数控件的显示形态
+void mainwindow::setTaskRunningState(bool running)
+{
+    ui->startTaskButton->setEnabled(!running);
+    ui->stopTaskButton->setEnabled(running);
+    ui->stopTaskButton->setText(QStringLiteral("停止"));
+
+    if (running) {
+        // 运行中：隐藏可编辑的循环次数输入框，用进度标签占位
+        ui->label_5->setText(QStringLiteral("运行中"));
+        ui->taskCycleNumber->hide();
+        if (!m_cycleProgressLabel) {
+            m_cycleProgressLabel = new QLabel(this);
+            // 比输入框略宽：无限循环时需显示「(∞) 已执行 N 次」，右侧为空白区域不遮挡其他控件
+            const QRect spinRect = ui->taskCycleNumber->geometry();
+            m_cycleProgressLabel->setGeometry(spinRect.x(), spinRect.y(), 160, spinRect.height());
+            // m_cycleProgressLabel->setStyleSheet(
+            //     "border: 1px solid #c0c4d0; border-radius: 4px;"
+            //     "background-color: #f7f9fc; padding-left: 4px;");
+            m_cycleProgressLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+            m_cycleProgressLabel->show();
+            m_cycleProgressLabel->raise();
+        }
+    } else {
+        // 停止/结束后：恢复默认的循环次数输入框
+        ui->label_5->setText(QStringLiteral("循环次数"));
+        if (m_cycleProgressLabel) {
+            m_cycleProgressLabel->hide();
+            m_cycleProgressLabel->deleteLater();
+            m_cycleProgressLabel = nullptr;
+        }
+        ui->taskCycleNumber->show();
+    }
+}
+
+// 显示循环进度：(已执行/总次数)；total <= 0 表示无限循环
+void mainwindow::showCycleProgress(int completed, int total)
+{
+    if (!m_cycleProgressLabel) {
+        return;
+    }
+    if (total <= 0) {
+        m_cycleProgressLabel->setText(QString("(∞) 已执行 %1 次").arg(completed));
+    } else {
+        m_cycleProgressLabel->setText(QString("(%1/%2)").arg(completed).arg(total));
+    }
 }
 
 void mainwindow::appendLogToUI(const QString &msg)
