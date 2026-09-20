@@ -49,6 +49,11 @@ public:
         return applicationDirPath() + "/src/resource/log/dx11_log.txt";
     }
 
+    // 应用自身日志（Logger 输出），与 dx11 hook 日志同目录但独立轮转
+    QString appLogPath() const {
+        return applicationDirPath() + "/src/resource/log/app_log.txt";
+    }
+
     QString dx11HookDllPath() const {
         return applicationDirPath() + "/src/resource/hook/libdx11_hook.dll";
     }

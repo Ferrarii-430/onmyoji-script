@@ -269,6 +269,9 @@ REM   example_cofing.json —— config.json 的开发样例，无任何代码/�
 REM   log\dx11_log.txt    —— 空占位日志，运行时由注入器写入，目录会自动创建
 if exist "%BUILD_OUT%\src\resource\example_cofing.json" del /f /q "%BUILD_OUT%\src\resource\example_cofing.json" >nul 2>nul
 if exist "%BUILD_OUT%\src\resource\log\dx11_log.txt" del /f /q "%BUILD_OUT%\src\resource\log\dx11_log.txt" >nul 2>nul
+if exist "%BUILD_OUT%\src\resource\log\app_log.txt" del /f /q "%BUILD_OUT%\src\resource\log\app_log.txt" >nul 2>nul
+if exist "%BUILD_OUT%\src\resource\log\app_log.1.txt" del /f /q "%BUILD_OUT%\src\resource\log\app_log.1.txt" >nul 2>nul
+if exist "%BUILD_OUT%\src\resource\log\app_log.2.txt" del /f /q "%BUILD_OUT%\src\resource\log\app_log.2.txt" >nul 2>nul
 REM 确保运行时可写目录存在
 if not exist "%BUILD_OUT%\src\resource\thumbnail" mkdir "%BUILD_OUT%\src\resource\thumbnail"
 if not exist "%BUILD_OUT%\src\resource\log" mkdir "%BUILD_OUT%\src\resource\log"
