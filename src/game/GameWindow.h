@@ -49,6 +49,10 @@ private:
     std::string target_ = "onmyoji.exe";
     HWND hwnd_ = nullptr;
     cv::Size lastCaptureSize_;
+
+    // 上次已确认达标时的 minWidth：相同值且截图尺寸未变小时，
+    // ensureMinWidthForCapture 走快速路径跳过逐帧窗口尺寸系统调用
+    int lastEnsuredMinWidth_ = 0;
 };
 
 #endif // GAMEWINDOW_H

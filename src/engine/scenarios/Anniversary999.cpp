@@ -7,6 +7,7 @@
 #include "src/core/EventLoopUtils.h"
 #include "src/core/Logger.h"
 #include "src/engine/ScriptActions.h"
+#include "src/engine/TaskRunner.h"
 
 using core::waitWithEventProcessing;
 using core::waitRandomWithEventProcessing;
@@ -86,8 +87,9 @@ namespace scenarios {
         waitWithEventProcessing(500);
 
         //步骤2 判断是否进入战斗
+        // 循环条件检查任务状态：点「停止」后立即中断等待
         bool isEngageInBattle = false;
-        for (int i = 0; i < 4; ++i)
+        for (int i = 0; i < 4 && TaskRunner::instance().isRunning(); ++i)
         {
             //先等1秒
             waitRandomWithEventProcessing(1000,200);
@@ -114,8 +116,9 @@ namespace scenarios {
         waitWithEventProcessing(2000);
 
         //步骤3 循环等待战斗结束
+        // 循环条件检查任务状态：点「停止」后立即中断等待
         bool isBattleOfEnd = false;
-        for (int i = 0; i < 10; ++i)
+        for (int i = 0; i < 10 && TaskRunner::instance().isRunning(); ++i)
         {
             Logger::log(QString("等待战斗结束...(%1/10)").arg(i+1));
             waitRandomWithEventProcessing(1000,200);

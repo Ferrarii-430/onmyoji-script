@@ -16,6 +16,10 @@
 // 直接触发 DLL 截图，无需每次都启动 remote_capture_call.exe。
 #define DX11_CAPTURE_REQUEST_EVENT_NAME L"OnmyojiDx11CaptureRequest"
 
+// 跨进程“新帧就绪”事件名称（auto-reset）。DLL 写完共享内存后 SetEvent，
+// script 进程 WaitForSingleObject 等待该事件，替代按 2ms 间隔轮询序号。
+#define DX11_CAPTURE_READY_EVENT_NAME L"OnmyojiDx11CaptureFrameReady"
+
 static const uint32_t DX11_SHARED_MAGIC = 0x31315844; // 'DX11'
 static const uint32_t DX11_SHARED_VERSION = 1;
 

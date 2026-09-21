@@ -9,7 +9,9 @@
 #include <QDir>
 #include <QLabel>
 #include <QMessageBox>
+#include <QSaveFile>
 
+#include "src/core/AppPaths.h"
 #include "src/core/Logger.h"
 #include "src/core/SettingManager.h"
 #include "src/core/UpdateChecker.h"
@@ -162,8 +164,8 @@ void SettingDialog::onSaveClicked()
 
 bool SettingDialog::saveConfigToFile(const QJsonObject& config)
 {
-    QString basePath = QCoreApplication::applicationDirPath();
-    QString configPath = basePath + "/src/resource/setting.json";
+    // 统一走 AppPaths：带 8.3 短路径转换，中文安装路径下与其它资源路径行为一致
+    QString configPath = AppPaths::instance().settingPath();
 
     // 确保目录存在
     QDir configDir = QFileInfo(configPath).absoluteDir();
@@ -174,7 +176,9 @@ bool SettingDialog::saveConfigToFile(const QJsonObject& config)
         }
     }
 
-    QFile configFile(configPath);
+    // QSaveFile 原子写入：先写临时文件，commit() 时刷盘并原子替换，
+    // 避免写一半进程被杀/断电导致 setting.json 损坏。
+    QSaveFile configFile(configPath);
     if (!configFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
         qWarning() << "无法打开配置文件进行写入:" << configPath;
         return false;
@@ -182,9 +186,8 @@ bool SettingDialog::saveConfigToFile(const QJsonObject& config)
 
     QJsonDocument configDoc(config);
     qint64 bytesWritten = configFile.write(configDoc.toJson(QJsonDocument::Indented));
-    configFile.close();
 
-    if (bytesWritten <= 0) {
+    if (bytesWritten <= 0 || !configFile.commit()) {
         qWarning() << "配置文件写入失败:" << configPath;
         return false;
     }

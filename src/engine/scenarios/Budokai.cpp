@@ -12,6 +12,7 @@
 #include "src/core/Logger.h"
 #include "src/core/ProfileStore.h"
 #include "src/engine/ScriptActions.h"
+#include "src/engine/TaskRunner.h"
 #include "src/game/GameWindow.h"
 #include "src/game/capture/CaptureService.h"
 #include "src/vision/Geometry.h"
@@ -326,10 +327,11 @@ bool executeBudokai()
     waitWithEventProcessing(2000);
 
     //11. 识别是否完成战斗，最长等待8min，每10s刷新一次缩略图
+    // 循环条件检查任务状态：点「停止」后立即中断等待，而非傻等满全部轮询
     constexpr int MAX_WAIT_NUM = 96;
     constexpr int MAX_WAIT_TIME = 5000;
     bool awaitingBattle = false;
-    for (int i = 0; i < MAX_WAIT_NUM; ++i)
+    for (int i = 0; i < MAX_WAIT_NUM && TaskRunner::instance().isRunning(); ++i)
     {
         waitWithEventProcessing(MAX_WAIT_TIME);
         if (actions.yoloContainsLabels(0.45, {"battle-victory"}, false))
@@ -345,7 +347,9 @@ bool executeBudokai()
         }
     }
     if (!awaitingBattle) {
-        Logger::log(QString("等待战斗超时"));
+        Logger::log(QString(TaskRunner::instance().isRunning()
+                                ? "等待战斗超时"
+                                : "任务已停止，中止武道大会流程"));
         return false;
     }
 

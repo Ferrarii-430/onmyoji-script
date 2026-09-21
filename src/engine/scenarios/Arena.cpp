@@ -10,6 +10,7 @@
 #include "src/core/Logger.h"
 #include "src/core/ProfileStore.h"
 #include "src/engine/ScriptActions.h"
+#include "src/engine/TaskRunner.h"
 #include "src/game/GameWindow.h"
 #include "src/vision/Geometry.h"
 
@@ -73,8 +74,9 @@ bool executeArena()
     waitWithEventProcessing(5000); // 等待进入战斗
 
     // 2. 等待匹配到对手后出现[准备]或者[自动]按钮并点击
+    // 循环条件检查任务状态：点「停止」后立即中断等待，而非傻等满全部轮询
     bool readied = false;
-    for (int i = 0; i < kMatchPollCount; ++i) {
+    for (int i = 0; i < kMatchPollCount && TaskRunner::instance().isRunning(); ++i) {
         waitWithEventProcessing(kMatchPollInterval);
 
         // 优先用 YOLO 标签识别准备按钮（一次识别，多标签按优先级择一点击）；回退到 OCR 文字「自动」
@@ -88,7 +90,9 @@ bool executeArena()
         }
     }
     if (!readied) {
-        Logger::log(QString("等待匹配/准备超时，结束本次执行"));
+        Logger::log(QString(TaskRunner::instance().isRunning()
+                                ? "等待匹配/准备超时，结束本次执行"
+                                : "任务已停止，中止斗技流程"));
         return false;
     }
 
@@ -96,7 +100,7 @@ bool executeArena()
     Logger::log(QString("等待进入斗技战斗"));
     waitWithEventProcessing(8000);
     bool actionPosition = false;
-    for (int i = 40 - 1; i >= 0; --i)
+    for (int i = 40 - 1; i >= 0 && TaskRunner::instance().isRunning(); --i)
     {
         waitWithEventProcessing(5000);
         QJsonArray isAutoData = actions.ocrRecognizes(QRectF(0, 13, 13, 28), ocr::Enhance::Upscale);
@@ -148,7 +152,7 @@ bool executeArena()
 
     // 4. 轮询等待战斗结束（胜利/失败结算界面），出现后点击结算继续
     bool isEnd = false;
-    for (int i = 0; i < kBattlePollCount; ++i) {
+    for (int i = 0; i < kBattlePollCount && TaskRunner::instance().isRunning(); ++i) {
         waitWithEventProcessing(kBattlePollInterval);
 
         // 战斗结束结算：一次 OCR 识别，命中「生利(胜利)」或「失败」哪个就点哪个
@@ -163,7 +167,9 @@ bool executeArena()
         }
     }
     if (!isEnd) {
-        Logger::log(QString("等待战斗结束超时，结束本次执行"));
+        Logger::log(QString(TaskRunner::instance().isRunning()
+                                ? "等待战斗结束超时，结束本次执行"
+                                : "任务已停止，中止斗技流程"));
         return false;
     }
 

@@ -14,6 +14,7 @@ namespace Ui { class mainwindow; }
 QT_END_NAMESPACE
 
 class QLabel;
+class QCloseEvent;
 
 class mainwindow : public QWidget {
 Q_OBJECT
@@ -33,12 +34,18 @@ public:
     void onProgrammeUpBtnClicked();
     void onProgrammeDownBtnClicked();
 
+protected:
+    void closeEvent(QCloseEvent *event) override;
+
 private:
     // 系统方案的动态配置表单容器(按 systemConfig 描述生成，改动即持久化)
     QWidget *m_systemConfigForm = nullptr;
 
     // 任务运行期间替换 QSpinBox 的循环进度标签，停止后销毁恢复默认
     QLabel *m_cycleProgressLabel = nullptr;
+
+    // 关窗被运行中任务拦截时置位：finished 信号到来后再真正关闭窗口
+    bool m_pendingClose = false;
 
     void showSystemConfigForm(const QString &configId);
     void setTaskRunningState(bool running);

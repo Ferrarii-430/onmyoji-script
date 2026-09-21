@@ -49,31 +49,63 @@ bool waitForProcessResponsive(QProcess& process, int timeoutMs)
     return true;
 }
 
+// ------------------------------
+// 截图共享内存常驻缓存
+// 原实现每次读取（含 2ms 轮询读序号）都做 OpenFileMapping → MapView →
+// Unmap → Close 全套系统调用，等一帧最多 250 轮、读一帧 2 次映射。
+// 命名 section 由内核引用计数管理：本进程持有 handle 期间对象不会销毁；
+// 游戏重启、DLL 重新注入后，同名 CreateFileMapping 打开的仍是同一对象并
+// 重置 header（sequence 从 0 重新自增），读端 != prevSeq 判定依旧成立，
+// 因此打开成功一次后常驻复用即可，无需失效重建。
+// ------------------------------
+HANDLE g_captureSharedMapping = nullptr;
+void* g_captureSharedView = nullptr;
+
+// 确保共享内存视图已打开：首次调用执行打开，成功后常驻复用；
+// 共享内存尚不存在（DLL 未截到第一帧）等失败场景下每次重试，不缓存失败。
+bool ensureSharedCaptureView()
+{
+    if (g_captureSharedView) {
+        return true;
+    }
+
+    HANDLE mapping = OpenFileMappingW(FILE_MAP_READ, FALSE, DX11_SHARED_NAME);
+    if (!mapping) {
+        return false;
+    }
+
+    // 全量映射（大小 0 = 整个 section）：header 与像素数据在同一 view 内，
+    // 读序号/读整帧都无需再二次映射
+    void* view = MapViewOfFile(mapping, FILE_MAP_READ, 0, 0, 0);
+    if (!view) {
+        CloseHandle(mapping);
+        return false;
+    }
+
+    g_captureSharedMapping = mapping;
+    g_captureSharedView = view;
+    return true;
+}
+
 // 读取共享内存中当前帧的序号（共享内存不可用时返回 0）
 uint32_t readDx11SharedSequence()
 {
-    HANDLE mapping = OpenFileMappingW(FILE_MAP_READ, FALSE, DX11_SHARED_NAME);
-    if (!mapping) return 0;
-
-    uint32_t seq = 0;
-    void* view = MapViewOfFile(mapping, FILE_MAP_READ, 0, 0, sizeof(Dx11CaptureShared));
-    if (view) {
-        const Dx11CaptureShared* hdr = static_cast<const Dx11CaptureShared*>(view);
-        if (hdr->magic == DX11_SHARED_MAGIC && hdr->version == DX11_SHARED_VERSION) {
-            seq = hdr->sequence;
-        }
-        UnmapViewOfFile(view);
+    if (!ensureSharedCaptureView()) {
+        return 0;
     }
-    CloseHandle(mapping);
-    return seq;
+
+    const Dx11CaptureShared* hdr = static_cast<const Dx11CaptureShared*>(g_captureSharedView);
+    if (hdr->magic == DX11_SHARED_MAGIC && hdr->version == DX11_SHARED_VERSION) {
+        return hdr->sequence;
+    }
+    return 0;
 }
 
 // 从 DLL 写入的共享内存中直接读取最新一帧（BGRA），转换为 BGR 的 cv::Mat。
 // 无需 PNG 落盘/解码中转。
 bool readDx11SharedCapture(cv::Mat& outImg)
 {
-    HANDLE mapping = OpenFileMappingW(FILE_MAP_READ, FALSE, DX11_SHARED_NAME);
-    if (!mapping) {
+    if (!ensureSharedCaptureView()) {
         const DWORD err = GetLastError();
         qWarning() << "无法打开截图共享内存 (错误码:" << err << ")";
         if (err == ERROR_FILE_NOT_FOUND) {
@@ -89,48 +121,25 @@ bool readDx11SharedCapture(cv::Mat& outImg)
         return false;
     }
 
-    bool ok = false;
-    uint32_t width = 0, height = 0, dataSize = 0;
-
-    // 先映射头部获取尺寸
-    void* headView = MapViewOfFile(mapping, FILE_MAP_READ, 0, 0, sizeof(Dx11CaptureShared));
-    if (headView) {
-        const Dx11CaptureShared* hdr = static_cast<const Dx11CaptureShared*>(headView);
-        if (hdr->magic == DX11_SHARED_MAGIC && hdr->version == DX11_SHARED_VERSION &&
-            hdr->status == 0 && hdr->channels == 4 &&
-            hdr->width > 0 && hdr->height > 0 &&
-            hdr->dataSize == hdr->width * hdr->height * 4) {
-            width = hdr->width;
-            height = hdr->height;
-            dataSize = hdr->dataSize;
-        } else {
-            qWarning() << "截图共享内存头部无效 (magic/version/status 不匹配)";
-        }
-        UnmapViewOfFile(headView);
+    const Dx11CaptureShared* hdr = static_cast<const Dx11CaptureShared*>(g_captureSharedView);
+    if (!(hdr->magic == DX11_SHARED_MAGIC && hdr->version == DX11_SHARED_VERSION &&
+          hdr->status == 0 && hdr->channels == 4 &&
+          hdr->width > 0 && hdr->height > 0 &&
+          hdr->dataSize == hdr->width * hdr->height * 4)) {
+        qWarning() << "截图共享内存头部无效 (magic/version/status 不匹配)";
+        return false;
     }
 
-    if (width > 0) {
-        void* view = MapViewOfFile(mapping, FILE_MAP_READ, 0, 0,
-                                   sizeof(Dx11CaptureShared) + dataSize);
-        if (view) {
-            const uchar* pixels = static_cast<const uchar*>(view) + sizeof(Dx11CaptureShared);
-            // DLL 把后备缓冲区的原始字节直接写入共享内存，不做通道交换。
-            // onmyoji 的后备缓冲区格式为 DXGI_FORMAT_R8G8B8A8_UNORM（日志中“格式=28”），
-            // 内存字节序为 R,G,B,A —— 因此必须按 RGBA 解析。此前误用 BGRA2BGR 会把
-            // R/B 通道对调，导致读到的图像红蓝颠倒（与 DLL 侧 PNG 落盘表现一致）。
-            const cv::Mat rgba(static_cast<int>(height), static_cast<int>(width),
-                               CV_8UC4, const_cast<uchar*>(pixels));
-            // cvtColor 会分配新内存，outImg 不再引用共享内存
-            cv::cvtColor(rgba, outImg, cv::COLOR_RGBA2BGR);
-            ok = !outImg.empty();
-            UnmapViewOfFile(view);
-        } else {
-            qWarning() << "映射截图共享内存失败 (错误码:" << GetLastError() << ")";
-        }
-    }
-
-    CloseHandle(mapping);
-    return ok;
+    // DLL 把后备缓冲区的原始字节直接写入共享内存，不做通道交换。
+    // onmyoji 的后备缓冲区格式为 DXGI_FORMAT_R8G8B8A8_UNORM（日志中“格式=28”），
+    // 内存字节序为 R,G,B,A —— 因此必须按 RGBA 解析。此前误用 BGRA2BGR 会把
+    // R/B 通道对调，导致读到的图像红蓝颠倒（与 DLL 侧 PNG 落盘表现一致）。
+    const uchar* pixels = static_cast<const uchar*>(g_captureSharedView) + sizeof(Dx11CaptureShared);
+    const cv::Mat rgba(static_cast<int>(hdr->height), static_cast<int>(hdr->width),
+                       CV_8UC4, const_cast<uchar*>(pixels));
+    // cvtColor 会分配新内存，outImg 不再引用共享内存
+    cv::cvtColor(rgba, outImg, cv::COLOR_RGBA2BGR);
+    return !outImg.empty();
 }
 
 // 检查 remote_capture_call.exe 与 hook DLL 是否就绪
@@ -162,6 +171,27 @@ bool isDllEventAvailable()
     return true;
 }
 
+// 打开 DLL 的跨进程“新帧就绪”事件（打开成功后常驻复用）。
+// 新版 DLL 在写完共享内存后 SetEvent 该事件，script 端等待即可拿到新帧；
+// 返回 null 表示当前 DLL 为旧版本（尚未创建该事件），调用方需回退轮询序号。
+// 打开失败不做负缓存：DLL 后续注入/升级后能自动切换到事件驱动模式。
+HANDLE ensureFrameReadyEvent()
+{
+    // INVALID_HANDLE_VALUE 表示尚未成功打开过；nullptr 表示旧版 DLL
+    static HANDLE s_readyEvent = INVALID_HANDLE_VALUE;
+    if (s_readyEvent != INVALID_HANDLE_VALUE) {
+        return s_readyEvent;
+    }
+
+    // SYNCHRONIZE 权限：本进程只等待该事件，不 SetEvent
+    HANDLE h = OpenEventW(SYNCHRONIZE, FALSE, DX11_CAPTURE_READY_EVENT_NAME);
+    if (h) {
+        qInfo() << "已打开 DLL 新帧就绪事件，等待模式为事件驱动";
+        s_readyEvent = h;
+    }
+    return h;
+}
+
 // 快速路径：通过跨进程事件直接触发 DLL 截图，无需启动注入器进程。
 // 返回 true 表示确认拿到新帧；false 表示未在超时内收到新帧。
 // 调用前应先通过 isDllEventAvailable() 确认事件存在。
@@ -177,16 +207,36 @@ bool captureViaEvent(cv::Mat& winImg)
     SetEvent(hEvent);
     CloseHandle(hEvent);
 
-    // 等待共享内存序号变化，确认 DLL 在渲染线程写入了新帧
-    QElapsedTimer timer;
-    timer.start();
     bool gotNewFrame = false;
-    while (timer.elapsed() < kFastPathFrameWaitMs) {
-        if (readDx11SharedSequence() != prevSeq) {
-            gotNewFrame = true;
-            break;
+
+    // 主路径：DLL 是新版时等待“新帧就绪”事件（单次阻塞系统调用，无轮询）。
+    // auto-reset 事件可能残留上一次超时未消费的旧信号，拿到信号后仍按
+    // sequence != prevSeq 二次确认，旧信号则继续等剩余时间，不会误判。
+    if (HANDLE readyEvent = ensureFrameReadyEvent()) {
+        QElapsedTimer timer;
+        timer.start();
+        while (timer.elapsed() < kFastPathFrameWaitMs) {
+            const int remaining = kFastPathFrameWaitMs - static_cast<int>(timer.elapsed());
+            if (WaitForSingleObject(readyEvent, remaining) != WAIT_OBJECT_0) {
+                break; // 超时或异常，按未拿到新帧处理
+            }
+            if (readDx11SharedSequence() != prevSeq) {
+                gotNewFrame = true;
+                break;
+            }
+            // 消费到旧信号，继续等待
         }
-        QThread::msleep(kFastPathPollIntervalMs);
+    } else {
+        // 回退路径：旧版 DLL 没有就绪事件，轮询共享内存序号
+        QElapsedTimer timer;
+        timer.start();
+        while (timer.elapsed() < kFastPathFrameWaitMs) {
+            if (readDx11SharedSequence() != prevSeq) {
+                gotNewFrame = true;
+                break;
+            }
+            QThread::msleep(kFastPathPollIntervalMs);
+        }
     }
 
     if (!gotNewFrame) {
@@ -490,7 +540,8 @@ bool dllStopHook(const QString& targetPid)
 
     process.start(remoteCaptureExe, arguments);
 
-    if (!process.waitForFinished(10000)) {
+    // 注入器内部等待 DLL 排空在途线程后卸载，最坏 ~15s，需完整覆盖
+    if (!process.waitForFinished(20000)) {
         qWarning() << "停止dx11_hook命令执行超时";
         process.kill();
         return false;

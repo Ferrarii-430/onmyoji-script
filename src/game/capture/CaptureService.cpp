@@ -1,5 +1,7 @@
 #include "src/game/capture/CaptureService.h"
 
+#include <utility>
+
 #include <opencv2/imgcodecs.hpp>
 
 #include "src/core/AppPaths.h"
@@ -12,6 +14,41 @@
 #include "src/platform/ProcessUtils.h"
 
 namespace capture {
+
+namespace {
+
+// 截图连续失败计数：成功一次即清零；达到 kMaxConsecutiveCaptureFailures
+// 时触发通知并重新从 0 累计（避免每次失败都重复回调）。
+int g_consecutiveFailures = 0;
+CaptureFailNotifier g_failNotifier;
+
+// 成功截图：清零连续失败计数
+void noteCaptureSuccess()
+{
+    g_consecutiveFailures = 0;
+}
+
+// 截图失败：累计并按需触发熔断通知
+void noteCaptureFailure()
+{
+    ++g_consecutiveFailures;
+    if (g_consecutiveFailures >= kMaxConsecutiveCaptureFailures && g_failNotifier) {
+        g_failNotifier(g_consecutiveFailures);
+        g_consecutiveFailures = 0;
+    }
+}
+
+} // namespace
+
+void setCaptureFailNotifier(CaptureFailNotifier notifier)
+{
+    g_failNotifier = std::move(notifier);
+}
+
+void resetCaptureFailCount()
+{
+    g_consecutiveFailures = 0;
+}
 
 cv::Mat captureGameWindow()
 {
@@ -59,6 +96,7 @@ cv::Mat captureGameWindow()
     if (!hasWinImg)
     {
         Logger::log(QString("游戏画面获取失败，请查看日志！"));
+        noteCaptureFailure();
         return winImg;
     }
 
@@ -68,6 +106,7 @@ cv::Mat captureGameWindow()
         vision::imwriteQt(saveCapturePath, winImg);
     }
 
+    noteCaptureSuccess();
     window.setLastCaptureSize(winImg.size());
     return winImg;
 }

@@ -11,6 +11,7 @@
 #include "src/core/Logger.h"
 #include "src/core/ProfileStore.h"
 #include "src/engine/ScriptActions.h"
+#include "src/engine/TaskRunner.h"
 #include "src/game/GameWindow.h"
 #include "src/vision/Geometry.h"
 
@@ -56,10 +57,11 @@ bool openRealmAndAttack(const Detection& det)
 }
 
 // 投4用：等待进入战斗后 ESC+回车 立即投降，并点击“失败”结算
+// 循环条件检查任务状态：点「停止」后立即中断等待，而非傻等满全部轮询
 bool surrenderBattle()
 {
     constexpr int kEnterBattleAttempts = 5;  // 5次 * 1秒 = 5秒
-    for (int attempts = 0; attempts < kEnterBattleAttempts; ++attempts) {
+    for (int attempts = 0; attempts < kEnterBattleAttempts && TaskRunner::instance().isRunning(); ++attempts) {
         waitWithEventProcessing(1000);
 
         if (ScriptActions::instance().yoloContainsLabels(0.45, {"common-exit-battle"}, false)) {
@@ -89,16 +91,19 @@ bool surrenderBattle()
             return true;
         }
     }
-    qWarning() << "等待" << kEnterBattleAttempts << "秒未进入战斗，结束任务";
+    Logger::log(QString(TaskRunner::instance().isRunning()
+                            ? "等待进入战斗超时，结束任务"
+                            : "任务已停止，中止结界突破流程"));
     return false;
 }
 
 // 清票用：等待战斗结束并点击结算框（含 3/6/9 次连胜的额外奖励确认）
+// 循环条件检查任务状态：点「停止」后立即中断等待，而非傻等满全部轮询
 bool waitForBattleEnd()
 {
     constexpr int kBattleEndAttempts = 36;  // 36次 * 5秒 = 3分钟
     const QString screenshotPath = AppPaths::instance().screenshotPath();
-    for (int attempts = 0; attempts < kBattleEndAttempts; ++attempts) {
+    for (int attempts = 0; attempts < kBattleEndAttempts && TaskRunner::instance().isRunning(); ++attempts) {
         waitWithEventProcessing(5000);
 
         if (!ScriptActions::instance()
@@ -116,7 +121,9 @@ bool waitForBattleEnd()
             return true;
         }
     }
-    qWarning() << "达到最大尝试次数" << kBattleEndAttempts << "，未找到识别目标，结束任务";
+    Logger::log(QString(TaskRunner::instance().isRunning()
+                            ? "等待战斗结算超时，结束任务"
+                            : "任务已停止，中止结界突破流程"));
     return false;
 }
 

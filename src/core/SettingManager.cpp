@@ -1,15 +1,15 @@
 #include "src/core/SettingManager.h"
 
-#include <qcoreapplication.h>
 #include <QDebug>
 #include <QDir>
 #include <qjsondocument.h>
 #include <qjsonparseerror.h>
 
+#include "src/core/AppPaths.h"
+
 bool SettingManager::loadConfig() {
-    // 构建默认配置文件路径
-    QString basePath = QCoreApplication::applicationDirPath();
-    m_configPath = basePath + "/src/resource/setting.json";
+    // 统一走 AppPaths：带 8.3 短路径转换，中文安装路径下与其它资源路径行为一致
+    m_configPath = AppPaths::instance().settingPath();
 
     return loadConfig(m_configPath);
 }

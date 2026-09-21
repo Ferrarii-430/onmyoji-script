@@ -13,6 +13,7 @@
 #include "src/core/Logger.h"
 #include "src/core/ProfileStore.h"
 #include "src/engine/ScriptActions.h"
+#include "src/engine/TaskRunner.h"
 
 using core::waitWithEventProcessing;
 
@@ -118,7 +119,8 @@ namespace scenarios
                     // 队长状态
                     Logger::log(QString("等待队友进入战斗"));
                     bool enteredBattle = false;
-                    for (int i = 0; i < MAX_WAIT_NUM; ++i)
+                    // 循环条件检查任务状态：点「停止」后立即中断等待，而非傻等满全部轮询
+                    for (int i = 0; i < MAX_WAIT_NUM && TaskRunner::instance().isRunning(); ++i)
                     {
                         //循环等待队友进入
                         waitWithEventProcessing(MAX_WAIT_TIME);
@@ -170,7 +172,8 @@ namespace scenarios
         // 判断是否已经进入战斗界面
         {
             bool enteredBattleScene = false;
-            for (int i = 0; i < MAX_WAIT_NUM; ++i)
+            // 循环条件检查任务状态：点「停止」后立即中断等待，而非傻等满全部轮询
+            for (int i = 0; i < MAX_WAIT_NUM && TaskRunner::instance().isRunning(); ++i)
             {
                 waitWithEventProcessing(MAX_WAIT_TIME);
                 if (actions.yoloContainsLabels(0.55, {"common-exit-battle"}, false))
@@ -190,7 +193,8 @@ namespace scenarios
         //循环等待战斗结束
         {
             bool isEnd = true;
-            for (int i = 0; i < MAX_WAIT_NUM; ++i) {
+            // 循环条件检查任务状态：点「停止」后立即中断等待，而非傻等满全部轮询
+            for (int i = 0; i < MAX_WAIT_NUM && TaskRunner::instance().isRunning(); ++i) {
                 waitWithEventProcessing(MAX_WAIT_TIME);
 
                 // 战斗结束结算：一次 OCR 识别，命中「生利(胜利)」或「失败」哪个就点哪个
@@ -213,7 +217,8 @@ namespace scenarios
         //进入领取御魂奖励状态
         {
             bool isError = true;
-            for (int i = 0; i < MAX_WAIT_NUM; ++i)
+            // 循环条件检查任务状态：点「停止」后立即中断等待，而非傻等满全部轮询
+            for (int i = 0; i < MAX_WAIT_NUM && TaskRunner::instance().isRunning(); ++i)
             {
                 QString savePathBattleEnd = actions.opencvRecognizesAndClick(screenshotPath + "battle_end.png", 0.65, true);
                 waitWithEventProcessing(MAX_WAIT_TIME);
@@ -239,7 +244,8 @@ namespace scenarios
         {
             //组队模式
             bool teamIsError = true;
-            for (int i = 0; i < MAX_WAIT_NUM; ++i)
+            // 循环条件检查任务状态：点「停止」后立即中断等待，而非傻等满全部轮询
+            for (int i = 0; i < MAX_WAIT_NUM && TaskRunner::instance().isRunning(); ++i)
             {
                 if (isCaptain)
                 {

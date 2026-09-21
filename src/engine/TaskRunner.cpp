@@ -207,6 +207,14 @@ void TaskRunner::run(const QJsonArray& steps, int cycleCount)
         m_isInitLogPath = true;
     }
 
+    // 截图连续失败熔断：游戏窗口失联（崩溃/被关闭）时 captureGameWindow 持续返回空，
+    // 各系统方案的轮询会傻等满全部超时。这里在截图层统计连续失败并自动停止任务。
+    capture::resetCaptureFailCount();
+    capture::setCaptureFailNotifier([](int failures) {
+        Logger::log(QString("连续 %1 次截图失败，游戏窗口可能已失联，自动停止任务").arg(failures));
+        TaskRunner::instance().stop();
+    });
+
     m_isRunning = true;
     emit started();
 

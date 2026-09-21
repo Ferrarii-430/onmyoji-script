@@ -89,6 +89,13 @@ void GameWindow::ensureMinWidthForCapture(int minWidth)
         return;
     }
 
+    // 快速路径：本 minWidth 上次已确认达标，且此后截图尺寸仍达标 → 跳过逐帧
+    // GetWindowPlacement/IsIconic 等系统调用。窗口被手动拉小时截图尺寸会跟着
+    // 变小（setLastCaptureSize），下次仍会走完整检查，不会漏判。
+    if (minWidth == lastEnsuredMinWidth_ && lastCaptureSize_.width >= minWidth) {
+        return;
+    }
+
     // 判断当前窗口宽度。优先使用上次截图尺寸（反映 hook swap chain 实际尺寸）；
     // 首次截图时 lastCaptureSize_ 为 0，需要主动获取窗口客户区尺寸。
     int currentWidth = lastCaptureSize_.width;
@@ -130,6 +137,8 @@ void GameWindow::ensureMinWidthForCapture(int minWidth)
             ShowWindow(hwnd_, SW_MINIMIZE);
             core::waitWithEventProcessing(50);
         }
+        // 记录本次已确认达标，后续逐帧调用走快速路径
+        lastEnsuredMinWidth_ = minWidth;
         // Logger::log(QString("窗口宽度调整: 当前宽度 %1 >= %2，无需调整")
         //             .arg(currentWidth).arg(minWidth));
         return;

@@ -78,6 +78,10 @@ public:
         return applicationDirPath() + "/src/resource/config.json";
     }
 
+    QString settingPath() const {
+        return applicationDirPath() + "/src/resource/setting.json";
+    }
+
     QString classesNamePath() const {
         return applicationDirPath() + "/src/resource/classes.txt";
     }

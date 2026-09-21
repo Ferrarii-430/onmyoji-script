@@ -54,7 +54,9 @@ private:
     int m_mouseSpeed = 7;                   // 默认值
     QString m_screenshotMode = "DLL注入";   // 默认值
     QString m_mouseClickMode = "PostMessage";   // 默认值
-    bool m_persistScreenshot = true;        // 是否将截图持久化为 PNG 文件
+    // 是否将截图持久化为 PNG 文件；默认值与出厂 setting.json (false) 对齐，
+    // 避免配置缺失该字段时退化为开启、每次识别都产生磁盘 IO
+    bool m_persistScreenshot = false;
 };
 
 // 全局访问宏

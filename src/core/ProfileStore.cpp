@@ -9,19 +9,37 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QPixmap>
+#include <QSaveFile>
 #include <QString>
 
 #include "src/core/AppPaths.h"
 #include "src/core/Logger.h"
 #include "src/vision/TemplateMatcher.h"
 
+// 原子写入配置 JSON：QSaveFile 先写临时文件，commit() 时自动刷盘并原子替换目标文件。
+// 直接 WriteOnly 截断重写时进程被杀/断电会留下写了一半的损坏文件，导致所有方案丢失。
+static bool saveJsonAtomically(const QString& filePath, const QJsonArray& rootArray)
+{
+    QSaveFile file(filePath);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        Logger::log("写入 JSON 文件失败: " + filePath);
+        return false;
+    }
+    QJsonDocument newDoc(rootArray);
+    file.write(newDoc.toJson(QJsonDocument::Indented));
+    if (!file.commit()) {
+        Logger::log("写入 JSON 文件失败: " + filePath);
+        return false;
+    }
+    return true;
+}
+
 
 
 QString getPathByRecognitionImg(const std::string &configId, const std::string &fileName)
 {
-    // 基础路径
-    QString basePath = QCoreApplication::applicationDirPath()
-                     + "/src/resource/screenshot/"
+    // 统一走 AppPaths：带 8.3 短路径转换，中文安装路径下与其它资源路径行为一致
+    QString basePath = AppPaths::instance().screenshotPath()
                      + QString::fromStdString(configId);
 
     // 确保目录存在
@@ -38,7 +56,6 @@ QString getPathByRecognitionImg(const std::string &configId, const std::string &
 // 往配置文件里追加一个对象
 void addConfigToJsonFile(const QString &filePath, const QString &name)
 {
-    QFile file(filePath);
     QJsonArray rootArray = m_configArray;
 
     // 2. 构造新对象
@@ -52,13 +69,8 @@ void addConfigToJsonFile(const QString &filePath, const QString &name)
     rootArray.append(newObj);
 
     // 4. 写回文件
-    if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        QJsonDocument newDoc(rootArray);
-        file.write(newDoc.toJson(QJsonDocument::Indented));
-        file.close();
+    if (saveJsonAtomically(filePath, rootArray)) {
         Logger::log("已成功写入新配置: " + name);
-    } else {
-        Logger::log("写入 JSON 文件失败: " + filePath);
     }
 }
 
@@ -89,23 +101,17 @@ bool removeConfigById(const QString &filePath, const QString &idToRemove)
     }
 
     // 3. 写回文件
-    if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        QJsonDocument newDoc(rootArray);
-        file.write(newDoc.toJson(QJsonDocument::Indented));
-        file.close();
+    if (saveJsonAtomically(filePath, rootArray)) {
         Logger::log("已删除 ID=" + idToRemove + " 的配置");
         return true;
-    } else {
-        Logger::log("写入 JSON 文件失败: " + filePath);
-        return false;
     }
+    return false;
 }
 
 
 // 往配置文件里追加一个对象 - 添加方案内容
 void addConfigToJsonFile(const QString &filePath, const QString &configId, const QJsonObject& json)
 {
-    QFile file(filePath);
     QJsonArray rootArray = m_configArray;
 
 
@@ -166,13 +172,8 @@ void addConfigToJsonFile(const QString &filePath, const QString &configId, const
 
     // 写回文件
     if (hasConfigId) {
-        if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-            QJsonDocument newDoc(rootArray);
-            file.write(newDoc.toJson(QJsonDocument::Indented));
-            file.close();
+        if (saveJsonAtomically(filePath, rootArray)) {
             Logger::log("已成功写入新配置: " + json["taskName"].toString());
-        } else {
-            Logger::log("写入 JSON 文件失败: " + filePath);
         }
     } else {
         Logger::log("未找到 configId: " + configId);
@@ -182,7 +183,6 @@ void addConfigToJsonFile(const QString &filePath, const QString &configId, const
 
 // 更新配置文件中的步骤对象 - 更新方案内容
 void updateConfigInJsonFile(const QString &filePath, const QString &configId, const QJsonObject& json) {
-    QFile file(filePath);
     QJsonArray rootArray = m_configArray;
 
 
@@ -254,13 +254,8 @@ void updateConfigInJsonFile(const QString &filePath, const QString &configId, co
 
     // 写回文件
     if (hasConfigId && hasStepsId) {
-        if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-            QJsonDocument newDoc(rootArray);
-            file.write(newDoc.toJson(QJsonDocument::Indented));
-            file.close();
+        if (saveJsonAtomically(filePath, rootArray)) {
             Logger::log("已成功更新配置: " + json["taskName"].toString());
-        } else {
-            Logger::log("写入 JSON 文件失败: " + filePath);
         }
     } else if (!hasConfigId) {
         Logger::log("未找到 configId: " + configId);
@@ -352,14 +347,8 @@ void updateSystemConfigValue(const QString &filePath, const QString &configId,
 
     // 同步内存并写回文件
     m_configArray = rootArray;
-    QFile file(filePath);
-    if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        QJsonDocument newDoc(rootArray);
-        file.write(newDoc.toJson(QJsonDocument::Indented));
-        file.close();
+    if (saveJsonAtomically(filePath, rootArray)) {
         Logger::log("已更新系统方案配置: " + key);
-    } else {
-        Logger::log("写入 JSON 文件失败: " + filePath);
     }
 }
 
@@ -393,8 +382,8 @@ void saveBase64ImageToFile(QJsonObject &data) {
         return;
     }
 
-    // 3. 确定目录
-    QString dirPath = QCoreApplication::applicationDirPath() + "/src/resource/screenshot";
+    // 3. 确定目录（统一走 AppPaths：带 8.3 短路径转换）
+    QString dirPath = AppPaths::instance().screenshotPath();
     QDir dir;
     if (!dir.exists(dirPath)) {
         if (!dir.mkpath(dirPath)) {
@@ -403,8 +392,8 @@ void saveBase64ImageToFile(QJsonObject &data) {
         }
     }
 
-    // 4. 图片保存路径
-    QString filePath = dirPath + "/" + stepsId + ".png";
+    // 4. 图片保存路径（dirPath 已带尾部斜杠）
+    QString filePath = dirPath + stepsId + ".png";
     if (!pix.save(filePath, "PNG")) {
         qWarning() << "图片保存失败：" << filePath;
         return;
@@ -514,16 +503,11 @@ bool removeConfigById(const QString &filePath, const QString &configId, const QS
     }
 
     // 写回文件
-    if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        QJsonDocument newDoc(rootArray);
-        file.write(newDoc.toJson(QJsonDocument::Indented));
-        file.close();
+    if (saveJsonAtomically(filePath, rootArray)) {
         Logger::log("已删除 stepsId=" + stepsId + " 的配置");
         return true;
-    } else {
-        Logger::log("写入 JSON 文件失败: " + filePath);
-        return false;
     }
+    return false;
 }
 
 //更新方案名称
@@ -535,7 +519,6 @@ void updateProgrammeContent(const QString &filePath, const QString &configId, co
         return;
     }
 
-    QFile file(filePath);
     QJsonArray rootArray = m_configArray;
 
 
@@ -557,13 +540,8 @@ void updateProgrammeContent(const QString &filePath, const QString &configId, co
 
     // 写回文件
     if (hasConfigId) {
-        if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-            QJsonDocument newDoc(rootArray);
-            file.write(newDoc.toJson(QJsonDocument::Indented));
-            file.close();
+        if (saveJsonAtomically(filePath, rootArray)) {
             Logger::log("已成功更新配置: " + name);
-        } else {
-            Logger::log("写入 JSON 文件失败: " + filePath);
         }
     } else {
         Logger::log("未找到 configId: " + configId);
@@ -648,16 +626,11 @@ bool moveProgramme(const QString &filePath, const QString &configId, const int s
     }
 
     // 写回文件
-    if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        QJsonDocument newDoc(rootArray);
-        file.write(newDoc.toJson(QJsonDocument::Indented));
-        file.close();
+    if (saveJsonAtomically(filePath, rootArray)) {
         // Logger::log(QString("步骤移动成功并保存到文件"));
         return true;
-    } else {
-        Logger::log("写入 JSON 文件失败: " + filePath);
-        return false;
     }
+    return false;
 }
 
 void refreshConfig()

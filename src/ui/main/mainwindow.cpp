@@ -8,6 +8,7 @@
 #include "src/core/Logger.h"
 #include <opencv2/opencv.hpp>
 #include "ui_mainwindow.h"
+#include <QCloseEvent>
 #include <QFile>
 #include <QHBoxLayout>
 #include <QHeaderView>
@@ -58,6 +59,9 @@ mainwindow::mainwindow(QWidget *parent) :
 
     // 把 Logger 输出重定向到界面日志框
     Logger::setSink([this](const QString& msg) { appendLogToUI(msg); });
+
+    // 日志框上限：超出自动丢弃最旧内容，防止长时间挂机内存无限增长
+    ui->plainTextEdit->setMaximumBlockCount(2000);
 
     // 绑定选中信号
     connect(ui->listWidget, &QListWidget::itemClicked,
@@ -151,6 +155,11 @@ mainwindow::mainwindow(QWidget *parent) :
     });
     connect(&runner, &TaskRunner::finished, this, [this]() {
         setTaskRunningState(false);
+        // 关窗曾被运行中任务拦截：任务已真正结束，此刻再执行退出
+        if (m_pendingClose) {
+            m_pendingClose = false;
+            close();
+        }
     });
     connect(&runner, &TaskRunner::cycleProgress, this, &mainwindow::showCycleProgress);
 
@@ -165,7 +174,43 @@ mainwindow::mainwindow(QWidget *parent) :
 }
 
 mainwindow::~mainwindow() {
+    // 清空全局日志回调：Logger 是全局单例，比本对象活得久，
+    // 不清理的话析构后下一条日志会通过悬空的 this 调用 appendLogToUI 而崩溃
+    Logger::setSink(nullptr);
     delete ui;
+}
+
+// 拦截运行中关窗：任务同步跑在 UI 线程，直接接受关闭会让正在执行的
+// run() 继续操作已销毁/隐藏的界面而崩溃。确认退出时先协作式停止，
+// 等 finished 信号（run() 返回）到来后再真正关闭窗口。
+void mainwindow::closeEvent(QCloseEvent *event)
+{
+    if (!TaskRunner::instance().isRunning()) {
+        Logger::setSink(nullptr);
+        event->accept();
+        return;
+    }
+
+    const auto reply = QMessageBox::question(
+        this, QStringLiteral("退出确认"),
+        QStringLiteral("任务正在运行，是否停止任务并退出？"),
+        QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+    if (reply != QMessageBox::Yes) {
+        event->ignore();
+        return;
+    }
+
+    Logger::log(QStringLiteral("停止任务并退出..."));
+    m_pendingClose = true;
+    TaskRunner::instance().stop();
+    if (!TaskRunner::instance().isRunning()) {
+        // 弹窗期间任务已恰好结束（finished 已错过），直接退出
+        m_pendingClose = false;
+        Logger::setSink(nullptr);
+        event->accept();
+        return;
+    }
+    event->ignore();
 }
 
 void mainwindow::loadListWidgetData()
@@ -568,10 +613,8 @@ void mainwindow::appendLogToUI(const QString &msg)
 {
     if (!ui || !ui->plainTextEdit) return;
 
+    // appendPlainText 本身会自动滚动到底并移动光标，无需再手动操作
     ui->plainTextEdit->appendPlainText(msg);
-    QTextCursor cursor = ui->plainTextEdit->textCursor();
-    cursor.movePosition(QTextCursor::End);
-    ui->plainTextEdit->setTextCursor(cursor);
 }
 
 // 按钮点击槽函数

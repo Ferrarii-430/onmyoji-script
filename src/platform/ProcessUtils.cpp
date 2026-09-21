@@ -73,6 +73,13 @@ HWND findWindowByPid(DWORD pid)
 
 bool enableDebugPrivilege()
 {
+    // 提权成功一次后进程内不会失效，缓存结果避免截图热路径每帧重复
+    // OpenProcessToken/AdjustTokenPrivileges 系统调用（调用方每次截图都会调用）
+    static bool cached = false;
+    if (cached) {
+        return true;
+    }
+
     HANDLE hToken;
     if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hToken)) {
         return false;
@@ -96,7 +103,9 @@ bool enableDebugPrivilege()
     }
 
     CloseHandle(hToken);
-    return GetLastError() == ERROR_SUCCESS;
+    const bool ok = GetLastError() == ERROR_SUCCESS;
+    cached = ok;
+    return ok;
 }
 
 } // namespace platform

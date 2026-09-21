@@ -286,8 +286,8 @@ ScriptActions& ScriptActions::instance()
 
 void ScriptActions::processAndShowImage(const QString& imagePath)
 {
+    // 回显走信号槽（同线程直连），无需人为让出时间片；
     qDebug() << imagePath;
-    core::waitWithEventProcessing(500);
     emit requestShowImage(imagePath);
 }
 
