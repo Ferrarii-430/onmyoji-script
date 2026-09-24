@@ -88,28 +88,10 @@ bool captureWindowToMat(HWND hwnd, cv::Mat& outBGR)
 
     HGDIOBJ oldBitmap = SelectObject(hMemDC, hBitmap);
 
-    // 5. 捕获窗口内容 - 使用多种方法尝试
-    BOOL captureOk = FALSE;
-
-    HMODULE user32 = GetModuleHandleA("user32.dll");
-
-    if (!user32) {
-        Logger::log(QString("无法获取user32.dll模块句柄"));
-        return FALSE;
-    }
-
-    // 方法1: PrintWindow with full content
-    BOOL (WINAPI *PrintWindow)(HWND, HDC, UINT) = nullptr;
-    PrintWindow = (BOOL (WINAPI*)(HWND, HDC, UINT))GetProcAddress(user32, "PrintWindow");
-
-    if (!PrintWindow) {
-        DWORD error = GetLastError();
-        Logger::log(QString("获取PrintWindow函数失败，错误代码: %1").arg(error));
-        return FALSE;
-    }
-
-    // 按兼容性顺序尝试不同的标志
-    captureOk = PrintWindow(hwnd, hMemDC, 0x0); // 默认方式
+    // 5. 捕获窗口内容 - 按兼容性顺序尝试不同的标志
+    // PrintWindow 自 XP 起随 user32 提供，无需动态加载；早前经
+    // GetProcAddress 二次获取的失败分支还漏释放已创建的 DC/位图。
+    BOOL captureOk = PrintWindow(hwnd, hMemDC, 0x0); // 默认方式
     if (!captureOk) {
         DWORD error = GetLastError();
         Logger::log(QString("PrintWindow默认方式失败，错误代码: %1").arg(error));

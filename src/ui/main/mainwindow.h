@@ -51,6 +51,9 @@ private:
     void setTaskRunningState(bool running);
     void showCycleProgress(int completed, int total);
 
+    // 退出前把游戏进程内的 hook DLL 安全卸载（未注入时为无操作）
+    void unloadHookOnExit();
+
     void loadListWidgetData();
     void onItemClicked(QListWidgetItem *item);
     void showStepsInTable(const QJsonArray &steps);

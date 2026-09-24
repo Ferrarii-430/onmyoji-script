@@ -219,9 +219,9 @@ cv::Mat prepareFullImageForOcr(const cv::Mat& winImg, const ocr::Enhance enhance
     QStringList applied;
     const cv::Mat ocrImg = enhanceOcrRoiImage(winImg, pixelEnhance, ignoredScale, applied);
 
-    Logger::log(QString("OCR识别整张图片: 像素(%1x%2) 增强[%3]")
+    qDebug() << QString("OCR识别整张图片: 像素(%1x%2) 增强[%3]")
                     .arg(winImg.cols).arg(winImg.rows)
-                    .arg(applied.join(" + ")));
+                    .arg(applied.join(" + "));
     return ocrImg;
 }
 
@@ -267,12 +267,12 @@ cv::Rect computeOcrRoi(const cv::Mat& winImg, const QRectF& roiPercent,
     outCropped = true;
     QStringList applied;
     outOcrImg = enhanceOcrRoiImage(winImg(roiRect), enhance, outScale, applied);
-    Logger::log(QString("OCR识别区域: 百分比(%1%,%2%,%3%,%4%) -> 像素(%5,%6,%7x%8) 增强[%9]")
+    qDebug() << QString("OCR识别区域: 百分比(%1%,%2%,%3%,%4%) -> 像素(%5,%6,%7x%8) 增强[%9]")
                     .arg(roiPercent.x()).arg(roiPercent.y())
                     .arg(roiPercent.width()).arg(roiPercent.height())
                     .arg(roiRect.x).arg(roiRect.y)
                     .arg(roiRect.width).arg(roiRect.height)
-                    .arg(applied.join(" + ")));
+                    .arg(applied.join(" + "));
     return roiRect;
 }
 
@@ -375,7 +375,7 @@ QString ScriptActions::opencvRecognizesAndClick(const QString& templPath, const 
         return nullptr;
     }
     if (!templateCacheHit) {
-        Logger::log("已加载模板图片: " + tempSavePath +
+        qDebug() << ("已加载模板图片: " + tempSavePath +
                     (templWithMask.mask.empty() ? "" : " (含透明掩码)"));
     }
     const cv::Mat& templ = templWithMask.gray;
@@ -384,7 +384,7 @@ QString ScriptActions::opencvRecognizesAndClick(const QString& templPath, const 
     // 读取模板截取时的游戏窗口分辨率（侧载 JSON），若存在则按该分辨率归一化截图
     const cv::Size templCaptureSize = vision::loadTemplateCaptureSize(tempSavePath);
     if (templCaptureSize.width > 0 && templCaptureSize.height > 0) {
-        Logger::log(QString("使用模板截取分辨率: %1x%2").arg(templCaptureSize.width).arg(templCaptureSize.height));
+        qDebug() << QString("使用模板截取分辨率: %1x%2").arg(templCaptureSize.width).arg(templCaptureSize.height);
     }
 
     // 加载彩色模板用于 HSV 颜色校验（灰度匹配无法区分同形状不同色的模板）
@@ -450,9 +450,9 @@ QString ScriptActions::opencvRecognizesAndClick(const QString& templPath, const 
     }
 
     // 记录点击点在匹配框内的相对位置（百分比），用于验证边框排除是否生效
-    Logger::log(QString("OpenCV点击点相对匹配框: x=%1%% y=%2%%")
+    qDebug() << QString("OpenCV点击点相对匹配框: x=%1%% y=%2%%")
                 .arg(matchRect.width > 0 ? (clickPt.x - matchRect.x) * 100 / matchRect.width : 0)
-                .arg(matchRect.height > 0 ? (clickPt.y - matchRect.y) * 100 / matchRect.height : 0));
+                .arg(matchRect.height > 0 ? (clickPt.y - matchRect.y) * 100 / matchRect.height : 0);
 
     // clickPt 为截图坐标系坐标，由 GameWindow::mapCapturePointToClient 负责
     // 截图坐标 -> 客户区坐标 的换算（基于实际捕获尺寸与客户区尺寸比例），
@@ -489,7 +489,7 @@ std::vector<OpenCvMatch> ScriptActions::opencvFindAll(const QString& templPath, 
         return results;
     }
     if (!templateCacheHit) {
-        Logger::log("opencvFindAll: 已加载模板图片: " + tempSavePath +
+        qDebug() << ("opencvFindAll: 已加载模板图片: " + tempSavePath +
                     (templWithMask.mask.empty() ? "" : " (含透明掩码)"));
     }
     const cv::Mat& templ = templWithMask.gray;
@@ -498,8 +498,8 @@ std::vector<OpenCvMatch> ScriptActions::opencvFindAll(const QString& templPath, 
     // 模板截取分辨率侧载
     const cv::Size templCaptureSize = vision::loadTemplateCaptureSize(tempSavePath);
     if (templCaptureSize.width > 0 && templCaptureSize.height > 0) {
-        Logger::log(QString("opencvFindAll: 使用模板截取分辨率: %1x%2")
-                    .arg(templCaptureSize.width).arg(templCaptureSize.height));
+        qDebug() << QString("opencvFindAll: 使用模板截取分辨率: %1x%2")
+                    .arg(templCaptureSize.width).arg(templCaptureSize.height);
     }
 
     // 多目标匹配
@@ -532,7 +532,7 @@ std::vector<OpenCvMatch> ScriptActions::opencvFindAll(const QString& templPath, 
 
         // HSV 颜色校验：不通过则跳过该匹配
         if (colorCheck && !vision::verifyHsvColorMatch(winImg, templColor, matchRect)) {
-            Logger::log(QString("opencvFindAll: score=%1 但 HSV 颜色校验不通过，跳过").arg(m.score, 0, 'f', 2));
+            qDebug() << QString("opencvFindAll: score=%1 但 HSV 颜色校验不通过，跳过").arg(m.score, 0, 'f', 2);
             continue;
         }
 
@@ -708,7 +708,7 @@ QString ScriptActions::ocrRecognizesAndClick(const QString& ocrText, const doubl
                     }
                 }else
                 {
-                    Logger::log(QString("[OCR] 已识别到:" + text + " 但分数过低"));
+                    qDebug() << QString("[OCR] 已识别到:" + text + " 但分数过低");
                 }
             }
         }
@@ -758,7 +758,7 @@ QString ScriptActions::ocrRecognizesAndClickAny(const QStringList& ocrTexts, con
                 continue;
             }
             if (item["score"].toDouble() < threshold) {
-                Logger::log(QString("[OCR] 已识别到:" + item["text"].toString() + " 但分数过低"));
+                qDebug() << QString("[OCR] 已识别到:" + item["text"].toString() + " 但分数过低");
                 continue;
             }
             if (!ocrClickMatchedItem(winImg, item, roiRect, cropped, roiScale, randomClick).isEmpty()) {

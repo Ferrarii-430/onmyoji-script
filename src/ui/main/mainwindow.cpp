@@ -34,6 +34,8 @@
 #include "src/core/UpdateChecker.h"
 #include "src/engine/ScriptActions.h"
 #include "src/engine/TaskRunner.h"
+#include "src/game/GameWindow.h"
+#include "src/game/capture/Dx11HookCapture.h"
 #include "src/platform/DPIHelper.h"
 #include "src/ui/editTask/edittaskdialog.h"
 #include "src/ui/setting/settingdialog.h"
@@ -180,12 +182,35 @@ mainwindow::~mainwindow() {
     delete ui;
 }
 
+// 退出前卸载游戏进程内的 hook DLL：DLL 已支持安全排空后自卸载（游戏不闪退、
+// 文件解锁）。未注入时（事件不存在）直接返回，不启动注入器进程。
+void mainwindow::unloadHookOnExit()
+{
+    if (!capture::isDllInjected()) {
+        return;
+    }
+
+    GameWindow& gameWindow = GameWindow::instance();
+    if (!gameWindow.handle() && !gameWindow.locate()) {
+        Logger::log(QStringLiteral("未找到游戏窗口，跳过 hook DLL 卸载"));
+        return;
+    }
+
+    Logger::log(QStringLiteral("正在从游戏进程卸载 hook DLL..."));
+    if (capture::dllStopHook(gameWindow.processId())) {
+        Logger::log(QStringLiteral("hook DLL 已卸载"));
+    } else {
+        Logger::log(QStringLiteral("hook DLL 卸载未确认（不影响退出）"));
+    }
+}
+
 // 拦截运行中关窗：任务同步跑在 UI 线程，直接接受关闭会让正在执行的
 // run() 继续操作已销毁/隐藏的界面而崩溃。确认退出时先协作式停止，
 // 等 finished 信号（run() 返回）到来后再真正关闭窗口。
 void mainwindow::closeEvent(QCloseEvent *event)
 {
     if (!TaskRunner::instance().isRunning()) {
+        unloadHookOnExit();
         Logger::setSink(nullptr);
         event->accept();
         return;
@@ -206,6 +231,7 @@ void mainwindow::closeEvent(QCloseEvent *event)
     if (!TaskRunner::instance().isRunning()) {
         // 弹窗期间任务已恰好结束（finished 已错过），直接退出
         m_pendingClose = false;
+        unloadHookOnExit();
         Logger::setSink(nullptr);
         event->accept();
         return;

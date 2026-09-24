@@ -305,13 +305,13 @@ void GameWindow::clickInWindow(const cv::Point& clickPoint)
         || mapClientRect.bottom <= 0;
 
     const cv::Point clientPoint = mapCapturePointToClient(clickPoint);
-    Logger::log(QString("点击坐标映射: 捕获(%1,%2) -> 客户区(%3,%4), 捕获尺寸: %5x%6, 客户区尺寸: %7x%8")
+    qDebug() << QString("点击坐标映射: 捕获(%1,%2) -> 客户区(%3,%4), 捕获尺寸: %5x%6, 客户区尺寸: %7x%8")
                .arg(clickPoint.x).arg(clickPoint.y)
                .arg(clientPoint.x).arg(clientPoint.y)
                .arg(lastCaptureSize_.width)
                .arg(lastCaptureSize_.height)
                .arg(mapClientRect.right)
-               .arg(mapClientRect.bottom));
+               .arg(mapClientRect.bottom);
 
     if (isDegenerateClientRect) {
         if (lastCaptureSize_.width <= 0 || lastCaptureSize_.height <= 0) {
@@ -332,19 +332,19 @@ void GameWindow::clickInWindow(const cv::Point& clickPoint)
     GetClientRect(hwnd_, &clientRect);
     GetWindowRect(hwnd_, &windowRect);
 
-    Logger::log(QString("窗口信息 - 客户区: %1x%2, 窗口: %3x%4, DPI缩放: %5")
+    qDebug() << QString("窗口信息 - 客户区: %1x%2, 窗口: %3x%4, DPI缩放: %5")
                .arg(clientRect.right).arg(clientRect.bottom)
                .arg(windowRect.right - windowRect.left).arg(windowRect.bottom - windowRect.top)
-               .arg(DPIHelper::GetWindowDPIScaling(hwnd_)));
+               .arg(DPIHelper::GetWindowDPIScaling(hwnd_));
 
     POINT screenPoint = { clientPoint.x, clientPoint.y };
     if (!isDegenerateClientRect) {
         ClientToScreen(hwnd_, &screenPoint);
     }
 
-    Logger::log(QString("坐标转换 - 客户区: (%1, %2) -> 屏幕: (%3, %4)")
+    qDebug() << QString("坐标转换 - 客户区: (%1, %2) -> 屏幕: (%3, %4)")
                .arg(clientPoint.x).arg(clientPoint.y)
-               .arg(screenPoint.x).arg(screenPoint.y));
+               .arg(screenPoint.x).arg(screenPoint.y);
 
     bool success = false;
     QString mouseClickMode = SETTING_CONFIG.getMouseClickMode();
@@ -354,9 +354,9 @@ void GameWindow::clickInWindow(const cv::Point& clickPoint)
     if (!isDegenerateClientRect) {
         messageTarget = resolveMessageTarget(hwnd_, messagePoint);
         if (messageTarget != hwnd_) {
-            Logger::log(QString("消息点击目标为子窗口: (%1, %2) -> (%3, %4)")
+            qDebug() << QString("消息点击目标为子窗口: (%1, %2) -> (%3, %4)")
                        .arg(clientPoint.x).arg(clientPoint.y)
-                       .arg(messagePoint.x).arg(messagePoint.y));
+                       .arg(messagePoint.x).arg(messagePoint.y);
         }
     }
 

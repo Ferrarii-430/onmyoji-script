@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <QCoreApplication>
+#include <QDebug>
 #include <QDir>
 #include <QElapsedTimer>
 #include <QFile>
@@ -448,7 +449,7 @@ bool findTemplate(const cv::Mat& haystack, const cv::Mat& needle,
     const int loggedBaseH = hasCaptureSize ? templateCaptureSize.height : BASE_MATCH_HEIGHT;
 
     if (outScore < threshold) {
-        Logger::log(QString("[WARN] 没有找到匹配，bestScore=%1 threshold=%2 耗时=%3ms "
+        qDebug() << QString("[WARN] 没有找到匹配，bestScore=%1 threshold=%2 耗时=%3ms "
                             "(src=%4x%5 -> base %6x%7, scale=%8, offset=(%9,%10), baseNeedleScale=%11, fineScale=%12)")
                     .arg(outScore, 0, 'f', 4).arg(threshold, 0, 'f', 4)
                     .arg(timer.elapsed())
@@ -457,11 +458,11 @@ bool findTemplate(const cv::Mat& haystack, const cv::Mat& needle,
                     .arg(localInfo.scale, 0, 'f', 4)
                     .arg(localInfo.offsetX).arg(localInfo.offsetY)
                     .arg(loggedBaseScale, 0, 'f', 4)
-                    .arg(bestFineScale, 0, 'f', 2));
+                    .arg(bestFineScale, 0, 'f', 2);
         return false;
     }
 
-    Logger::log(QString("[RESULT] bestScore=%1 baseRect=(%2,%3,%4x%5) 耗时=%6ms "
+    qDebug() << QString("[RESULT] bestScore=%1 baseRect=(%2,%3,%4x%5) 耗时=%6ms "
                         "(src=%7x%8 -> base %9x%10, scale=%11, offset=(%12,%13), baseNeedleScale=%14, fineScale=%15)")
                 .arg(outScore, 0, 'f', 4)
                 .arg(outRect.x).arg(outRect.y).arg(outRect.width).arg(outRect.height)
@@ -471,7 +472,7 @@ bool findTemplate(const cv::Mat& haystack, const cv::Mat& needle,
                 .arg(localInfo.scale, 0, 'f', 4)
                 .arg(localInfo.offsetX).arg(localInfo.offsetY)
                 .arg(loggedBaseScale, 0, 'f', 4)
-                .arg(bestFineScale, 0, 'f', 2));
+                .arg(bestFineScale, 0, 'f', 2);
 
     return true;
 }
@@ -672,13 +673,13 @@ bool findTemplateAll(const cv::Mat& haystack, const cv::Mat& needle,
         }
     }
 
-    Logger::log(QString("[findAll] 候选=%1 去重后=%2 阈值=%3 耗时=%4ms "
+    qDebug() << QString("[findAll] 候选=%1 去重后=%2 阈值=%3 耗时=%4ms "
                         "(src=%5x%6 -> base %7x%8, scale=%9)")
                 .arg(candidates.size()).arg(outMatches.size())
                 .arg(threshold, 0, 'f', 2).arg(timer.elapsed())
                 .arg(localInfo.srcWidth).arg(localInfo.srcHeight)
                 .arg(targetWidth).arg(targetHeight)
-                .arg(localInfo.scale, 0, 'f', 4));
+                .arg(localInfo.scale, 0, 'f', 4);
 
     return !outMatches.empty();
 }
@@ -738,10 +739,10 @@ bool verifyHsvColorMatch(const cv::Mat& haystackColor, const cv::Mat& needleColo
     double dv = std::abs(hMean[2] - nMean[2]);
 
     const bool ok = (dh <= hueTol && ds <= satTol && dv <= valTol);
-    Logger::log(QString("[HSV校验] dh=%1 ds=%2 dv=%3 (tol h=%4 s=%5 v=%6) => %7")
+    qDebug() << QString("[HSV校验] dh=%1 ds=%2 dv=%3 (tol h=%4 s=%5 v=%6) => %7")
                 .arg(dh, 0, 'f', 1).arg(ds, 0, 'f', 1).arg(dv, 0, 'f', 1)
                 .arg(hueTol, 0, 'f', 1).arg(satTol, 0, 'f', 1).arg(valTol, 0, 'f', 1)
-                .arg(ok ? "通过" : "不通过"));
+                .arg(ok ? "通过" : "不通过");
 
     return ok;
 }

@@ -313,8 +313,8 @@ bool captureByDllInjection(const QString& targetPid, cv::Mat& winImg)
     if (isDllEventAvailable()) {
         for (int attempt = 0; attempt < kFastPathMaxRetries; ++attempt) {
             if (captureViaEvent(winImg) && !winImg.empty()) {
-                Logger::log(QString("截图成功(快速路径, 尝试次数：%1)，图像尺寸: %2 x %3  通道数: %4")
-                                .arg(attempt + 1).arg(winImg.cols).arg(winImg.rows).arg(winImg.channels()));
+                qDebug() << QString("截图成功(快速路径, 尝试次数：%1)，图像尺寸: %2 x %3  通道数: %4")
+                                .arg(attempt + 1).arg(winImg.cols).arg(winImg.rows).arg(winImg.channels());
                 return true;
             }
             // 未拿到新帧（游戏可能帧率低），等待后重试
@@ -413,8 +413,8 @@ bool captureByDllInjection(const QString& targetPid, cv::Mat& winImg)
     }
 
     if (readDx11SharedCapture(winImg)) {
-        Logger::log(QString("截图成功(共享内存)，图像尺寸: %1 x %2  通道数: %3")
-                        .arg(winImg.cols).arg(winImg.rows).arg(winImg.channels()));
+        qDebug() << QString("截图成功(共享内存)，图像尺寸: %1 x %2  通道数: %3")
+                        .arg(winImg.cols).arg(winImg.rows).arg(winImg.channels());
         return true;
     }
 
@@ -432,8 +432,8 @@ bool captureByDllInjection(const QString& targetPid, cv::Mat& winImg)
     if (persist && QFile::exists(DX11_CAPTURE_PATH)) {
         winImg = vision::imreadQt(DX11_CAPTURE_PATH);
         if (!winImg.empty()) {
-            Logger::log(QString("截图成功(文件回退)，图像尺寸: %1 x %2  通道数: %3")
-                            .arg(winImg.cols).arg(winImg.rows).arg(winImg.channels()));
+            qDebug() << QString("截图成功(文件回退)，图像尺寸: %1 x %2  通道数: %3")
+                            .arg(winImg.cols).arg(winImg.rows).arg(winImg.channels());
             return true;
         }
         qWarning() << "无法读取截图文件:" << DX11_CAPTURE_PATH;
@@ -514,6 +514,18 @@ bool dllSetLogPath(const QString& targetPid)
     return success;
 }
 
+bool isDllInjected()
+{
+    // DLL 注入成功即在 DllMain 中创建该命名事件，事件存在 = DLL 在游戏进程内；
+    // 游戏退出或尚未注入时事件不存在。仅打开句柄检查存在性，代价为一次系统调用。
+    HANDLE hEvent = OpenEventW(SYNCHRONIZE, FALSE, DX11_CAPTURE_REQUEST_EVENT_NAME);
+    if (!hEvent) {
+        return false;
+    }
+    CloseHandle(hEvent);
+    return true;
+}
+
 bool dllStopHook(const QString& targetPid)
 {
     QString DX11_HOOK_DLL_PATH = QDir::toNativeSeparators(AppPaths::instance().dx11HookDllPath());
@@ -567,7 +579,7 @@ bool clickByDllInjection(const QString& targetPid, int x, int y)
     // 快速路径：DLL 已注入时直接通过跨进程事件触发点击，延迟低、无需启动进程。
     // =========================================================================
     if (isClickEventAvailable() && clickViaEvent(x, y)) {
-        Logger::log(QString("点击成功(快速路径) (%1, %2)").arg(x).arg(y));
+        qDebug() << QString("点击成功(快速路径) (%1, %2)").arg(x).arg(y);
         return true;
     }
 

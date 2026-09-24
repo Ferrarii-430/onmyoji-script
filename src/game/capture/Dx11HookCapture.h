@@ -16,6 +16,10 @@ bool clickByDllInjection(const QString& targetPid, int x, int y);
 // 修改注入 DLL 的日志输出路径
 bool dllSetLogPath(const QString& targetPid);
 
+// 检查 hook DLL 是否已注入游戏进程（通过 DLL 创建的命名事件判断，
+// 无需启动注入器进程）。用于退出时决定是否需要执行卸载。
+bool isDllInjected();
+
 // 停止/卸载注入的 DX11 hook
 bool dllStopHook(const QString& targetPid);
 
