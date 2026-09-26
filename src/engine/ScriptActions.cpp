@@ -478,8 +478,10 @@ QString ScriptActions::opencvRecognizesAndClickImpl(const QString& templPath, co
     cv::rectangle(resultImg, matchRect, cv::Scalar(0, 255, 0), 2);
     drawClickMarker(resultImg, clickPt);
 
-    Logger::log(QString("转换后点击点: (%1, %2)").arg(clickPt.x).arg(clickPt.y));
-    GameWindow::instance().clickInWindow(clickPt);
+    GameWindow::instance().clickInWindow(clickPt,
+        QString("OpenCV模板 %1 (%2,%3)")
+            .arg(QFileInfo(tempSavePath).fileName())
+            .arg(clickPt.x).arg(clickPt.y));
 
     return saveResultAndShow(resultImg);
 }
@@ -676,7 +678,10 @@ QString ScriptActions::ocrClickMatchedItem(const cv::Mat& winImg, const QJsonObj
     cv::rectangle(resultImg, matchRect, cv::Scalar(0, 255, 0), 2);
     drawClickMarker(resultImg, clickPt);
 
-    GameWindow::instance().clickInWindow(clickPt);
+    GameWindow::instance().clickInWindow(clickPt,
+        QString("OCR文字 %1 (%2,%3)")
+            .arg(item["text"].toString())
+            .arg(clickPt.x).arg(clickPt.y));
     return saveResultAndShow(resultImg);
 }
 
@@ -901,18 +906,16 @@ QString ScriptActions::clickInRoi(const QRectF& roiPercent, const bool randomCli
                             roiRect.y + roiRect.height / 2);
     }
 
-    Logger::log(QString("clickInRoi: 区域 百分比(%1%,%2%,%3%,%4%) -> 像素(%5,%6,%7x%8) 点击(%9,%10)")
-                    .arg(roiPercent.x()).arg(roiPercent.y())
-                    .arg(roiPercent.width()).arg(roiPercent.height())
-                    .arg(roiRect.x).arg(roiRect.y).arg(roiRect.width).arg(roiRect.height)
-                    .arg(clickPt.x).arg(clickPt.y));
-
     // 保存带区域框和点击标记的结果图
     cv::Mat resultImg = winImg.clone();
     cv::rectangle(resultImg, roiRect, cv::Scalar(0, 255, 0), 2);
     drawClickMarker(resultImg, clickPt);
 
-    GameWindow::instance().clickInWindow(clickPt);
+    GameWindow::instance().clickInWindow(clickPt,
+        QString("ROI区域(%1,%2,%3,%4)% 点击(%5,%6)")
+            .arg(roiPercent.x()).arg(roiPercent.y())
+            .arg(roiPercent.width()).arg(roiPercent.height())
+            .arg(clickPt.x).arg(clickPt.y));
     return saveResultAndShow(resultImg);
 }
 
@@ -1009,7 +1012,9 @@ QString ScriptActions::yoloRecognizesAndClickImpl(const double threshold, const 
         // 在图像上标记点击点
         drawClickMarker(captureImg, clickPt);
 
-        GameWindow::instance().clickInWindow(clickPt);
+        GameWindow::instance().clickInWindow(clickPt,
+            QString("YOLO标签 %1 (%2,%3)")
+                .arg(targetLabelName).arg(clickPt.x).arg(clickPt.y));
     }else
     {
         Logger::log(QString("未识别到指定目标"));
@@ -1187,7 +1192,9 @@ void ScriptActions::clickDetection(const Detection& det, bool randomClick, const
         Logger::log(QString("共享内存截图缺失，跳过调试图保存"));
     }
 
-    GameWindow::instance().clickInWindow(physicalClickPt);
+    GameWindow::instance().clickInWindow(physicalClickPt,
+        QString("YOLO标签 %1 (%2,%3)")
+            .arg(labelName).arg(physicalClickPt.x).arg(physicalClickPt.y));
 }
 
 QString ScriptActions::clickFirstDetectionByLabels(const QStringList& targetLabels, double threshold,

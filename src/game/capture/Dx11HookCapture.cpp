@@ -302,6 +302,15 @@ bool clickViaEvent(int x, int y)
     return done;
 }
 
+// 注入器运行后检测 DLL 注入状态：从未注入变为已注入时记录一条成功日志。
+// DLL 已注入时再走注入器路径（如快速路径失败回退）不会重复记录。
+void logDllInjectionStateChange(bool wasInjectedBefore, const QString& targetPid)
+{
+    if (!wasInjectedBefore && isDllInjected()) {
+        Logger::log(QString("DX11 hook DLL 注入成功 (PID: %1)").arg(targetPid));
+    }
+}
+
 } // namespace
 
 bool captureByDllInjection(const QString& targetPid, cv::Mat& winImg)
@@ -365,6 +374,9 @@ bool captureByDllInjection(const QString& targetPid, cv::Mat& winImg)
     // 记录截图前的共享内存序号，用于确认拿到的是本次写入的新帧。
     const uint32_t prevSeq = readDx11SharedSequence();
 
+    // 记录注入器运行前的注入状态，运行后用于检测"注入成功"并记录日志
+    const bool wasInjectedBefore = isDllInjected();
+
     QProcess process;
     // 合并 stdout/stderr，便于在注入或截图失败时看到注入器的完整诊断输出
     // （OpenProcess 失败、需要管理员权限、CaptureFrame 超时等都会打印在这里）。
@@ -386,6 +398,9 @@ bool captureByDllInjection(const QString& targetPid, cv::Mat& winImg)
         process.kill();
         waitForProcessResponsive(process, 1000);
 
+        // 注入器虽超时，但 DLL 可能已完成注入，检测并记录注入状态变化
+        logDllInjectionStateChange(wasInjectedBefore, targetPid);
+
         // 即使注入器超时，DLL 可能已成功注入。尝试用快速路径读取。
         if (captureViaEvent(winImg) && !winImg.empty()) {
             Logger::log(QString("注入器超时但快速路径恢复成功，图像尺寸: %1 x %2")
@@ -394,6 +409,9 @@ bool captureByDllInjection(const QString& targetPid, cv::Mat& winImg)
         }
         return false;
     }
+
+    // 注入器已运行完毕，检测 DLL 是否由未注入变为已注入并记录
+    logDllInjectionStateChange(wasInjectedBefore, targetPid);
 
     // 无论成功与否都记录注入器退出码与输出，便于定位“共享内存打不开”的真正原因。
     const int exitCode = process.exitCode();
@@ -599,6 +617,9 @@ bool clickByDllInjection(const QString& targetPid, int x, int y)
         return false;
     }
 
+    // 记录注入器运行前的注入状态，运行后用于检测"注入成功"并记录日志
+    const bool wasInjectedBefore = isDllInjected();
+
     QProcess process;
     process.setProcessChannelMode(QProcess::MergedChannels);
     QStringList arguments;
@@ -616,6 +637,7 @@ bool clickByDllInjection(const QString& targetPid, int x, int y)
                    << process.readAll();
         process.kill();
         waitForProcessResponsive(process, 1000);
+        logDllInjectionStateChange(wasInjectedBefore, targetPid);
         return false;
     }
 
@@ -626,6 +648,7 @@ bool clickByDllInjection(const QString& targetPid, int x, int y)
         return false;
     }
 
+    logDllInjectionStateChange(wasInjectedBefore, targetPid);
     Logger::log(QString("点击成功(注入器) (%1, %2)").arg(x).arg(y));
     return true;
 }

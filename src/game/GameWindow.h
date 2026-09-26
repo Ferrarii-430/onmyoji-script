@@ -30,12 +30,15 @@ public:
     cv::Size lastCaptureSize() const { return lastCaptureSize_; }
 
     // 截图前确保窗口宽度不小于 minWidth（基于上次截图尺寸判断）。
-    // 仅在窗口最小化时通过"恢复→移至屏幕外改宽→恢复位置→重新最小化"
-    // 的无感流程调整；调整后窗口位置保持不变，下次用户打开仍在原位。
+    // 窗口最小化时通过"恢复→移至屏幕外改宽→恢复位置→重新最小化"的无感流程调整；
+    // 窗口最大化且前台显示时跳过移屏外流程，恢复普通状态后原地调整大小，
+    // 避免窗口被压到其他窗口之后（表现为消失/像被最小化）。
     void ensureMinWidthForCapture(int minWidth);
 
-    // 在窗口内执行点击（clickPoint 为截图坐标系）
-    void clickInWindow(const cv::Point& clickPoint);
+    // 在窗口内执行点击（clickPoint 为截图坐标系）。
+    // clickContext 用于日志标注本次点击对象（如 YOLO标签/OCR文字/OpenCV模板/ROI区域），
+    // 为空时日志显示通用的「点击成功/点击失败」
+    void clickInWindow(const cv::Point& clickPoint, const QString& clickContext = QString());
 
     // 将截图坐标映射为窗口客户区坐标
     cv::Point mapCapturePointToClient(const cv::Point& capturePoint);

@@ -100,6 +100,9 @@ void GameWindow::ensureMinWidthForCapture(int minWidth)
     // 首次截图时 lastCaptureSize_ 为 0，需要主动获取窗口客户区尺寸。
     int currentWidth = lastCaptureSize_.width;
     const bool wasIconic = IsIconic(hwnd_) != 0;
+    // 最大化且在前台：不能走"移到屏幕外"的无感流程（会使窗口脱离最大化并被压到
+    // 其他窗口之后，表现为窗口消失/像被最小化），改为恢复普通状态后原地调整
+    const bool wasMaximizedForeground = IsZoomed(hwnd_) != 0 && GetForegroundWindow() == hwnd_;
 
     // 获取窗口"正常"位置/尺寸（非最小化/非最大化状态下的矩形）。
     // 注意：阴阳师窗口被系统隐藏时，rcNormalPosition 可能返回系统占位区
@@ -157,6 +160,13 @@ void GameWindow::ensureMinWidthForCapture(int minWidth)
         Logger::log(QString("窗口宽度调整: 窗口已从最小化恢复（不激活）"));
     }
 
+    // 最大化前台：先恢复为普通状态（保持前台可见），后续原地调整大小，不再最小化
+    if (wasMaximizedForeground) {
+        ShowWindow(hwnd_, SW_RESTORE);
+        core::waitWithEventProcessing(50);
+        Logger::log(QString("窗口宽度调整: 窗口原为最大化前台显示，已恢复普通状态，原地调整大小"));
+    }
+
     // 阴阳师(Unity) 不接受外部直接指定的窗口尺寸，会按窗口高度自行推导 16:9 客户区：
     //   客户高 = 窗口高 - 自定义边框(实测约 78px)，客户宽 = 客户高 * 16 / 9
     // （实测: 窗口 998x622 -> 渲染 966x544；窗口 632x416 -> 渲染 600x338）
@@ -170,17 +180,30 @@ void GameWindow::ensureMinWidthForCapture(int minWidth)
     const int winW = clientW + kFrameW;
     const int winH = clientH + kFrameH;
 
-    // 先移到屏幕外避免用户看到闪烁
-    SetWindowPos(hwnd_, HWND_BOTTOM,
-                 -10000, -10000, 0, 0,
-                 SWP_NOSIZE | SWP_NOACTIVATE);
+    // 无感调整：先移到屏幕外避免用户看到闪烁；最大化前台场景跳过（原地调整保持可见）
+    if (!wasMaximizedForeground) {
+        SetWindowPos(hwnd_, HWND_BOTTOM,
+                     -10000, -10000, 0, 0,
+                     SWP_NOSIZE | SWP_NOACTIVATE);
+    }
+
+    // 调整尺寸的目标位置：无感流程在屏幕外；最大化前台原地调整，取当前窗口位置
+    int resizeX = -10000;
+    int resizeY = -10000;
+    if (wasMaximizedForeground) {
+        RECT cur{};
+        if (GetWindowRect(hwnd_, &cur)) {
+            resizeX = cur.left;
+            resizeY = cur.top;
+        }
+    }
 
     // 模拟用户拖动边框调整尺寸的完整消息序列。
     // 仅 SetWindowPos 改窗口矩形不会触发 Unity 调用 Screen.SetResolution，
     // 必须发送 WM_ENTERSIZEMOVE / WM_EXITSIZEMOVE / WM_SIZE 让 Unity 检测到尺寸变化。
     SendMessage(hwnd_, WM_ENTERSIZEMOVE, 0, 0);
     SetWindowPos(hwnd_, nullptr,
-                 -10000, -10000,
+                 resizeX, resizeY,
                  winW, winH,
                  SWP_NOACTIVATE | SWP_NOZORDER);
     RECT newSize{};
@@ -291,7 +314,7 @@ void GameWindow::ensureMinWidthForCapture(int minWidth)
     Logger::log(QString("窗口宽度调整完成"));
 }
 
-void GameWindow::clickInWindow(const cv::Point& clickPoint)
+void GameWindow::clickInWindow(const cv::Point& clickPoint, const QString& clickContext)
 {
     if (!IsWindow(hwnd_)) {
         Logger::log(QString("错误: 无效的窗口句柄"));
@@ -392,10 +415,15 @@ void GameWindow::clickInWindow(const cv::Point& clickPoint)
         success = simulator.StealthMessageClick(messageTarget, messagePoint.x, messagePoint.y);
     }
 
+    // 带上下文标注点击对象（YOLO标签/OCR文字/OpenCV模板/ROI区域），便于从日志判断点了什么
     if (success) {
-        Logger::log(QString("点击成功"));
+        Logger::log(clickContext.isEmpty()
+                        ? QString("点击成功")
+                        : QString("点击成功: %1").arg(clickContext));
     } else {
-        Logger::log(QString("点击失败"));
+        Logger::log(clickContext.isEmpty()
+                        ? QString("点击失败")
+                        : QString("点击失败: %1").arg(clickContext));
     }
 }
 
