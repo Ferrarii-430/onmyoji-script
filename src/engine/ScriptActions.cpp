@@ -326,7 +326,8 @@ QString ScriptActions::saveResultAndShow(const cv::Mat& resultImg)
 
 QString ScriptActions::opencvRecognizesAndClickByBase64(const QString& base64, const double threshold,
                                                         const bool randomClick, const bool colorCheck,
-                                                        const cv::Size& captureSize, const ClickExclude& exclude)
+                                                        const cv::Size& captureSize, const ClickExclude& exclude,
+                                                        const bool skipCollaborationGuard)
 {
     if (base64.isEmpty()) {
         return "错误: base64 图像数据为空";
@@ -354,11 +355,24 @@ QString ScriptActions::opencvRecognizesAndClickByBase64(const QString& base64, c
         vision::saveTemplateCaptureSize(tempFile.fileName(), captureSize);
     }
 
-    return opencvRecognizesAndClick(tempFile.fileName(), threshold, randomClick, colorCheck, exclude);
+    return opencvRecognizesAndClick(tempFile.fileName(), threshold, randomClick, colorCheck, exclude, skipCollaborationGuard);
 }
 
 QString ScriptActions::opencvRecognizesAndClick(const QString& templPath, const double threshold, const bool randomClick,
-                                                const bool colorCheck, const ClickExclude& exclude)
+                                                const bool colorCheck, const ClickExclude& exclude,
+                                                const bool skipCollaborationGuard)
+{
+    QString result = opencvRecognizesAndClickImpl(templPath, threshold, randomClick, colorCheck, exclude);
+    if (result.isEmpty() && m_collaborationGuardEnabled && !skipCollaborationGuard && cancelCollaborationPopup())
+    {
+        // 协作弹窗已取消，重试一次识别点击
+        result = opencvRecognizesAndClickImpl(templPath, threshold, randomClick, colorCheck, exclude);
+    }
+    return result;
+}
+
+QString ScriptActions::opencvRecognizesAndClickImpl(const QString& templPath, const double threshold, const bool randomClick,
+                                                    const bool colorCheck, const ClickExclude& exclude)
 {
     cv::Mat winImg = capture::captureGameWindow();
     if (winImg.empty())
@@ -667,7 +681,20 @@ QString ScriptActions::ocrClickMatchedItem(const cv::Mat& winImg, const QJsonObj
 }
 
 QString ScriptActions::ocrRecognizesAndClick(const QString& ocrText, const double threshold, const bool randomClick,
-                                             const QRectF& roiPercent, const ocr::Enhance enhance)
+                                             const QRectF& roiPercent, const ocr::Enhance enhance,
+                                             const bool skipCollaborationGuard)
+{
+    QString result = ocrRecognizesAndClickImpl(ocrText, threshold, randomClick, roiPercent, enhance);
+    if (result.isEmpty() && m_collaborationGuardEnabled && !skipCollaborationGuard && cancelCollaborationPopup())
+    {
+        // 协作弹窗已取消，重试一次识别点击
+        result = ocrRecognizesAndClickImpl(ocrText, threshold, randomClick, roiPercent, enhance);
+    }
+    return result;
+}
+
+QString ScriptActions::ocrRecognizesAndClickImpl(const QString& ocrText, const double threshold, const bool randomClick,
+                                                 const QRectF& roiPercent, const ocr::Enhance enhance)
 {
     cv::Mat winImg = capture::captureGameWindow();
     bool hasOcrText = false;
@@ -725,7 +752,20 @@ QString ScriptActions::ocrRecognizesAndClick(const QString& ocrText, const doubl
 
 QString ScriptActions::ocrRecognizesAndClickAny(const QStringList& ocrTexts, const double threshold,
                                                 const bool randomClick, const QRectF& roiPercent,
-                                                const ocr::Enhance enhance)
+                                                const ocr::Enhance enhance, const bool skipCollaborationGuard)
+{
+    QString result = ocrRecognizesAndClickAnyImpl(ocrTexts, threshold, randomClick, roiPercent, enhance);
+    if (result.isEmpty() && m_collaborationGuardEnabled && !skipCollaborationGuard && cancelCollaborationPopup())
+    {
+        // 协作弹窗已取消，重试一次识别点击
+        result = ocrRecognizesAndClickAnyImpl(ocrTexts, threshold, randomClick, roiPercent, enhance);
+    }
+    return result;
+}
+
+QString ScriptActions::ocrRecognizesAndClickAnyImpl(const QStringList& ocrTexts, const double threshold,
+                                                    const bool randomClick, const QRectF& roiPercent,
+                                                    const ocr::Enhance enhance)
 {
     cv::Mat winImg = capture::captureGameWindow();
 
@@ -821,8 +861,16 @@ bool ScriptActions::ocrContainsText(const QString& ocrText, const double thresho
     return false;
 }
 
-QString ScriptActions::clickInRoi(const QRectF& roiPercent, const bool randomClick)
+QString ScriptActions::clickInRoi(const QRectF& roiPercent, const bool randomClick, const bool skipCollaborationGuard)
 {
+    // 协作弹窗守卫：ROI 点击无识别，被弹窗遮挡不会表现为识别失败，
+    // 开关开启时改为点击前先扫协作弹窗（命中则点击取消并等待 1s，避免盲点落到弹窗上）；
+    // skipCollaborationGuard=true 时本次点击跳过扫描
+    if (m_collaborationGuardEnabled && !skipCollaborationGuard)
+    {
+        cancelCollaborationPopup();
+    }
+
     cv::Mat winImg = capture::captureGameWindow();
     if (winImg.empty())
     {
@@ -876,7 +924,19 @@ QString ScriptActions::clickInRoi(const QRectF& roiPercent, const bool randomCli
  * @param exclude 随机点击时排除的边框区域比例，全部为 0 表示不排除
  */
 QString ScriptActions::yoloRecognizesAndClick(const double threshold, const bool randomClick, const QString& targetLabelName,
-                                              const ClickExclude& exclude)
+                                              const ClickExclude& exclude, const bool skipCollaborationGuard)
+{
+    QString result = yoloRecognizesAndClickImpl(threshold, randomClick, targetLabelName, exclude);
+    if (result.isEmpty() && m_collaborationGuardEnabled && !skipCollaborationGuard && cancelCollaborationPopup())
+    {
+        // 协作弹窗已取消，重试一次识别点击
+        result = yoloRecognizesAndClickImpl(threshold, randomClick, targetLabelName, exclude);
+    }
+    return result;
+}
+
+QString ScriptActions::yoloRecognizesAndClickImpl(const double threshold, const bool randomClick, const QString& targetLabelName,
+                                                  const ClickExclude& exclude)
 {
     cv::Mat winImg = capture::captureGameWindow();
 
@@ -1012,6 +1072,40 @@ std::vector<Detection> ScriptActions::yoloRecognizes(const double threshold)
     return final_detections;
 }
 
+void ScriptActions::setCollaborationGuardEnabled(const bool enabled)
+{
+    m_collaborationGuardEnabled = enabled;
+}
+
+bool ScriptActions::isCollaborationGuardEnabled() const
+{
+    return m_collaborationGuardEnabled;
+}
+
+bool ScriptActions::cancelCollaborationPopup()
+{
+    // 直调 Impl 绕过守卫，防止扫描点击守卫/hasCollaboration 递归
+    const QString savePath = yoloRecognizesAndClickImpl(0.50, false, QStringLiteral("common-btn-red_x_transparent"),
+                                                        ClickExclude{});
+    if (savePath.isEmpty())
+    {
+        return false;
+    }
+    Logger::log(QString("点击取消协作"));
+    core::waitWithEventProcessing(1000);
+    return true;
+}
+
+bool ScriptActions::hasCollaboration()
+{
+    if (cancelCollaborationPopup())
+    {
+        return true;
+    }
+    core::waitWithEventProcessing(500);
+    return false;
+}
+
 /**
  * @param threshold 得分
  * @param targetLabels 需要包含的标签列表
@@ -1097,7 +1191,20 @@ void ScriptActions::clickDetection(const Detection& det, bool randomClick, const
 }
 
 QString ScriptActions::clickFirstDetectionByLabels(const QStringList& targetLabels, double threshold,
-                                                   bool randomClick, const ClickExclude& exclude)
+                                                   bool randomClick, const ClickExclude& exclude,
+                                                   const bool skipCollaborationGuard)
+{
+    QString result = clickFirstDetectionByLabelsImpl(targetLabels, threshold, randomClick, exclude);
+    if (result.isEmpty() && m_collaborationGuardEnabled && !skipCollaborationGuard && cancelCollaborationPopup())
+    {
+        // 协作弹窗已取消，重试一次识别点击
+        result = clickFirstDetectionByLabelsImpl(targetLabels, threshold, randomClick, exclude);
+    }
+    return result;
+}
+
+QString ScriptActions::clickFirstDetectionByLabelsImpl(const QStringList& targetLabels, double threshold,
+                                                       bool randomClick, const ClickExclude& exclude)
 {
     // 只截图/识别一次，按 targetLabels 的填入顺序作为优先级，命中哪个就点哪个（只点一次）
     const auto detections = yoloRecognizes(threshold);
@@ -1115,9 +1222,11 @@ QString ScriptActions::clickFirstDetectionByLabels(const QStringList& targetLabe
 }
 
 bool ScriptActions::clickDetectionByLabel(const QString& targetLabel, double threshold,
-                                          bool randomClick, const ClickExclude& exclude)
+                                          bool randomClick, const ClickExclude& exclude,
+                                          const bool skipCollaborationGuard)
 {
-    return !clickFirstDetectionByLabels(QStringList{targetLabel}, threshold, randomClick, exclude).isEmpty();
+    return !clickFirstDetectionByLabels(QStringList{targetLabel}, threshold, randomClick, exclude,
+                                        skipCollaborationGuard).isEmpty();
 }
 
 // 智能路径处理：绝对路径直接使用，相对路径拼接基础路径

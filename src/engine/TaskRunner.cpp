@@ -153,7 +153,10 @@ QString TaskRunner::executeStep(const QJsonObject& step)
         }
 
         case ConfigTypeEnum::SYSTEM_MITAMA: {
+                // 御魂方案开启协作弹窗守卫：识别点击失败时自动扫协作弹窗并重试一次，执行完关闭
+                actions.setCollaborationGuardEnabled(true);
                 savePath = scenarios::executeMitama() ? QStringLiteral("system-ok") : QString();
+                actions.setCollaborationGuardEnabled(false);
                 break;
         }
 

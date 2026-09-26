@@ -84,10 +84,12 @@ public:
     // colorCheck 为是否做 HSV 颜色校验（用于区分同形状不同色的模板）
     // exclude 为随机点击时排除的边框区域比例，仅在 randomClick=true 时生效
     QString opencvRecognizesAndClick(const QString& templPath, double threshold, bool randomClick,
-                                     bool colorCheck = false, const ClickExclude& exclude = ClickExclude{});
+                                     bool colorCheck = false, const ClickExclude& exclude = ClickExclude{},
+                                     bool skipCollaborationGuard = false);
     QString opencvRecognizesAndClickByBase64(const QString& base64, double threshold, bool randomClick,
                                              bool colorCheck = false, const cv::Size& captureSize = cv::Size(),
-                                             const ClickExclude& exclude = ClickExclude{});
+                                             const ClickExclude& exclude = ClickExclude{},
+                                             bool skipCollaborationGuard = false);
 
     // OpenCV 多目标识别：找出截图中所有匹配模板的区域，回显带 ROI 框的结果图，不点击。
     // 返回所有匹配结果（DX11 原始捕获坐标系），按分数降序排列，供调用方做下一步判断。
@@ -102,12 +104,14 @@ public:
                              ocr::Enhance enhance = ocr::Enhance::Upscale);
     QString ocrRecognizesAndClick(const QString& ocrText, double threshold, bool randomClick,
                                   const QRectF& roiPercent = QRectF(),
-                                  ocr::Enhance enhance = ocr::Enhance::Upscale);
+                                  ocr::Enhance enhance = ocr::Enhance::Upscale,
+                                  bool skipCollaborationGuard = false);
     // 单次 OCR 识别，多个文字按填入顺序作为优先级，命中首个即点击并返回命中的文字，
     // 全部未命中返回空。用于「只识别一次、多关键字择一点击」的场景。
     QString ocrRecognizesAndClickAny(const QStringList& ocrTexts, double threshold, bool randomClick,
                                      const QRectF& roiPercent = QRectF(),
-                                     ocr::Enhance enhance = ocr::Enhance::Upscale);
+                                     ocr::Enhance enhance = ocr::Enhance::Upscale,
+                                     bool skipCollaborationGuard = false);
 
     // 判断区域内是否出现目标文字（纯检测，不点击）：
     // 识别结果与 ocrText 完全相等（== 全等匹配，非子串）且分数 >= threshold 时返回 true；
@@ -119,26 +123,42 @@ public:
     // 按百分比区域直接点击（无任何识别）：roiPercent 为点击区域（左/上/宽/高，单位为图片尺寸的百分比 0~100），
     // randomClick 为 true 时在矩形内随机取点，否则点击矩形中心。
     // 成功返回带区域框和点击标记的结果图路径，截图失败或区域无效返回空。
-    QString clickInRoi(const QRectF& roiPercent, bool randomClick = true);
+    // 开启协作弹窗守卫时，点击前会先扫协作弹窗并取消（无识别无法以失败信号发现遮挡，故改为事前清理）
+    QString clickInRoi(const QRectF& roiPercent, bool randomClick = true,
+                       bool skipCollaborationGuard = false);
 
     // YOLO 识别（纯识别，不点击）。返回所有检测结果，由调用方决定如何处理
     std::vector<Detection> yoloRecognizes(double threshold);
     // YOLO 是否包含指定标签；matchAll 为 false 时任一标签命中即返回 true
     bool yoloContainsLabels(double threshold, const QStringList& targetLabels, bool matchAll = false);
     QString yoloRecognizesAndClick(double threshold, bool randomClick, const QString& targetLabelName,
-                                   const ClickExclude& exclude = ClickExclude{});
+                                   const ClickExclude& exclude = ClickExclude{},
+                                   bool skipCollaborationGuard = false);
 
     // 在 YOLO 识别结果中点击指定标签，成功返回 true
     // exclude 为随机点击时排除的边框区域比例，仅在 randomClick=true 时生效
     bool clickDetectionByLabel(const QString& targetLabel, double threshold,
                                bool randomClick = true,
-                               const ClickExclude& exclude = ClickExclude{});
+                               const ClickExclude& exclude = ClickExclude{},
+                               bool skipCollaborationGuard = false);
     // 单次 YOLO 识别，多个标签按填入顺序作为优先级，命中首个即点击并返回命中的标签，
     // 全部未命中返回空。用于「只识别一次、多标签择一点击」的场景。
     QString clickFirstDetectionByLabels(const QStringList& targetLabels, double threshold,
                                         bool randomClick = true,
-                                        const ClickExclude& exclude = ClickExclude{});
+                                        const ClickExclude& exclude = ClickExclude{},
+                                        bool skipCollaborationGuard = false);
     static bool hasDetectionWithLabel(const std::vector<Detection>& detections, const QString& targetLabel);
+
+    // 协作弹窗守卫开关（默认关闭）：开启后各「识别+点击」方法在识别失败时自动做
+    // 「扫协作弹窗 → 取消 → 重试一次」；clickInRoi 无识别、无失败信号，改为点击前先扫协作弹窗。
+    // 需要处理协作邀请的场景/任务显式开启，用完关闭，避免影响其他场景与编辑器步骤测试。
+    // 单次调用想跳过守卫时，调用各点击方法时末尾传 skipCollaborationGuard=true，不影响全局开关
+    void setCollaborationGuardEnabled(bool enabled);
+    bool isCollaborationGuardEnabled() const;
+
+    // 协作弹窗检查（显式调用，不受守卫开关影响，供场景在流程节点前清场、等待超时后兜底扫描）：
+    // 命中协作弹窗则点击取消并等待 1s，返回 true；未命中等待 500ms 后返回 false
+    bool hasCollaboration();
 
     // 发射信号让 UI 显示识别结果图
     void processAndShowImage(const QString& imagePath);
@@ -155,6 +175,25 @@ signals:
 private:
     ScriptActions() = default;
 
+    // 协作弹窗取消核心：YOLO 识别并点击 common-btn-red_x_transparent（阈值 0.50），
+    // 命中则记录日志并等待 1s，返回 true；未命中返回 false 且不额外等待。
+    // 供扫描点击守卫与 hasCollaboration 使用；直调 yoloRecognizesAndClickImpl 防止递归
+    bool cancelCollaborationPopup();
+
+    // 「识别+点击」的原始实现（无弹窗守卫）。公有方法统一包装为
+    // （仅当 m_collaborationGuardEnabled 开启时生效）：
+    // 失败 → cancelCollaborationPopup() 命中（弹窗已取消）→ 原始实现重试一次
+    QString yoloRecognizesAndClickImpl(double threshold, bool randomClick, const QString& targetLabelName,
+                                       const ClickExclude& exclude);
+    QString opencvRecognizesAndClickImpl(const QString& templPath, double threshold, bool randomClick,
+                                         bool colorCheck, const ClickExclude& exclude);
+    QString ocrRecognizesAndClickImpl(const QString& ocrText, double threshold, bool randomClick,
+                                      const QRectF& roiPercent, ocr::Enhance enhance);
+    QString ocrRecognizesAndClickAnyImpl(const QStringList& ocrTexts, double threshold, bool randomClick,
+                                         const QRectF& roiPercent, ocr::Enhance enhance);
+    QString clickFirstDetectionByLabelsImpl(const QStringList& targetLabels, double threshold,
+                                            bool randomClick, const ClickExclude& exclude);
+
     static QString resolveTemplatePath(const QString& templatePath, const QString& basePath);
 
     // 命中某个 YOLO 检测框后：画框、保存调试图、回显并点击
@@ -170,6 +209,9 @@ private:
     // 关闭时只存内存并回显内存 key，替代每次识别的磁盘 IO。
     // 返回值：文件模式为结果图路径，内存模式为 memoryResultKey()；非空均表示成功
     QString saveResultAndShow(const cv::Mat& resultImg);
+
+    // 协作弹窗守卫开关：默认关闭，开启后扫描点击方法识别失败时自动扫协作弹窗并重试一次
+    bool m_collaborationGuardEnabled = false;
 
     // persistScreenshot 关闭时缓存最近一次的结果图，供 UI 内存回显
     cv::Mat m_memoryResultImage;

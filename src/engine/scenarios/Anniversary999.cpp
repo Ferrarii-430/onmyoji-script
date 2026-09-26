@@ -29,7 +29,7 @@ namespace scenarios {
         Logger::log(QString("开始执行十周年999"));
         QString screenshotPath = AppPaths::instance().screenshotPath();
 
-        hasCollaboration();
+        actions.hasCollaboration();
 
         //步骤0 判断是否锁定
         if (!anniversary_isCastingLocked)
@@ -40,7 +40,7 @@ namespace scenarios {
                 Logger::log(QString("点击【阵容锁定】"));
             }else
             {
-                if (hasCollaboration())
+                if (actions.hasCollaboration())
                 {
                     QString savePathCommonUnlockRe = actions.opencvRecognizesAndClick(screenshotPath + "anniversary-unlock.png", 0.75, false, true);
                     if (!savePathCommonUnlockRe.isEmpty())
@@ -54,7 +54,7 @@ namespace scenarios {
             waitRandomWithEventProcessing(1000,200);
         }
 
-        hasCollaboration();
+        actions.hasCollaboration();
 
         //步骤1 点击挑战进入战斗
         constexpr ClickExclude openCvAnniversaryChallengeRecordExclude{0.1, 0.1, 0.1, 0.1};
@@ -64,7 +64,7 @@ namespace scenarios {
             Logger::log(QString("点击【挑战】成功"));
         }else
         {
-            if (!hasCollaboration())
+            if (!actions.hasCollaboration())
             {
                 Logger::log(QString("点击【挑战】失败"));
                 return false;
@@ -102,7 +102,7 @@ namespace scenarios {
         }
         if (!isEngageInBattle)
         {
-            if (!hasCollaboration())
+            if (!actions.hasCollaboration())
             {
                 Logger::log(QString("等待进入战斗场景超时"));
                 return false;
@@ -131,7 +131,7 @@ namespace scenarios {
         }
         if (!isBattleOfEnd)
         {
-            if (!hasCollaboration())
+            if (!actions.hasCollaboration())
             {
                 Logger::log(QString("等待战斗结束超时"));
                 return false;
@@ -148,7 +148,7 @@ namespace scenarios {
             Logger::log(QString("已识别到【获得奖励】"));
         }else
         {
-            hasCollaboration();
+            actions.hasCollaboration();
         }
 
         //步骤5 跳过获得奖励
@@ -178,21 +178,5 @@ namespace scenarios {
         return true;
     }
 
-
-    //判断是否有协作
-    bool hasCollaboration()
-    {
-        ScriptActions& actions = ScriptActions::instance();
-        QString path = actions.yoloRecognizesAndClick(0.50, false, "common-btn-red_x_transparent");
-        // actions.yoloContainsLabels(0.50, {"common-btn-red_x_solid", "common-btn-red_x_transparent"}, false);
-        if (!path.isEmpty())
-        {
-            Logger::log(QString("点击取消协作"));
-            waitWithEventProcessing(1000);
-            return true;
-        }
-        waitWithEventProcessing(500);
-        return false;
-    }
 
 } // namespace scenarios
