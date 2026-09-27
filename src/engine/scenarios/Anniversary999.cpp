@@ -1,5 +1,7 @@
 #include "Anniversary999.h"
 
+#include "ScenarioRegistry.h"
+
 #include <QJsonObject>
 #include <QRandomGenerator>
 #include <QString>
@@ -178,5 +180,8 @@ namespace scenarios {
         return true;
     }
 
+    // 注册为系统方案：TaskRunner 按注册表调度（注册方式见 ScenarioRegistry.h）。
+    // 当前 config.json 未包含该方案，处于休眠状态；恢复使用只需把方案条目加回 config.json。
+    REGISTER_SCENARIO("SYSTEM_ANNIVERSARY_999", executeAnniversary999, resetAnniversary999Status, false)
 
 } // namespace scenarios

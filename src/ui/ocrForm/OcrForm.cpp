@@ -70,6 +70,7 @@ void OcrForm::loadFromJson(const QString &configId, const QJsonObject &obj)
     ui->ocrTextEdit->setText(obj["ocrText"].toString());
     ui->spinScoreBox->setValue(obj["score"].toDouble());
     ui->randomClickCheckBox->setChecked(obj["randomClick"].toBool());
+    ui->autoCancelCollabCheckBox->setChecked(obj["autoCancelCollab"].toBool(false));
 
     // 识别区域（百分比）；旧配置无该字段时默认整张图片
     ui->roiXBox->setValue(obj["ocrRoiX"].toDouble(0.0));
@@ -226,6 +227,7 @@ QJsonObject OcrForm::toJson() const {
     obj["ocrText"] = ui->ocrTextEdit->text();
     obj["score"] = ui->spinScoreBox->value();
     obj["randomClick"] = ui->randomClickCheckBox->isChecked();
+    obj["autoCancelCollab"] = ui->autoCancelCollabCheckBox->isChecked();
     obj["ocrRoiX"] = ui->roiXBox->value();
     obj["ocrRoiY"] = ui->roiYBox->value();
     obj["ocrRoiW"] = ui->roiWBox->value();

@@ -68,6 +68,7 @@ void TypeOpenCVForm::loadFromJson(const QString &configId, const QJsonObject &ob
     ui->spinScoreBox->setValue(obj["score"].toDouble());
     ui->randomClickCheckBox->setChecked(obj["randomClick"].toBool());
     ui->colorCheckCheckBox->setChecked(obj["colorCheck"].toBool());
+    ui->autoCancelCollabCheckBox->setChecked(obj["autoCancelCollab"].toBool(false));
     // 比值(0~0.9) -> 百分比(0~90)
     ui->excludeLeftBox->setValue(qRound(obj["excludeLeft"].toDouble(0.0) * 100.0));
     ui->excludeRightBox->setValue(qRound(obj["excludeRight"].toDouble(0.0) * 100.0));
@@ -156,6 +157,7 @@ QJsonObject TypeOpenCVForm::toJson() const {
     obj["score"] = ui->spinScoreBox->value();
     obj["randomClick"] = ui->randomClickCheckBox->isChecked();
     obj["colorCheck"] = ui->colorCheckCheckBox->isChecked();
+    obj["autoCancelCollab"] = ui->autoCancelCollabCheckBox->isChecked();
     // 百分比(0~90) -> 比值(0~0.9)，保留两位小数，避免浮点尾数（如 0.15000000000000002）
     auto percentToRatio = [](double percent) {
         return QString::number(percent / 100.0, 'f', 2).toDouble();

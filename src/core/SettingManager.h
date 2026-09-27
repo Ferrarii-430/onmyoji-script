@@ -29,6 +29,8 @@ public:
     QString getScreenshotMode() const { return m_screenshotMode; }
     QString getMouseClickMode() const { return m_mouseClickMode; }
     bool getPersistScreenshot() const { return m_persistScreenshot; }
+    // 全局「自动协作关闭」：任务运行期间所有识别点击失败时自动扫协作弹窗并重试一次
+    bool getGlobalAutoCancelCollab() const { return m_globalAutoCancelCollab; }
 
     // 获取原始JSON对象（用于扩展）
     QJsonObject getRawConfig() const { return m_config; }
@@ -57,6 +59,8 @@ private:
     // 是否将截图持久化为 PNG 文件；默认值与出厂 setting.json (false) 对齐，
     // 避免配置缺失该字段时退化为开启、每次识别都产生磁盘 IO
     bool m_persistScreenshot = false;
+    // 全局「自动协作关闭」，默认关闭；缺失字段时保持关闭
+    bool m_globalAutoCancelCollab = false;
 };
 
 // 全局访问宏

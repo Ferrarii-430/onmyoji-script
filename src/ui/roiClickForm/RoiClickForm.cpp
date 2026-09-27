@@ -63,6 +63,7 @@ void RoiClickForm::loadFromJson(const QString &configId, const QJsonObject &obj)
     stepDataCopy = obj;
     ui->lineTaskNameEdit->setText(obj["taskName"].toString());
     ui->randomClickCheckBox->setChecked(obj["randomClick"].toBool(true));
+    ui->autoCancelCollabCheckBox->setChecked(obj["autoCancelCollab"].toBool(false));
 
     // 点击区域（百分比）；旧配置无该字段时默认整张图片
     ui->roiXBox->setValue(obj["clickRoiX"].toDouble(0.0));
@@ -186,6 +187,7 @@ QJsonObject RoiClickForm::toJson() const {
     obj["type"] = "CLICK_ROI";
     obj["taskName"] = ui->lineTaskNameEdit->text();
     obj["randomClick"] = ui->randomClickCheckBox->isChecked();
+    obj["autoCancelCollab"] = ui->autoCancelCollabCheckBox->isChecked();
     obj["clickRoiX"] = ui->roiXBox->value();
     obj["clickRoiY"] = ui->roiYBox->value();
     obj["clickRoiW"] = ui->roiWBox->value();

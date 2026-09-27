@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>400</width>
-    <height>300</height>
+    <height>430</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -17,7 +17,7 @@
    <property name="geometry">
     <rect>
      <x>120</x>
-     <y>260</y>
+     <y>385</y>
      <width>171</width>
      <height>31</height>
     </rect>
@@ -45,7 +45,7 @@
      <x>50</x>
      <y>20</y>
      <width>301</width>
-     <height>211</height>
+     <height>287</height>
     </rect>
    </property>
    <layout class="QFormLayout" name="formLayout">
@@ -110,6 +110,60 @@
      <widget class="QCheckBox" name="persistScreenshot">
       <property name="text">
        <string>保存截图到文件</string>
+      </property>
+     </widget>
+    </item>
+    <item row="5" column="0">
+     <widget class="QLabel" name="label_6">
+      <property name="text">
+       <string>方案配置</string>
+      </property>
+     </widget>
+    </item>
+    <item row="5" column="1">
+     <layout class="QHBoxLayout" name="configIoLayout">
+      <property name="spacing">
+       <number>20</number>
+      </property>
+      <item>
+       <widget class="QToolButton" name="configExportBtn">
+        <property name="toolTip">
+         <string>导出当前全部方案配置到文件</string>
+        </property>
+        <property name="text">
+         <string>导出配置</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QToolButton" name="configImportBtn">
+        <property name="toolTip">
+         <string>从文件导入方案配置（导入前自动备份当前配置）</string>
+        </property>
+        <property name="text">
+         <string>导入配置</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+    <item row="6" column="0">
+     <widget class="QLabel" name="label_7">
+      <property name="toolTip">
+       <string>开启后任务运行期间所有识别点击失败时自动扫协作邀请弹窗并关闭后重试一次（影响全部方案与步骤，步骤内勾选仍可单独生效）</string>
+      </property>
+      <property name="text">
+       <string>自动协作关闭</string>
+      </property>
+     </widget>
+    </item>
+    <item row="6" column="1">
+     <widget class="QCheckBox" name="globalAutoCancelCollab">
+      <property name="toolTip">
+       <string>开启后任务运行期间所有识别点击失败时自动扫协作邀请弹窗并关闭后重试一次（影响全部方案与步骤，步骤内勾选仍可单独生效）</string>
+      </property>
+      <property name="text">
+       <string>全局开启</string>
       </property>
      </widget>
     </item>

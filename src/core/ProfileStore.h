@@ -49,4 +49,22 @@ QJsonValue getSystemConfigValue(const QString &configId, const QString &key,
 // 更新某方案某 key 的配置值并写回文件(只改 value，不动控件描述)
 void updateSystemConfigValue(const QString &filePath, const QString &configId,
                              const QString &key, const QJsonValue &value);
+
+// ------------------------------
+// 配置导出 / 导入（带版本校验）
+// ------------------------------
+// 当前配置格式版本：config.json 本体保持裸数组格式不变，版本号仅写入导出文件。
+// 新增配置字段时递增此值；导入低版本文件时缺失字段由各读取处的默认值兜底
+// （如 TaskRunner 的 step["excludeLeft"].toDouble(0.0)），只降级不崩溃。
+constexpr int kConfigVersion = 1;
+
+// 导出当前全部方案到 targetFilePath（带 app/appVersion/configVersion/exportedAt/programs 包装）。
+// 成功返回空字符串，失败返回错误信息（用于 UI 弹窗提示）
+QString exportConfigToFile(const QString &targetFilePath);
+
+// 从 sourceFilePath 导入方案并整体替换当前 config.json（导入前自动备份原文件为
+// config.json.bak）。兼容导出包装格式与裸数组（旧版配置原文）两种文件。
+// 版本校验：文件版本高于程序支持时拒绝导入；成功后 m_configArray 已刷新，
+// 失败返回错误信息且原配置不受影响
+QString importConfigFromFile(const QString &sourceFilePath);
 #endif //COMMON_H

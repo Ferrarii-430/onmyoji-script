@@ -139,11 +139,9 @@ add_executable(qtTest WIN32
         src/ui/ocrForm/OcrForm.h
         src/ui/ocrForm/RoiPreviewWidget.cpp
         src/ui/ocrForm/RoiPreviewWidget.h
-        src/ui/ocrForm/ui_OcrForm.h
         src/ui/roiClickForm/RoiClickForm.cpp
         src/ui/roiClickForm/RoiClickForm.h
         src/ui/roiClickForm/RoiClickForm.ui
-        src/ui/roiClickForm/ui_RoiClickForm.h
         src/ui/yoloForm/YoloForm.cpp
         src/ui/yoloForm/YoloForm.h
         src/ui/theme/Theme.cpp
@@ -153,6 +151,8 @@ add_executable(qtTest WIN32
         src/ui/setting/settingdialog.ui
         src/engine/scenarios/Mitama.cpp
         src/engine/scenarios/Mitama.h
+        src/engine/scenarios/ScenarioRegistry.cpp
+        src/engine/scenarios/ScenarioRegistry.h
 )
 
 if(WIN32)

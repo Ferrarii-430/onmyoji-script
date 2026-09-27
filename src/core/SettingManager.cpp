@@ -99,6 +99,13 @@ bool SettingManager::parseConfig() {
         qWarning() << "配置缺少 mouseClickMode 字段或类型错误，使用默认值:" << m_mouseClickMode;
     }
 
+    // 解析全局「自动协作关闭」；旧配置缺失该字段时保持默认关闭，不刷警告日志
+    if (m_config.contains("globalAutoCancelCollab") && m_config["globalAutoCancelCollab"].isBool()) {
+        m_globalAutoCancelCollab = m_config["globalAutoCancelCollab"].toBool();
+    } else {
+        m_globalAutoCancelCollab = false;
+    }
+
     return true;
 }
 

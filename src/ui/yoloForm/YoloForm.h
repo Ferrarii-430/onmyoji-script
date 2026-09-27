@@ -29,6 +29,7 @@ private:
     QComboBox* labelBox;
     QDoubleSpinBox* spinScoreBox;
     QCheckBox* randomClickCheckBox;
+    QCheckBox* autoCancelCollabCheckBox;
     QDoubleSpinBox* excludeLeftBox;
     QDoubleSpinBox* excludeRightBox;
     QDoubleSpinBox* excludeTopBox;

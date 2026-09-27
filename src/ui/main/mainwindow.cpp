@@ -714,6 +714,21 @@ void mainwindow::onProgrammeRemoveBtnClicked()
 void mainwindow::onSettingBtnClicked()
 {
     SettingDialog dialog(this);
+    // 设置内导入方案配置成功后，刷新主窗口的方案列表与表单
+    connect(&dialog, &SettingDialog::configImported, this, [this]() {
+        commonSetCurrentItem(QString(), QString());
+        if (m_systemConfigForm) {
+            m_systemConfigForm->deleteLater();
+            m_systemConfigForm = nullptr;
+        }
+        loadListWidgetData();
+        if (m_configArray.isEmpty()) {
+            ui->tableWidget->clear();
+            ui->tableWidget->setRowCount(0);
+            ui->tableWidget->setColumnCount(0);
+            ui->currentTaskName->setText(QStringLiteral("（无方案）"));
+        }
+    });
     if (dialog.exec() == QDialog::Accepted) {
         // 设置已保存和应用
         Logger::log(QString("Setting配置已修改"));

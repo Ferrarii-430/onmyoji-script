@@ -1,4 +1,5 @@
 #include "src/engine/scenarios/Arena.h"
+#include "src/engine/scenarios/ScenarioRegistry.h"
 
 #include <limits>
 
@@ -198,5 +199,8 @@ bool getNumberOfFraction()
     return comparesEqual(parts[0], parts[1]);
     // return fraction.toInt();
 }
+
+// 注册为系统方案：TaskRunner 按注册表调度（注册方式见 ScenarioRegistry.h）
+REGISTER_SCENARIO("SYSTEM_ARENA", executeArena, nullptr, false)
 
 } // namespace scenarios

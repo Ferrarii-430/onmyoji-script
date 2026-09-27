@@ -13,11 +13,6 @@ QString getConfigTypeEnumToQStringName(ConfigTypeEnum type) {
         case ConfigTypeEnum::OCR: return "OCR识别";
         case ConfigTypeEnum::YOLO: return "YOLO";
         case ConfigTypeEnum::CLICK_ROI: return "范围点击";
-        case ConfigTypeEnum::SYSTEM_BORDER_BREAKTHROUGH: return "SYSTEM_BORDER_BREAKTHROUGH";
-        case ConfigTypeEnum::SYSTEM_ARENA: return "SYSTEM_ARENA";
-        case ConfigTypeEnum::SYSTEM_MITAMA: return "SYSTEM_MITAMA";
-        case ConfigTypeEnum::SYSTEM_BUDOKAI: return "SYSTEM_BUDOKAI";
-        case ConfigTypeEnum::SYSTEM_ANNIVERSARY_999: return "SYSTEM_ANNIVERSARY_999";
         default: return "未知";
     }
 }
@@ -44,21 +39,6 @@ ConfigTypeEnum stringToConfigType(const QString& typeStr) {
     if (typeStr.compare("CLICK_ROI", Qt::CaseInsensitive) == 0) {
         return ConfigTypeEnum::CLICK_ROI;
     }
-    if (typeStr.compare("SYSTEM_BORDER_BREAKTHROUGH", Qt::CaseInsensitive) == 0) {
-        return ConfigTypeEnum::SYSTEM_BORDER_BREAKTHROUGH;
-    }
-    if (typeStr.compare("SYSTEM_ARENA", Qt::CaseInsensitive) == 0) {
-        return ConfigTypeEnum::SYSTEM_ARENA;
-    }
-    if (typeStr.compare("SYSTEM_MITAMA", Qt::CaseInsensitive) == 0) {
-        return ConfigTypeEnum::SYSTEM_MITAMA;
-    }
-    if (typeStr.compare("SYSTEM_BUDOKAI", Qt::CaseInsensitive) == 0) {
-        return ConfigTypeEnum::SYSTEM_BUDOKAI;
-    }
-    if (typeStr.compare("SYSTEM_ANNIVERSARY_999", Qt::CaseInsensitive) == 0) {
-        return ConfigTypeEnum::SYSTEM_ANNIVERSARY_999;
-    }
     return ConfigTypeEnum::UNKNOWN;
 }
 
@@ -70,11 +50,6 @@ QString configTypeToQString(ConfigTypeEnum type) {
         case ConfigTypeEnum::OCR: return "OCR";
         case ConfigTypeEnum::YOLO: return "YOLO";
         case ConfigTypeEnum::CLICK_ROI: return "CLICK_ROI";
-        case ConfigTypeEnum::SYSTEM_BORDER_BREAKTHROUGH: return "SYSTEM_BORDER_BREAKTHROUGH";
-        case ConfigTypeEnum::SYSTEM_ARENA: return "SYSTEM_ARENA";
-        case ConfigTypeEnum::SYSTEM_MITAMA: return "SYSTEM_MITAMA";
-        case ConfigTypeEnum::SYSTEM_BUDOKAI: return "SYSTEM_BUDOKAI";
-        case ConfigTypeEnum::SYSTEM_ANNIVERSARY_999: return "SYSTEM_ANNIVERSARY_999";
         default: return "UNKNOWN";
     }
 }

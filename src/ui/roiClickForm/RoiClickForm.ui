@@ -169,13 +169,30 @@
      <widget class="QComboBox" name="stepInputBox"/>
     </item>
     <item row="6" column="0">
+     <widget class="QLabel" name="autoCancelCollabLabel">
+      <property name="toolTip">
+       <string>开启后本步骤点击前自动扫描协作邀请弹窗并点击关闭，避免点到弹窗上（仅当前步骤生效，非全局）</string>
+      </property>
+      <property name="text">
+       <string>自动协作关闭</string>
+      </property>
+     </widget>
+    </item>
+    <item row="6" column="1">
+     <widget class="QCheckBox" name="autoCancelCollabCheckBox">
+      <property name="text">
+       <string/>
+      </property>
+     </widget>
+    </item>
+    <item row="7" column="0">
      <widget class="QLabel" name="previewLabel">
       <property name="text">
        <string>预览</string>
       </property>
      </widget>
     </item>
-    <item row="6" column="1">
+    <item row="7" column="1">
      <layout class="QHBoxLayout" name="previewBtnLayout">
       <property name="spacing">
        <number>8</number>
@@ -199,7 +216,7 @@
       </item>
      </layout>
     </item>
-    <item row="7" column="0" colspan="2">
+    <item row="8" column="0" colspan="2">
      <widget class="RoiPreviewWidget" name="roiPreview" native="true">
       <property name="sizePolicy">
        <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
@@ -221,7 +238,7 @@
       </property>
      </widget>
     </item>
-    <item row="8" column="0" colspan="2">
+    <item row="9" column="0" colspan="2">
      <spacer name="bottomSpacer">
       <property name="orientation">
        <enum>Qt::Vertical</enum>

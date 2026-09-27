@@ -5,14 +5,17 @@
 #include "src/core/ProfileStore.h"
 #include <qcoreapplication.h>
 #include "string"
+#include <QDateTime>
 #include <QDir>
 #include <QJsonArray>
+#include <QJsonDocument>
 #include <QJsonObject>
 #include <QPixmap>
 #include <QSaveFile>
 #include <QString>
 
 #include "src/core/AppPaths.h"
+#include "src/core/AppVersion.h"
 #include "src/core/Logger.h"
 #include "src/vision/TemplateMatcher.h"
 
@@ -350,6 +353,127 @@ void updateSystemConfigValue(const QString &filePath, const QString &configId,
     if (saveJsonAtomically(filePath, rootArray)) {
         Logger::log("已更新系统方案配置: " + key);
     }
+}
+
+// ------------------------------
+// 配置导出 / 导入（带版本校验）
+// ------------------------------
+QString exportConfigToFile(const QString &targetFilePath)
+{
+    if (targetFilePath.isEmpty()) {
+        return QStringLiteral("导出路径为空");
+    }
+
+    // 导出包装格式：{ app, appVersion, configVersion, exportedAt, programs:[...] }，
+    // programs 为 config.json 的原始数组内容；版本号供导入时做兼容校验
+    QJsonObject wrapper;
+    wrapper["app"] = QStringLiteral("onmyoji-script");
+    wrapper["appVersion"] = APP_VERSION;
+    wrapper["configVersion"] = kConfigVersion;
+    wrapper["exportedAt"] = QDateTime::currentDateTime().toString(QStringLiteral("yyyy-MM-dd hh:mm:ss"));
+    wrapper["programs"] = getLastConfigJSON(); // 先 refreshConfig 再取，保证导出最新内容
+
+    QSaveFile file(targetFilePath);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        return QStringLiteral("无法打开导出文件: %1").arg(targetFilePath);
+    }
+    QJsonDocument doc(wrapper);
+    file.write(doc.toJson(QJsonDocument::Indented));
+    if (!file.commit()) {
+        return QStringLiteral("写入导出文件失败: %1").arg(targetFilePath);
+    }
+
+    Logger::log(QStringLiteral("配置导出成功: %1（共 %2 个方案，配置版本 v%3）")
+                    .arg(targetFilePath)
+                    .arg(wrapper["programs"].toArray().size())
+                    .arg(kConfigVersion));
+    return QString();
+}
+
+QString importConfigFromFile(const QString &sourceFilePath)
+{
+    QFile file(sourceFilePath);
+    if (!file.exists()) {
+        return QStringLiteral("导入文件不存在: %1").arg(sourceFilePath);
+    }
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        return QStringLiteral("无法打开导入文件: %1").arg(sourceFilePath);
+    }
+    const QByteArray data = file.readAll();
+    file.close();
+
+    const QJsonDocument doc = QJsonDocument::fromJson(data);
+    if (doc.isNull()) {
+        return QStringLiteral("文件不是有效的 JSON: %1").arg(sourceFilePath);
+    }
+
+    // 兼容两种导入格式：
+    // 1. 本程序导出的包装对象 { configVersion, programs:[...] }
+    // 2. 裸数组：旧版/手工备份的 config.json 原文，视为无版本的低版本配置
+    QJsonArray programs;
+    int fileVersion = 0;
+    if (doc.isArray()) {
+        programs = doc.array();
+    } else if (doc.isObject()) {
+        const QJsonObject wrapper = doc.object();
+        fileVersion = wrapper["configVersion"].toInt(0);
+        programs = wrapper["programs"].toArray();
+    } else {
+        return QStringLiteral("无法识别的配置格式（既不是数组也不是对象）");
+    }
+
+    // 版本校验：高于程序支持的版本可能包含未知语义的字段，直接拒绝
+    if (fileVersion > kConfigVersion) {
+        return QStringLiteral("配置版本过高（文件 v%1 > 程序支持 v%2），请先升级程序后再导入")
+                   .arg(fileVersion).arg(kConfigVersion);
+    }
+
+    // 基本校验：每个方案必须是带非空 id 的对象，防止误导入任意 JSON 破坏配置
+    for (const QJsonValue &val : programs) {
+        if (!val.isObject() || val.toObject()["id"].toString().isEmpty()) {
+            return QStringLiteral("配置内容无效：存在缺少 id 的方案条目");
+        }
+    }
+
+    const QString configPath = AppPaths::instance().configPath();
+
+    // 导入前备份当前配置，出问题可用 config.json.bak 手动还原
+    if (QFile::exists(configPath)) {
+        const QString backupPath = configPath + QStringLiteral(".bak");
+        QFile::remove(backupPath);
+        if (!QFile::copy(configPath, backupPath)) {
+            return QStringLiteral("备份当前配置失败，已取消导入（原配置未改动）");
+        }
+    }
+
+    if (!saveJsonAtomically(configPath, programs)) {
+        return QStringLiteral("写入配置文件失败（原配置未改动）");
+    }
+
+    refreshConfig();
+
+    if (fileVersion < kConfigVersion) {
+        Logger::log(QStringLiteral("已导入低版本配置（文件 v%1，程序 v%2），缺失字段将按各处默认值处理")
+                        .arg(fileVersion).arg(kConfigVersion));
+    }
+
+    // 模板图片不随 config.json 导出，引用模板的步骤需要手动补齐图片
+    int imageRefs = 0;
+    for (const QJsonValue &val : programs) {
+        for (const QJsonValue &stepVal : val.toObject()["steps"].toArray()) {
+            if (!stepVal.toObject()["imagePath"].toString().isEmpty()) {
+                ++imageRefs;
+            }
+        }
+    }
+    if (imageRefs > 0) {
+        Logger::log(QStringLiteral("提示：共 %1 个步骤引用 OpenCV 模板图片，模板不随配置导出，"
+                                   "请手动拷贝 src/resource/screenshot 下的对应模板文件").arg(imageRefs));
+    }
+
+    Logger::log(QStringLiteral("配置导入成功: %1（共 %2 个方案，原配置已备份为 config.json.bak）")
+                    .arg(sourceFilePath).arg(programs.size()));
+    return QString();
 }
 
 QJsonValue safeValue(const QJsonObject &obj, const QString &key) {

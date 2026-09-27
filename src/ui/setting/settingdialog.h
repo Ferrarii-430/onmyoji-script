@@ -23,6 +23,12 @@ private slots:
     void initSetting() const;  // 初始化设置显示
     void onSaveClicked();      // 保存配置
     void onCancelClicked();    // 取消
+    void onConfigExportClicked(); // 导出方案配置到文件
+    void onConfigImportClicked(); // 从文件导入方案配置
+
+signals:
+    // 设置内导入方案配置成功后发出，主窗口据此刷新方案列表与表单
+    void configImported();
 
 private:
     Ui::SettingDialog *ui;

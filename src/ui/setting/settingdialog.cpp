@@ -6,15 +6,19 @@
 
 #include "settingdialog.h"
 
+#include <QDateTime>
 #include <QDir>
+#include <QFileDialog>
 #include <QLabel>
 #include <QMessageBox>
 #include <QSaveFile>
 
 #include "src/core/AppPaths.h"
 #include "src/core/Logger.h"
+#include "src/core/ProfileStore.h"
 #include "src/core/SettingManager.h"
 #include "src/core/UpdateChecker.h"
+#include "src/engine/TaskRunner.h"
 #include "ui_SettingDialog.h"
 
 
@@ -31,7 +35,7 @@ SettingDialog::SettingDialog(QWidget *parent) :
     githubLink->setOpenExternalLinks(true);
     githubLink->setCursor(Qt::PointingHandCursor);
     githubLink->setToolTip("点击在浏览器中打开项目主页");
-    githubLink->setGeometry(120, 210, 171, 20);
+    githubLink->setGeometry(120, 320, 171, 20);
     githubLink->setAlignment(Qt::AlignCenter);
 
     // 手动检查更新链接：调用 UpdateChecker 立即向 Gitee 查询最新发行版。
@@ -41,7 +45,7 @@ SettingDialog::SettingDialog(QWidget *parent) :
                              "style=\"color:#5b6cf0; text-decoration:none;\">检查更新</a>");
     checkUpdateLink->setCursor(Qt::PointingHandCursor);
     checkUpdateLink->setToolTip("立即向 Gitee 查询最新发行版");
-    checkUpdateLink->setGeometry(120, 235, 171, 20);
+    checkUpdateLink->setGeometry(120, 352, 171, 20);
     checkUpdateLink->setAlignment(Qt::AlignCenter);
     connect(checkUpdateLink, &QLabel::linkActivated, this, [this]() {
         // notifyOnNoUpdate=true：无论结果如何都弹窗提示用户
@@ -51,6 +55,8 @@ SettingDialog::SettingDialog(QWidget *parent) :
     // 连接信号槽
     connect(ui->btnSave, &QToolButton::clicked, this, &SettingDialog::onSaveClicked);
     connect(ui->btnCancel, &QToolButton::clicked, this, &SettingDialog::onCancelClicked);
+    connect(ui->configExportBtn, &QToolButton::clicked, this, &SettingDialog::onConfigExportClicked);
+    connect(ui->configImportBtn, &QToolButton::clicked, this, &SettingDialog::onConfigImportClicked);
 
     // 保存原始值
     m_originalMouseMode = SETTING_CONFIG.getMouseControlMode();
@@ -83,6 +89,7 @@ void SettingDialog::initSetting() const
     ui->screenshotMode->setCurrentText(SETTING_CONFIG.getScreenshotMode());
     ui->mouseClickMode->setCurrentText(SETTING_CONFIG.getMouseClickMode());
     ui->persistScreenshot->setChecked(SETTING_CONFIG.getPersistScreenshot());
+    ui->globalAutoCancelCollab->setChecked(SETTING_CONFIG.getGlobalAutoCancelCollab());
 
     // 根据配置值设置当前选项
     QString currentMouseMode = SETTING_CONFIG.getMouseControlMode();
@@ -129,6 +136,7 @@ void SettingDialog::onSaveClicked()
     QString screenshotMode = ui->screenshotMode->currentData().toString();
     QString mouseClickMode = ui->mouseClickMode->currentData().toString();
     bool persistScreenshot = ui->persistScreenshot->isChecked();
+    bool globalAutoCancelCollab = ui->globalAutoCancelCollab->isChecked();
 
     // 验证数据
     if (mouseSpeed < 1 || mouseSpeed > 10) {
@@ -144,6 +152,7 @@ void SettingDialog::onSaveClicked()
     config["screenshotMode"] = screenshotMode;
     config["mouseClickMode"] = mouseClickMode;
     config["persistScreenshot"] = persistScreenshot;
+    config["globalAutoCancelCollab"] = globalAutoCancelCollab;
 
     // 保存到文件
     if (saveConfigToFile(config)) {
@@ -222,4 +231,71 @@ void SettingDialog::applySettings()
 void SettingDialog::onCancelClicked()
 {
     reject(); // 关闭对话框
+}
+
+void SettingDialog::onConfigExportClicked()
+{
+    // 任务运行中方案配置可能被脚本写入，禁止导出避免导出中间状态
+    if (TaskRunner::instance().isRunning()) {
+        QMessageBox::information(this, QStringLiteral("导出配置"),
+                                 QStringLiteral("任务运行中，请先停止任务再导出配置"));
+        return;
+    }
+
+    const QString defaultName = QStringLiteral("onmyoji-config-%1.json")
+            .arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-HHmmss")));
+    const QString target = QFileDialog::getSaveFileName(
+        this, QStringLiteral("导出配置"),
+        QDir::homePath() + QStringLiteral("/") + defaultName,
+        QStringLiteral("JSON 配置 (*.json)"));
+    if (target.isEmpty()) {
+        return; // 用户取消
+    }
+
+    const QString error = exportConfigToFile(target);
+    if (error.isEmpty()) {
+        QMessageBox::information(this, QStringLiteral("导出配置"),
+                                 QStringLiteral("配置已导出到：\n%1").arg(target));
+    } else {
+        QMessageBox::warning(this, QStringLiteral("导出配置"), error);
+        Logger::log(QStringLiteral("配置导出失败: %1").arg(error));
+    }
+}
+
+void SettingDialog::onConfigImportClicked()
+{
+    if (TaskRunner::instance().isRunning()) {
+        QMessageBox::information(this, QStringLiteral("导入配置"),
+                                 QStringLiteral("任务运行中，请先停止任务再导入配置"));
+        return;
+    }
+
+    const QString source = QFileDialog::getOpenFileName(
+        this, QStringLiteral("导入配置"), QDir::homePath(),
+        QStringLiteral("JSON 配置 (*.json);;所有文件 (*)"));
+    if (source.isEmpty()) {
+        return; // 用户取消
+    }
+
+    // 导入会整体替换现有方案，二次确认防止误操作
+    const QMessageBox::StandardButton btn = QMessageBox::question(
+        this, QStringLiteral("导入配置"),
+        QStringLiteral("导入将用文件中的方案【整体替换】当前全部方案，\n"
+                       "原配置会自动备份为 config.json.bak。\n确定继续吗？"),
+        QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+    if (btn != QMessageBox::Yes) {
+        return;
+    }
+
+    const QString error = importConfigFromFile(source);
+    if (!error.isEmpty()) {
+        QMessageBox::warning(this, QStringLiteral("导入配置"), error);
+        Logger::log(QStringLiteral("配置导入失败: %1").arg(error));
+        return;
+    }
+
+    // 通知主窗口刷新方案列表与表单
+    emit configImported();
+    QMessageBox::information(this, QStringLiteral("导入配置"),
+                             QStringLiteral("配置导入成功，方案列表已刷新。"));
 }

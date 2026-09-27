@@ -10,12 +10,9 @@
 #include "src/core/ConfigTypeEnum.h"
 #include "src/core/EventLoopUtils.h"
 #include "src/core/Logger.h"
+#include "src/core/SettingManager.h"
 #include "src/engine/ScriptActions.h"
-#include "src/engine/scenarios/Arena.h"
-#include "src/engine/scenarios/Anniversary999.h"
-#include "src/engine/scenarios/BorderBreakthrough.h"
-#include "src/engine/scenarios/Budokai.h"
-#include "src/engine/scenarios/Mitama.h"
+#include "src/engine/scenarios/ScenarioRegistry.h"
 #include "src/game/GameWindow.h"
 #include "src/game/capture/CaptureService.h"
 
@@ -35,8 +32,32 @@ QString TaskRunner::executeStep(const QJsonObject& step)
 {
     ScriptActions& actions = ScriptActions::instance();
     QString typeStr = step["type"].toString();
-    ConfigTypeEnum type = stringToConfigType(typeStr);
     QString savePath;
+
+    // 全局「自动协作关闭」（设置页持久化开关）作为守卫基线：每个步骤开始时恢复到基线，
+    // 读取的是内存缓存，任务运行中在设置页保存也能即时生效
+    const bool globalCollabGuard = SETTING_CONFIG.getGlobalAutoCancelCollab();
+    actions.setCollaborationGuardEnabled(globalCollabGuard);
+
+    // 系统方案：从场景注册表按 type 字符串调度（新增/删除系统方案见 ScenarioRegistry.h），
+    // 无需修改本文件。返回值语义与普通步骤一致：非空 savePath 表示本轮成功。
+    if (const scenarios::ScenarioEntry* scenario = scenarios::findScenario(typeStr)) {
+        // 按方案配置开启协作弹窗守卫（识别点击失败自动扫协作弹窗并重试一次），
+        // 全局开关开启时方案即使未配置守卫也保持开启；执行完恢复到全局基线
+        actions.setCollaborationGuardEnabled(scenario->enableCollaborationGuard || globalCollabGuard);
+        savePath = scenario->execute() ? QStringLiteral("system-ok") : QString();
+        actions.setCollaborationGuardEnabled(globalCollabGuard);
+        return savePath;
+    }
+
+    ConfigTypeEnum type = stringToConfigType(typeStr);
+
+    // 步骤级「自动协作关闭」：勾选后仅在本步骤执行期间叠加开启协作弹窗守卫，
+    // 识别点击失败时自动扫协作邀请弹窗并关闭后重试一次；范围点击则为点击前先扫一次
+    const bool stepCollabGuard = step["autoCancelCollab"].toBool(false);
+    if (stepCollabGuard) {
+        actions.setCollaborationGuardEnabled(true);
+    }
 
     // 识别类步骤：直接执行一次，不做重试。
     auto recognizeWithRetry = [this](const std::function<QString()>& recognize) -> QString {
@@ -141,39 +162,15 @@ QString TaskRunner::executeStep(const QJsonObject& step)
                 break;
         }
 
-        case ConfigTypeEnum::SYSTEM_BORDER_BREAKTHROUGH: {
-                // 系统方案：返回值表示本轮是否正常完成，非空 savePath 表示成功
-                savePath = scenarios::executeBorderBreakthrough() ? QStringLiteral("system-ok") : QString();
-                break;
-        }
-
-        case ConfigTypeEnum::SYSTEM_ARENA: {
-                savePath = scenarios::executeArena() ? QStringLiteral("system-ok") : QString();
-                break;
-        }
-
-        case ConfigTypeEnum::SYSTEM_MITAMA: {
-                // 御魂方案开启协作弹窗守卫：识别点击失败时自动扫协作弹窗并重试一次，执行完关闭
-                actions.setCollaborationGuardEnabled(true);
-                savePath = scenarios::executeMitama() ? QStringLiteral("system-ok") : QString();
-                actions.setCollaborationGuardEnabled(false);
-                break;
-        }
-
-        case ConfigTypeEnum::SYSTEM_BUDOKAI: {
-                savePath = scenarios::executeBudokai() ? QStringLiteral("system-ok") : QString();
-                break;
-        }
-
-        case ConfigTypeEnum::SYSTEM_ANNIVERSARY_999: {
-                savePath = scenarios::executeAnniversary999() ? QStringLiteral("system-ok") : QString();
-                break;
-        }
-
         default: {
                 Logger::log(QString("未知的命令：%1").arg(typeStr));
                 break;
         }
+    }
+
+    // 步骤级协作守卫用完即恢复到全局基线，不影响后续步骤
+    if (stepCollabGuard) {
+        actions.setCollaborationGuardEnabled(globalCollabGuard);
     }
 
     return savePath;
@@ -243,12 +240,7 @@ void TaskRunner::run(const QJsonArray& steps, int cycleCount)
             // 系统方案步骤执行失败：内部流程已中断，直接终止整个任务循环，
             // 防止剩余步骤继续执行及下一轮循环连环报错。
             // identifyErrorHandle 仅对普通方案的识别步骤（OPENCV/OCR/YOLO）生效，逻辑保持不变。
-            if (savePath.isEmpty()
-                && (type == ConfigTypeEnum::SYSTEM_BORDER_BREAKTHROUGH
-                    || type == ConfigTypeEnum::SYSTEM_ARENA
-                    || type == ConfigTypeEnum::SYSTEM_MITAMA
-                    || type == ConfigTypeEnum::SYSTEM_BUDOKAI
-                    || type == ConfigTypeEnum::SYSTEM_ANNIVERSARY_999))
+            if (savePath.isEmpty() && scenarios::findScenario(typeStr) != nullptr)
             {
                 Logger::log(QString("系统方案执行失败，终止任务循环"));
                 stopDoLoop = true;
@@ -336,18 +328,18 @@ void TaskRunner::run(const QJsonArray& steps, int cycleCount)
 
     } while (m_isRunning && (infiniteLoop || number > 0));
 
-    // 若运行的是武道大会方案，循环结束后重置状态
+    // 重置本轮任务用到过的系统方案的跨轮次状态（如阵容锁定标记），
+    // 各方案是否需要重置由其注册项决定（见 ScenarioRegistry.h）
     for (const QJsonValue& stepVal : steps) {
-        if (stringToConfigType(stepVal.toObject().value("type").toString()) == ConfigTypeEnum::SYSTEM_BUDOKAI) {
-            scenarios::resetBudokaiStatus();
-            break;
-        }
-
-        if (stringToConfigType(stepVal.toObject().value("type").toString()) == ConfigTypeEnum::SYSTEM_ANNIVERSARY_999) {
-            scenarios::resetAnniversary999Status();
-            break;
+        const scenarios::ScenarioEntry* scenario =
+            scenarios::findScenario(stepVal.toObject().value("type").toString());
+        if (scenario && scenario->reset) {
+            scenario->reset();
         }
     }
+
+    // 任务结束后关闭协作守卫，避免全局/步骤/方案级开关在任务外残留生效
+    ScriptActions::instance().setCollaborationGuardEnabled(false);
 
     m_isRunning = false;
     emit finished();

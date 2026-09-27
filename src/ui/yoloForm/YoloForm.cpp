@@ -96,6 +96,13 @@ YoloForm::YoloForm(QWidget *parent) :
     stepInputLabel->hide();
     stepInputBox->hide();
 
+    // 自动协作关闭：仅本步骤执行期间开启协作弹窗守卫（非全局）
+    autoCancelCollabCheckBox = new QCheckBox(this);
+    auto* autoCancelCollabLabel = new QLabel("自动协作关闭", this);
+    autoCancelCollabLabel->setToolTip(
+        "开启后本步骤执行时自动处理协作邀请弹窗：识别失败时扫描并关闭弹窗后重试一次（仅当前步骤生效，非全局）");
+    layout->addRow(autoCancelCollabLabel, autoCancelCollabCheckBox);
+
     connect(errorHandleBox, &QComboBox::currentIndexChanged, this, [this](int index)
     {
         // 当值为1(跳转步骤)时显示stepInput，其他值隐藏
@@ -139,6 +146,7 @@ void YoloForm::loadFromJson(const QString &configId, const QJsonObject &obj)
     lineTaskNameEdit->setText(obj["taskName"].toString());
     spinScoreBox->setValue(obj["score"].toDouble());
     randomClickCheckBox->setChecked(obj["randomClick"].toBool());
+    autoCancelCollabCheckBox->setChecked(obj["autoCancelCollab"].toBool(false));
     // 比值(0~0.9) -> 百分比(0~90)
     excludeLeftBox->setValue(qRound(obj["excludeLeft"].toDouble(0.0) * 100.0));
     excludeRightBox->setValue(qRound(obj["excludeRight"].toDouble(0.0) * 100.0));
@@ -209,6 +217,7 @@ QJsonObject YoloForm::toJson() const {
     obj["yoloLabel"] = labelBox->currentData().toString();
     obj["score"] = spinScoreBox->value();
     obj["randomClick"] = randomClickCheckBox->isChecked();
+    obj["autoCancelCollab"] = autoCancelCollabCheckBox->isChecked();
     // 百分比(0~90) -> 比值(0~0.9)，保留两位小数，避免浮点尾数（如 0.15000000000000002）
     auto percentToRatio = [](double percent) {
         return QString::number(percent / 100.0, 'f', 2).toDouble();

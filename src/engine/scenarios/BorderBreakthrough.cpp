@@ -1,4 +1,5 @@
 #include "src/engine/scenarios/BorderBreakthrough.h"
+#include "src/engine/scenarios/ScenarioRegistry.h"
 
 #include <windows.h>
 #include <QDebug>
@@ -255,5 +256,8 @@ bool executeBorderBreakthrough()
     Logger::log(QString("结界突破执行完成"));
     return true;
 }
+
+// 注册为系统方案：TaskRunner 按注册表调度（注册方式见 ScenarioRegistry.h）
+REGISTER_SCENARIO("SYSTEM_BORDER_BREAKTHROUGH", executeBorderBreakthrough, nullptr, false)
 
 } // namespace scenarios

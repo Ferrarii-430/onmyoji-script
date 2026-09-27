@@ -1,4 +1,5 @@
 #include "src/engine/scenarios/Budokai.h"
+#include "src/engine/scenarios/ScenarioRegistry.h"
 
 #include <QJsonArray>
 #include <QJsonObject>
@@ -363,5 +364,8 @@ void resetBudokaiStatus()
     status = 0;
     Logger::log(QString("武道大会状态已重置"));
 }
+
+// 注册为系统方案：TaskRunner 按注册表调度（注册方式见 ScenarioRegistry.h）
+REGISTER_SCENARIO("SYSTEM_BUDOKAI", executeBudokai, resetBudokaiStatus, false)
 
 } // namespace scenarios

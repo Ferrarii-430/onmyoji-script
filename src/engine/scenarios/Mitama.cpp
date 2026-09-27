@@ -3,6 +3,7 @@
 //
 
 #include "Mitama.h"
+#include "ScenarioRegistry.h"
 
 #include <QJsonObject>
 #include <QString>
@@ -391,5 +392,8 @@ namespace scenarios
         waitWithEventProcessing(2000);
         return !path.isEmpty();
     }
+
+    // 注册为系统方案：TaskRunner 按注册表调度（注册方式见 ScenarioRegistry.h）
+    REGISTER_SCENARIO("SYSTEM_MITAMA", executeMitama, resetMitamaStatus, true)
 
 } // namespace scenarios
