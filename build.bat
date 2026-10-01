@@ -235,6 +235,21 @@ if defined MINGW_DIR (
     )
 )
 
+REM ---------- VC++ 运行库兜底 ----------
+REM onnxruntime.dll 是 MSVC 编译的，依赖 VC++ 2015-2022 x64 运行库；
+REM 目标机器未安装 vc_redist 时程序启动即报 0xc0000142 (STATUS_DLL_INIT_FAILED)。
+REM 从编译机 System32 复制到应用目录（仅缺失时补齐），Windows 优先加载 exe 同级副本。
+for %%F in (msvcp140.dll msvcp140_1.dll vcruntime140.dll vcruntime140_1.dll) do (
+    if not exist "%BUILD_OUT%\%%F" (
+        if exist "%windir%\System32\%%F" (
+            copy /y "%windir%\System32\%%F" "%BUILD_OUT%\%%F" >nul
+            echo [信息] 已补复制 VC++ 运行库: %%F
+        ) else (
+            echo [警告] 编译机缺少 %windir%\System32\%%F，目标机器需自行安装 VC++ 2015-2022 x64 运行库
+        )
+    )
+)
+
 REM ---------- 3. 复制 onnxruntime.dll ----------
 echo [步骤 3/7] 复制 onnxruntime.dll
 if exist "%CMAKE_BUILD_DIR%\onnxruntime.dll" (
@@ -290,6 +305,10 @@ for %%F in (
     "libstdc++-6.dll"
     "libwinpthread-1.dll"
     "onnxruntime.dll"
+    "msvcp140.dll"
+    "msvcp140_1.dll"
+    "vcruntime140.dll"
+    "vcruntime140_1.dll"
     "platforms\qwindows.dll"
     "tls\qschannelbackend.dll"
     "src\resource\config.json"
