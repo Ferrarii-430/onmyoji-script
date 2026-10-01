@@ -153,6 +153,8 @@ add_executable(qtTest WIN32
         src/engine/scenarios/Mitama.h
         src/engine/scenarios/ScenarioRegistry.cpp
         src/engine/scenarios/ScenarioRegistry.h
+        src/engine/scenarios/GuessCollect.cpp
+        src/engine/scenarios/GuessCollect.h
 )
 
 if(WIN32)

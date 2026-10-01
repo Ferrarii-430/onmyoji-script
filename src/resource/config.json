@@ -97,5 +97,27 @@
         "type": "SYSTEM_MITAMA"
       }
     ]
+  },
+  {
+    "id": "E5A7D999-1357-41C2-B684-066597E40GC1",
+    "name": "系统方案-对弈竞猜采集",
+    "type": "system",
+    "tip": "对弈竞猜数据常驻定时采集：每天 10:01 起每 2h 一局，自动采集双方式神数据并下注，整点后 1 分钟采集答案并录入后端；00:01 收尾最后一局，手动点击停止前不退出。",
+    "steps": [
+      {
+        "identifyErrorHandle": "next",
+        "imagePath": null,
+        "jumpStepsId": null,
+        "ocrText": null,
+        "offsetTime": null,
+        "randomClick": true,
+        "randomWait": null,
+        "score": 0.55,
+        "stepsId": "E5A7D999-b290-9645-5876-58995ugc001",
+        "taskName": "对弈竞猜数据采集",
+        "time": null,
+        "type": "SYSTEM_GUESS_COLLECT"
+      }
+    ]
   }
 ]
