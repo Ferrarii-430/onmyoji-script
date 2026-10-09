@@ -133,7 +133,7 @@ bool waitForBattleEnd()
 int getNumberOfTickets()
 {
     ScriptActions& actions = ScriptActions::instance();
-    QJsonArray ticketsData = actions.ocrRecognizes(QRectF(82, 0, 100, 8), ocr::Enhance::Upscale);
+    QJsonArray ticketsData = actions.ocrRecognizes(QRectF(88, 0, 9, 8), ocr::Enhance::Upscale);
     if (ticketsData.isEmpty())
     {
         qWarning() << "门票检测异常：" << ticketsData;
