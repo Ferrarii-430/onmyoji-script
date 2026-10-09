@@ -1,15 +1,9 @@
 [
   {
-    "id": "DC42C888-2449-41D2-A894-095606E38D12",
-    "name": "空的配置",
-    "type": "normal",
-    "steps": [
-    ]
-  },
-  {
-    "id": "D942C888-2449-41D2-A794-055586E39P13",
-    "name": "系统方案-结界突破",
+    "id": "E5A7D999-1357-41C2-B684-066597E40GC1",
+    "name": "系统方案-对弈竞猜采集",
     "type": "system",
+    "tip": "对弈竞猜数据常驻定时采集：每天 10:01 起每 2h 一局，自动采集双方式神数据并下注，整点后 1 分钟采集答案并录入后端；00:01 收尾最后一局，手动点击停止前不退出。",
     "steps": [
       {
         "identifyErrorHandle": "next",
@@ -20,66 +14,10 @@
         "randomClick": true,
         "randomWait": null,
         "score": 0.55,
-        "stepsId": "96399177-b290-4245-9076-56695ub7e5e5",
-        "taskName": "自动结界突破",
+        "stepsId": "E5A7D999-b290-9645-5876-58995ugc001",
+        "taskName": "对弈竞猜数据采集",
         "time": null,
-        "type": "SYSTEM_BORDER_BREAKTHROUGH"
-      }
-    ]
-  },
-  {
-    "id": "A1B2C3D4-2449-41D2-A794-055586E3ARENA",
-    "name": "系统方案-自动挂机斗技",
-    "type": "system",
-    "systemConfig": [
-      {
-        "key": "ocrScore",
-        "label": "OCR识别阈值",
-        "control": "number",
-        "min": 0,
-        "max": 1,
-        "step": 0.05,
-        "decimals": 2,
-        "value": 0.6
-      },
-      {
-        "key": "matchPollCount",
-        "label": "匹配等待轮数",
-        "control": "number",
-        "min": 1,
-        "max": 60,
-        "step": 1,
-        "decimals": 0,
-        "value": 15
-      },
-      {
-        "key": "randomClick",
-        "label": "随机点击",
-        "control": "switch",
-        "value": true
-      },
-      {
-        "key": "arenaType",
-        "label": "斗技类型",
-        "control": "select",
-        "options": ["个人斗技", "巅峰赛"],
-        "value": "个人斗技"
-      }
-    ],
-    "steps": [
-      {
-        "identifyErrorHandle": "next",
-        "imagePath": null,
-        "jumpStepsId": null,
-        "ocrText": null,
-        "offsetTime": null,
-        "randomClick": true,
-        "randomWait": null,
-        "score": 0.55,
-        "stepsId": "A1B2C3D4-b290-4245-9076-56695uARENA",
-        "taskName": "自动挂机斗技",
-        "time": null,
-        "type": "SYSTEM_ARENA"
+        "type": "SYSTEM_GUESS_COLLECT"
       }
     ]
   }

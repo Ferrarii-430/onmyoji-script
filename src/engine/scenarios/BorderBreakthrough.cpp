@@ -61,13 +61,13 @@ bool openRealmAndAttack(const Detection& det)
 // 循环条件检查任务状态：点「停止」后立即中断等待，而非傻等满全部轮询
 bool surrenderBattle()
 {
-    constexpr int kEnterBattleAttempts = 5;  // 5次 * 1秒 = 5秒
+    constexpr int kEnterBattleAttempts = 6;  // 6次 * 1秒 = 6秒
     for (int attempts = 0; attempts < kEnterBattleAttempts && TaskRunner::instance().isRunning(); ++attempts) {
         waitWithEventProcessing(1000);
 
-        if (ScriptActions::instance().yoloContainsLabels(0.45, {"common-exit-battle"}, false)) {
+        if (ScriptActions::instance().yoloContainsLabels(0.4, {"common-exit-battle", "common-chat"}, false)) {
             Logger::log(QString("准备退出战斗"));
-            waitWithEventProcessing(500);
+            waitWithEventProcessing(800);
 
             GameWindow::instance().postKey(VK_ESCAPE);
             waitWithEventProcessing(200);
