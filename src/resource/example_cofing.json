@@ -4,6 +4,16 @@
     "name": "系统方案-对弈竞猜采集",
     "type": "system",
     "tip": "对弈竞猜数据常驻定时采集：每天 10:01 起每 2h 一局，自动采集双方式神数据并下注，整点后 1 分钟采集答案并录入后端；00:01 收尾最后一局，手动点击停止前不退出。",
+    "systemConfig": [
+      {
+        "key": "url",
+        "label": "URL",
+        "control": "input",
+        "value": "",
+        "placeholder": "URL",
+        "tip": "采集数据请求地址。"
+      }
+    ],
     "steps": [
       {
         "identifyErrorHandle": "next",

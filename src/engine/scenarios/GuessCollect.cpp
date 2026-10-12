@@ -25,6 +25,7 @@
 #include "src/engine/ScriptActions.h"
 #include "src/engine/TaskRunner.h"
 #include "ScenarioRegistry.h"
+#include "src/core/ProfileStore.h"
 
 using core::waitWithEventProcessing;
 using core::waitRandomWithEventProcessing;
@@ -60,6 +61,12 @@ namespace scenarios
         // 长等待（如 00:01 收尾后要等到 10:01）期间按墙钟周期性重算剩余时长，
         // 避免系统休眠/时钟调整后按单调时钟睡过头
         constexpr int kClockRecheckMs = 30 * 1000;
+
+        // 读取当前运行方案的自定义配置
+        const QString configId = currentItem.id;
+        const QString host = getSystemConfigValue(configId, "host", "").toString();
+        const QString resultUrl = getSystemConfigValue(configId, "resultUrl", "").toString();
+        const QString shikigamiUrl = getSystemConfigValue(configId, "shikigamiUrl", "").toString();
 
         // 计算下一次触发：取 kDailySchedule 中最早晚于 now 的触发项及其触发时间。
         // 今天已过点的项自动顺延到明天；00:01 收尾事件跨天后自然衔接当日 10:01。
