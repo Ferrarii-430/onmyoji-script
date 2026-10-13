@@ -31,9 +31,6 @@ bool YOLODetector::initialize(const std::wstring& model_path) {
         auto output_tensor_info = output_type_info.GetTensorTypeAndShapeInfo();
         output_shape = output_tensor_info.GetShape();
 
-        std::cout << "Model loaded successfully. Input: " << input_name
-                  << ", Output: " << output_name << std::endl;
-
         is_initialized = true;
         return true;
 

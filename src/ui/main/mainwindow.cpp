@@ -129,7 +129,7 @@ mainwindow::mainwindow(QWidget *parent) :
     // 检查OpenCV版本和编译选项
     Logger::log(QString("OpenCV 版本 %1").arg(CV_VERSION));
 
-    Logger::log(QString("RapidOCR 版本 v1.1.0"));
+    Logger::log(QString("OCR 引擎: PP-OCRv6（OcrLite 推理）"));
 
     QString onnxPath = AppPaths::instance().onmyojiYoloOnnxPath();
     bool initSuccess = YOLODetector::getInstance().initialize(onnxPath.toStdWString());
@@ -141,7 +141,7 @@ mainwindow::mainwindow(QWidget *parent) :
     // OCR 引擎模型常驻：启动时预加载，避免首次 OCR 识别卡顿
     if (vision::initInProcessOcr())
     {
-        Logger::log(QString("RapidOCR 进程内引擎加载成功！"));
+        Logger::log(QString("PP-OCRv6 进程内引擎加载成功！"));
     }
 
     ui->taskCycleNumber->setValue(1);

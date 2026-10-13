@@ -317,10 +317,10 @@ for %%F in (
     "src\resource\onmyoji-yolo-v5.onnx"
     "src\resource\yolo_label_catalog.json"
     "src\resource\hook\libdx11_hook.dll"
-    "src\resource\RapidOCR\models\ch_PP-OCRv4_det_infer.onnx"
-    "src\resource\RapidOCR\models\ch_ppocr_mobile_v2.0_cls_infer.onnx"
-    "src\resource\RapidOCR\models\rec_ch_PP-OCRv4_infer.onnx"
-    "src\resource\RapidOCR\models\dict_chinese.txt"
+    "src\resource\PaddleOCR\PP-OCRv6_small_det_onnx.onnx"
+    "src\resource\PaddleOCR\ch_ppocr_mobile_v2.0_cls_infer.onnx"
+    "src\resource\PaddleOCR\PP-OCRv6_small_rec_onnx.onnx"
+    "src\resource\PaddleOCR\ppocrv6_dict.txt"
 ) do (
     if not exist "%BUILD_OUT%\%%~F" (
         echo [校验失败] 缺失: %%~F

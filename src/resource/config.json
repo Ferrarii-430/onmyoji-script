@@ -106,10 +106,10 @@
     "systemConfig": [
       {
         "key": "host",
-        "label": "HOST",
+        "label": "HOST地址",
         "control": "input",
         "value": "https://frp-hat.com:55740",
-        "placeholder": "HOST",
+        "placeholder": "HOST地址",
         "tip": ""
       },
       {

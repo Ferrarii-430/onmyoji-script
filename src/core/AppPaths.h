@@ -94,24 +94,24 @@ public:
         return applicationDirPath() + "/src/resource/onmyoji-yolo-v5.onnx";
     }
 
-    QString rapidOCRDetPathV4() const {
-        return "ch_PP-OCRv4_det_infer.onnx";
+    QString rapidOCRDetPath() const {
+        return "PP-OCRv6_small_det_onnx.onnx";
     }
 
-    QString rapidOCRClsPathV4() const {
+    QString rapidOCRClsPath() const {
         return "ch_ppocr_mobile_v2.0_cls_infer.onnx";
     }
 
-    QString rapidOCRRecPathV4() const {
-        return "rec_ch_PP-OCRv4_infer.onnx";
+    QString rapidOCRRecPath() const {
+        return "PP-OCRv6_small_rec_onnx.onnx";
     }
 
     QString rapidOCRKeysPath() const {
-        return "dict_chinese.txt";
+        return "ppocrv6_dict.txt";
     }
 
     QString rapidOCRModelsPath() const {
-        return applicationDirPath() + "/src/resource/RapidOCR/models/";
+        return applicationDirPath() + "/src/resource/PaddleOCR/";
     }
 
 private:

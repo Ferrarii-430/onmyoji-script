@@ -62,12 +62,6 @@ namespace scenarios
         // 避免系统休眠/时钟调整后按单调时钟睡过头
         constexpr int kClockRecheckMs = 30 * 1000;
 
-        // 读取当前运行方案的自定义配置
-        const QString configId = currentItem.id;
-        const QString host = getSystemConfigValue(configId, "host", "").toString();
-        const QString resultUrl = getSystemConfigValue(configId, "resultUrl", "").toString();
-        const QString shikigamiUrl = getSystemConfigValue(configId, "shikigamiUrl", "").toString();
-
         // 计算下一次触发：取 kDailySchedule 中最早晚于 now 的触发项及其触发时间。
         // 今天已过点的项自动顺延到明天；00:01 收尾事件跨天后自然衔接当日 10:01。
         void findNextEvent(const QDateTime& now, const ScheduleEvent*& event, QDateTime& at)
@@ -106,8 +100,11 @@ namespace scenarios
         {
             constexpr int kTimeoutMs = 15 * 1000;
 
+            // 运行时读取 HOST 配置（currentItem 在方案启动时才填充，不能静态初始化读取）
+            const QString host = getSystemConfigValue(currentItem.id, "host", "").toString();
+
             QNetworkAccessManager manager;
-            QNetworkRequest request(QUrl(QStringLiteral("https://frp-hat.com:55740") + apiPath));
+            QNetworkRequest request(QUrl(host + apiPath));
             request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/x-www-form-urlencoded"));
             request.setTransferTimeout(kTimeoutMs);
 
@@ -146,8 +143,11 @@ namespace scenarios
         // 上报对局结果到后端：POST /api/guess/round/result。失败/超时仅记日志，不中断采集流程
         void reportRoundResult(const QString& roundDate, int roundNo, const QString& winSide)
         {
+            // 运行时读取结果录入接口配置
+            const QString resultUrl = getSystemConfigValue(currentItem.id, "resultUrl", "").toString();
+
             QString response;
-            if (postForm(QStringLiteral("/api/guess/round/result"),
+            if (postForm(resultUrl,
                          {{QStringLiteral("roundDate"), roundDate},
                           {QStringLiteral("roundNo"), QString::number(roundNo)},
                           {QStringLiteral("winSide"), winSide}},
@@ -164,8 +164,11 @@ namespace scenarios
         // 失败/超时仅记日志，不中断采集流程
         void reportShikigamiData(const QString& roundDate, int roundNo, const QJsonArray& redTeam, const QJsonArray& blueTeam)
         {
+            // 运行时读取式神采集接口配置
+            const QString shikigamiUrl = getSystemConfigValue(currentItem.id, "shikigamiUrl", "").toString();
+
             QString response;
-            if (postForm(QStringLiteral("/api/guess/shikigami"),
+            if (postForm(shikigamiUrl,
                          {{QStringLiteral("roundDate"), roundDate},
                           {QStringLiteral("roundNo"), QString::number(roundNo)},
                           {QStringLiteral("red"), QString::fromUtf8(QJsonDocument(redTeam).toJson(QJsonDocument::Compact))},

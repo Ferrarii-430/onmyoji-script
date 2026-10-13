@@ -30,9 +30,9 @@ OcrLite& ocrLite()
     if (!initialized) {
         lite.setNumThread(kOcrNumThread);
         const QString modelsPath = AppPaths::instance().rapidOCRModelsPath();
-        lite.initModels((modelsPath + AppPaths::instance().rapidOCRDetPathV4()).toStdString(),
-                        (modelsPath + AppPaths::instance().rapidOCRClsPathV4()).toStdString(),
-                        (modelsPath + AppPaths::instance().rapidOCRRecPathV4()).toStdString(),
+        lite.initModels((modelsPath + AppPaths::instance().rapidOCRDetPath()).toStdString(),
+                        (modelsPath + AppPaths::instance().rapidOCRClsPath()).toStdString(),
+                        (modelsPath + AppPaths::instance().rapidOCRRecPath()).toStdString(),
                         (modelsPath + AppPaths::instance().rapidOCRKeysPath()).toStdString());
         initialized = true;
         // Logger::log(QString("进程内RapidOCR模型加载完成"));
@@ -71,10 +71,10 @@ bool initInProcessOcr()
         ocrLite();
         return true;
     } catch (const Ort::Exception& e) {
-        qWarning() << "进程内RapidOCR模型加载失败:" << e.what();
+        qWarning() << "PP-OCRv6 模型加载失败:" << e.what();
         return false;
     } catch (const std::exception& e) {
-        qWarning() << "进程内RapidOCR初始化异常:" << e.what();
+        qWarning() << "PP-OCRv6 引擎初始化异常:" << e.what();
         return false;
     }
 }
