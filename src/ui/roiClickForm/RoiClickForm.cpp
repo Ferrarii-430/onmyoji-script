@@ -15,6 +15,7 @@
 #include "src/core/ProfileStore.h"
 #include "src/game/GameWindow.h"
 #include "src/game/capture/CaptureService.h"
+#include "src/ui/ocrForm/RoiPreviewWidget.h"
 
 RoiClickForm::RoiClickForm(QWidget *parent) :
     QWidget(parent), ui(new Ui::RoiClickForm) {
@@ -36,6 +37,19 @@ RoiClickForm::RoiClickForm(QWidget *parent) :
     connect(ui->roiYBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &RoiClickForm::updateRoiPreview);
     connect(ui->roiWBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &RoiClickForm::updateRoiPreview);
     connect(ui->roiHBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &RoiClickForm::updateRoiPreview);
+
+    // 鼠标在预览上拖拽 ROI 时反向同步数值框；阻断信号避免 valueChanged 回环
+    connect(ui->roiPreview, &RoiPreviewWidget::roiChanged, this, [this](double x, double y, double w, double h)
+    {
+        const QSignalBlocker bx(ui->roiXBox);
+        const QSignalBlocker by(ui->roiYBox);
+        const QSignalBlocker bw(ui->roiWBox);
+        const QSignalBlocker bh(ui->roiHBox);
+        ui->roiXBox->setValue(x);
+        ui->roiYBox->setValue(y);
+        ui->roiWBox->setValue(w);
+        ui->roiHBox->setValue(h);
+    });
 
     connect(ui->errorHandleBox, &QComboBox::currentIndexChanged, this, [this](int index)
     {
