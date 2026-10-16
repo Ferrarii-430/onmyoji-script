@@ -12,6 +12,7 @@ enum class ConfigTypeEnum {
     OCR,
     YOLO,
     CLICK_ROI,
+    SWIPE,
     // 注意：系统方案（SYSTEM_*）不在此枚举中，由场景注册表
     // src/engine/scenarios/ScenarioRegistry.h 按步骤 type 字符串直接调度
     UNKNOWN

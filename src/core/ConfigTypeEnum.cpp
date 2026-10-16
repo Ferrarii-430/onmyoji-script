@@ -13,6 +13,7 @@ QString getConfigTypeEnumToQStringName(ConfigTypeEnum type) {
         case ConfigTypeEnum::OCR: return "OCR识别";
         case ConfigTypeEnum::YOLO: return "YOLO";
         case ConfigTypeEnum::CLICK_ROI: return "范围点击";
+        case ConfigTypeEnum::SWIPE: return "滑动";
         default: return "未知";
     }
 }
@@ -39,6 +40,9 @@ ConfigTypeEnum stringToConfigType(const QString& typeStr) {
     if (typeStr.compare("CLICK_ROI", Qt::CaseInsensitive) == 0) {
         return ConfigTypeEnum::CLICK_ROI;
     }
+    if (typeStr.compare("SWIPE", Qt::CaseInsensitive) == 0) {
+        return ConfigTypeEnum::SWIPE;
+    }
     return ConfigTypeEnum::UNKNOWN;
 }
 
@@ -50,6 +54,7 @@ QString configTypeToQString(ConfigTypeEnum type) {
         case ConfigTypeEnum::OCR: return "OCR";
         case ConfigTypeEnum::YOLO: return "YOLO";
         case ConfigTypeEnum::CLICK_ROI: return "CLICK_ROI";
+        case ConfigTypeEnum::SWIPE: return "SWIPE";
         default: return "UNKNOWN";
     }
 }

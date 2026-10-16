@@ -127,6 +127,17 @@ public:
     QString clickInRoi(const QRectF& roiPercent, bool randomClick = true,
                        bool skipCollaborationGuard = false);
 
+    // 两点滑动（无识别）：fromPercent 为按下点、toPercent 为抬起点，
+    // 坐标单位为图片尺寸的百分比 0~100。trajectoryType 为滑动轨迹类型字符串
+    // （LINEAR 直线 / BEZIER 贝塞尔曲线 / S_CURVE S形曲线 / RANDOM_WALK 随机漫步），
+    // durationMs 为按下到抬起的总时长（毫秒）。
+    // 成功返回带起止点与滑动方向标记的结果图路径，截图失败返回空。
+    // 开启协作弹窗守卫时，滑动前会先扫协作弹窗并取消（与 clickInRoi 同理）
+    QString swipeBetweenPoints(const QPointF& fromPercent, const QPointF& toPercent,
+                               const QString& trajectoryType = QStringLiteral("BEZIER"),
+                               int durationMs = 500,
+                               bool skipCollaborationGuard = false);
+
     // YOLO 识别（纯识别，不点击）。返回所有检测结果，由调用方决定如何处理
     std::vector<Detection> yoloRecognizes(double threshold);
     // YOLO 是否包含指定标签；matchAll 为 false 时任一标签命中即返回 true

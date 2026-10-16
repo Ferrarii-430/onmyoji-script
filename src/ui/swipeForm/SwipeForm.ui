@@ -1,0 +1,323 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>SwipeForm</class>
+ <widget class="QWidget" name="SwipeForm">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>291</width>
+    <height>620</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>SwipeForm</string>
+  </property>
+  <widget class="QWidget" name="formLayoutWidget">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>291</width>
+     <height>614</height>
+    </rect>
+   </property>
+   <layout class="QFormLayout" name="formLayout">
+    <property name="horizontalSpacing">
+     <number>6</number>
+    </property>
+    <property name="verticalSpacing">
+     <number>12</number>
+    </property>
+    <item row="0" column="0">
+     <widget class="QLabel" name="label">
+      <property name="text">
+       <string>任务名称</string>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="1">
+     <widget class="QLineEdit" name="lineTaskNameEdit"/>
+    </item>
+    <item row="1" column="0">
+     <widget class="QLabel" name="fromPointLabel">
+      <property name="toolTip">
+       <string>按下点坐标，占图片宽/高的百分比</string>
+      </property>
+      <property name="text">
+       <string>点1按下(%): X/Y</string>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="1">
+     <layout class="QHBoxLayout" name="fromPointLayout">
+      <item>
+       <widget class="QDoubleSpinBox" name="swipeFromXBox">
+        <property name="suffix">
+         <string>%</string>
+        </property>
+        <property name="decimals">
+         <number>1</number>
+        </property>
+        <property name="maximum">
+         <double>100.000000000000000</double>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QDoubleSpinBox" name="swipeFromYBox">
+        <property name="suffix">
+         <string>%</string>
+        </property>
+        <property name="decimals">
+         <number>1</number>
+        </property>
+        <property name="maximum">
+         <double>100.000000000000000</double>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+    <item row="2" column="0">
+     <widget class="QLabel" name="toPointLabel">
+      <property name="toolTip">
+       <string>抬起点坐标，占图片宽/高的百分比</string>
+      </property>
+      <property name="text">
+       <string>点2抬起(%): X/Y</string>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="1">
+     <layout class="QHBoxLayout" name="toPointLayout">
+      <item>
+       <widget class="QDoubleSpinBox" name="swipeToXBox">
+        <property name="suffix">
+         <string>%</string>
+        </property>
+        <property name="decimals">
+         <number>1</number>
+        </property>
+        <property name="maximum">
+         <double>100.000000000000000</double>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QDoubleSpinBox" name="swipeToYBox">
+        <property name="suffix">
+         <string>%</string>
+        </property>
+        <property name="decimals">
+         <number>1</number>
+        </property>
+        <property name="maximum">
+         <double>100.000000000000000</double>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+    <item row="3" column="0">
+     <widget class="QLabel" name="activePointLabel">
+      <property name="toolTip">
+       <string>点击预览图取点时，坐标设置到当前选中的点</string>
+      </property>
+      <property name="text">
+       <string>点击取点到</string>
+      </property>
+     </widget>
+    </item>
+    <item row="3" column="1">
+     <layout class="QHBoxLayout" name="activePointLayout">
+      <item>
+       <widget class="QRadioButton" name="radioPoint1">
+        <property name="toolTip">
+         <string>点击预览图时设置点1（按下点）</string>
+        </property>
+        <property name="text">
+         <string>点1(按下)</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QRadioButton" name="radioPoint2">
+        <property name="toolTip">
+         <string>点击预览图时设置点2（抬起点）</string>
+        </property>
+        <property name="text">
+         <string>点2(抬起)</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+    <item row="4" column="0">
+     <widget class="QLabel" name="trajectoryLabel">
+      <property name="toolTip">
+       <string>滑动经过的轨迹形状，与鼠标控制模式一致</string>
+      </property>
+      <property name="text">
+       <string>轨迹类型</string>
+      </property>
+     </widget>
+    </item>
+    <item row="4" column="1">
+     <widget class="QComboBox" name="swipeTrajectoryBox"/>
+    </item>
+    <item row="5" column="0">
+     <widget class="QLabel" name="durationLabel">
+      <property name="toolTip">
+       <string>从按下到抬起的总时长；过短会被游戏判定为点击而非滑动</string>
+      </property>
+      <property name="text">
+       <string>滑动时长</string>
+      </property>
+     </widget>
+    </item>
+    <item row="5" column="1">
+     <widget class="QSpinBox" name="swipeDurationBox">
+      <property name="toolTip">
+       <string>从按下到抬起的总时长（毫秒）</string>
+      </property>
+      <property name="suffix">
+       <string> ms</string>
+      </property>
+      <property name="minimum">
+       <number>100</number>
+      </property>
+      <property name="maximum">
+       <number>10000</number>
+      </property>
+      <property name="singleStep">
+       <number>100</number>
+      </property>
+      <property name="value">
+       <number>500</number>
+      </property>
+     </widget>
+    </item>
+    <item row="6" column="0">
+     <widget class="QLabel" name="errorHandleLabel">
+      <property name="toolTip">
+       <string>滑动失败（截图失败）时的处理方式</string>
+      </property>
+      <property name="text">
+       <string>失败处理</string>
+      </property>
+     </widget>
+    </item>
+    <item row="6" column="1">
+     <widget class="QComboBox" name="errorHandleBox"/>
+    </item>
+    <item row="7" column="0">
+     <widget class="QLabel" name="stepInputLabel">
+      <property name="text">
+       <string>跳转步骤</string>
+      </property>
+     </widget>
+    </item>
+    <item row="7" column="1">
+     <widget class="QComboBox" name="stepInputBox"/>
+    </item>
+    <item row="8" column="0">
+     <widget class="QLabel" name="autoCancelCollabLabel">
+      <property name="toolTip">
+       <string>开启后本步骤滑动前自动扫描协作邀请弹窗并点击关闭，避免滑到弹窗上（仅当前步骤生效，非全局）</string>
+      </property>
+      <property name="text">
+       <string>自动协作关闭</string>
+      </property>
+     </widget>
+    </item>
+    <item row="8" column="1">
+     <widget class="QCheckBox" name="autoCancelCollabCheckBox">
+      <property name="text">
+       <string/>
+      </property>
+     </widget>
+    </item>
+    <item row="9" column="0">
+     <widget class="QLabel" name="previewLabel">
+      <property name="text">
+       <string>预览</string>
+      </property>
+     </widget>
+    </item>
+    <item row="9" column="1">
+     <layout class="QHBoxLayout" name="previewBtnLayout">
+      <property name="spacing">
+       <number>8</number>
+      </property>
+      <item>
+       <widget class="QToolButton" name="btnUploadImage">
+        <property name="text">
+         <string>上传图片查看区域</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QToolButton" name="btnCaptureImage">
+        <property name="toolTip">
+         <string>截取当前游戏画面作为预览底图</string>
+        </property>
+        <property name="text">
+         <string>截图获取</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+    <item row="10" column="0" colspan="2">
+     <widget class="SwipePreviewWidget" name="swipePreview" native="true">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="minimumSize">
+       <size>
+        <width>260</width>
+        <height>150</height>
+       </size>
+      </property>
+      <property name="maximumSize">
+       <size>
+        <width>16777215</width>
+        <height>200</height>
+       </size>
+      </property>
+     </widget>
+    </item>
+    <item row="11" column="0" colspan="2">
+     <spacer name="bottomSpacer">
+      <property name="orientation">
+       <enum>Qt::Vertical</enum>
+      </property>
+      <property name="sizeHint" stdset="0">
+       <size>
+        <width>20</width>
+        <height>0</height>
+       </size>
+      </property>
+     </spacer>
+    </item>
+   </layout>
+  </widget>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>SwipePreviewWidget</class>
+   <extends>QWidget</extends>
+   <header>src/ui/swipeForm/SwipePreviewWidget.h</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
+ <resources/>
+ <connections/>
+</ui>

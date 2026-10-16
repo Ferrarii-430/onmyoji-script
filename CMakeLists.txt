@@ -142,6 +142,11 @@ add_executable(qtTest WIN32
         src/ui/roiClickForm/RoiClickForm.cpp
         src/ui/roiClickForm/RoiClickForm.h
         src/ui/roiClickForm/RoiClickForm.ui
+        src/ui/swipeForm/SwipeForm.cpp
+        src/ui/swipeForm/SwipeForm.h
+        src/ui/swipeForm/SwipeForm.ui
+        src/ui/swipeForm/SwipePreviewWidget.cpp
+        src/ui/swipeForm/SwipePreviewWidget.h
         src/ui/yoloForm/YoloForm.cpp
         src/ui/yoloForm/YoloForm.h
         src/ui/theme/Theme.cpp

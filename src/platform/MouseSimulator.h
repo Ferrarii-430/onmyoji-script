@@ -64,6 +64,12 @@ public:
     bool StealthHardwareClick(int x, int y);
     bool StealthMessageClick(HWND hWnd, int x, int y);
 
+    // 后台消息滑动（PostMessage）：从 (startX,startY) 按下，沿指定轨迹移动到
+    // (endX,endY) 后抬起。durationMs 为按下到抬起的总时长，途中按轨迹点均分间隔。
+    bool MessageSwipe(HWND hWnd, int startX, int startY, int endX, int endY,
+                      TrajectoryType trajectoryType = TrajectoryType::BEZIER,
+                      int durationMs = 500);
+
     // 辅助方法
     void AddRandomMicroMovements(int targetX, int targetY);
     void PostClickBehavior();

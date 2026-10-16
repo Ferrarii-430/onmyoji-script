@@ -333,6 +333,53 @@ bool MouseSimulator::StealthMessageClick(HWND hWnd, int x, int y) {
     return MessageClick(hWnd, x, y);
 }
 
+// 后台消息滑动：按下 → 沿轨迹移动 → 抬起。
+// 关键约束：按下期间 WM_MOUSEMOVE 的 wParam 必须携带 MK_LBUTTON，
+// 否则目标窗口收不到"左键按住拖动"的手势语义。
+bool MouseSimulator::MessageSwipe(HWND hWnd, int startX, int startY, int endX, int endY,
+                                  TrajectoryType trajectoryType, int durationMs) {
+    // 未按下先把光标移到起点
+    if (!PostMessage(hWnd, WM_MOUSEMOVE, 0, MAKELPARAM(startX, startY))) {
+        return false;
+    }
+    Sleep(GetRandomInRange(20, 50));
+
+    // 在起点按下左键
+    if (!PostMessage(hWnd, WM_LBUTTONDOWN, MK_LBUTTON, MAKELPARAM(startX, startY))) {
+        return false;
+    }
+    // 按下后短暂停留：停留过短会被游戏判定为点击而非拖动手势
+    Sleep(GetRandomInRange(80, 150));
+
+    // 按滑动时长与步进间隔估算轨迹点数，复用既有的轨迹生成（直线/贝塞尔/S形/随机漫步）
+    constexpr int kStepMs = 15;
+    const int steps = durationMs / kStepMs > 8 ? durationMs / kStepMs : 8;
+    std::vector<POINT> trajectory = GenerateComplexTrajectory(
+        {startX, startY}, {endX, endY}, trajectoryType, steps);
+
+    // 各轨迹生成器均以起点作为首点，跳过避免与按下位置重复
+    if (trajectory.size() > 1) {
+        trajectory.erase(trajectory.begin());
+    }
+
+    // 把滑动时长均分到每个移动点，间隔带随机抖动更拟人
+    const int moveCount = static_cast<int>(trajectory.size());
+    const int perMove = moveCount > 0 ? durationMs / moveCount : durationMs;
+
+    for (const auto& pt : trajectory) {
+        if (!PostMessage(hWnd, WM_MOUSEMOVE, MK_LBUTTON, MAKELPARAM(pt.x, pt.y))) {
+            // 投递失败需抬起左键，避免目标窗口残留"按住"状态
+            PostMessage(hWnd, WM_LBUTTONUP, 0, MAKELPARAM(pt.x, pt.y));
+            return false;
+        }
+        const int delay = perMove + GetRandomInRange(-3, 3);
+        Sleep(delay > 1 ? delay : 1);
+    }
+
+    // 在终点抬起左键（轨迹末点即终点，坐标一致）
+    return PostMessage(hWnd, WM_LBUTTONUP, 0, MAKELPARAM(endX, endY)) != 0;
+}
+
 // 辅助方法
 void MouseSimulator::AddRandomMicroMovements(int targetX, int targetY) {
     POINT currentPos = GetCurrentPosition();

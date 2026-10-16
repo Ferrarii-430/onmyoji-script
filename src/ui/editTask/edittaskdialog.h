@@ -13,6 +13,7 @@
 #include "src/ui/ocrForm/OcrForm.h"
 #include "src/ui/yoloForm/YoloForm.h"
 #include "src/ui/roiClickForm/RoiClickForm.h"
+#include "src/ui/swipeForm/SwipeForm.h"
 
 enum class EditMode { Add, Edit };
 
@@ -40,6 +41,7 @@ bool validateOpenCVFormData(const QJsonObject& data);
 bool validateOcrFormData(const QJsonObject& data);
 bool validateYoloFormData(const QJsonObject& data);
 bool validateRoiClickFormData(const QJsonObject& data);
+bool validateSwipeFormData(const QJsonObject& data);
 bool validateData();
 void accept();
 void setCurrentIndex();
@@ -53,6 +55,7 @@ private:
     OcrForm* ocrForm;
     YoloForm* yoloForm;
     RoiClickForm* roiClickForm;
+    SwipeForm* swipeForm;
     Ui::EditTaskDialog *ui;
 };
 

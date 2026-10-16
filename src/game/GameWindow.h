@@ -6,6 +6,8 @@
 #include <string>
 #include <opencv2/core/types.hpp>
 
+#include "src/platform/MouseSimulator.h"
+
 // 游戏窗口管理：负责定位游戏进程/窗口句柄、
 // 截图坐标到客户区坐标的映射、以及对窗口的点击/按键输入。
 class GameWindow
@@ -39,6 +41,13 @@ public:
     // clickContext 用于日志标注本次点击对象（如 YOLO标签/OCR文字/OpenCV模板/ROI区域），
     // 为空时日志显示通用的「点击成功/点击失败」
     void clickInWindow(const cv::Point& clickPoint, const QString& clickContext = QString());
+
+    // 在窗口内执行滑动（起止点均为截图坐标系）：从 startPoint 按下滑动到 endPoint 后抬起。
+    // 仅 PostMessage 模式实现后台消息滑动；Hook / InputMouse 模式暂未实现（记录日志并跳过）。
+    // swipeContext 用于日志标注本次滑动对象，为空时日志显示通用的「滑动成功/滑动失败」
+    void swipeInWindow(const cv::Point& startPoint, const cv::Point& endPoint,
+                       TrajectoryType trajectoryType, int durationMs,
+                       const QString& swipeContext = QString());
 
     // 将截图坐标映射为窗口客户区坐标
     cv::Point mapCapturePointToClient(const cv::Point& capturePoint);

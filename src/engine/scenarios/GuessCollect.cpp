@@ -245,6 +245,14 @@ namespace scenarios
             return team;
         }
 
+        // 第一局（10:01）采集与押注前的切换更新操作（内部留空，待自行实现）
+        void switchUpdateForFirstRound()
+        {
+            // TODO: 待实现，因为第一局不会自动切换更新，需要手动点击切换更新按钮
+            // TODO: 因为目前活动没开，下次开启时记得修复这个异常
+            Logger::log(QString("手动点击切换更新按钮（未实现）"));
+        }
+
         // 题目采集逻辑（每局开始后 1 分钟触发）。
         // triggerTime 用于推断场次：10:01~22:01 → 第 hour/2-4 局（10:01→第1局 ... 22:01→第7局），
         // 采集双方式神数据后默认下注红方，并把数据上报后端保存
@@ -252,6 +260,11 @@ namespace scenarios
         {
             const QString roundDate = triggerTime.date().toString(QStringLiteral("yyyy-MM-dd"));
             const int roundNo = triggerTime.time().hour() / 2 - 4;
+
+            // 第一局（10:01）采集押注前需先执行切换更新操作
+            if (roundNo == 1) {
+                switchUpdateForFirstRound();
+            }
 
             QJsonArray redTeam = collectSideShikigami(QRectF(24, 16, 28, 17), QStringLiteral("红"));
 

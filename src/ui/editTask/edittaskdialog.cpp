@@ -52,6 +52,7 @@ EditTaskDialog::EditTaskDialog(EditMode mode, const QJsonObject &stepData, const
     ocrForm = new OcrForm(this);
     yoloForm = new YoloForm(this);
     roiClickForm = new RoiClickForm(this);
+    swipeForm = new SwipeForm(this);
 
     // 下拉项、步骤类型、表单页在此处一一对应；调整顺序只改这里即可，
     // 其余逻辑均按类型字符串（itemData）分发，不依赖下拉项下标
@@ -60,6 +61,7 @@ EditTaskDialog::EditTaskDialog(EditMode mode, const QJsonObject &stepData, const
         {"OCR识别", "OCR"},
         {"YOLO识别", "YOLO"},
         {"范围点击", "CLICK_ROI"},
+        {"滑动", "SWIPE"},
         {"等待", "WAIT"},
     };
     for (const auto& page : pages) {
@@ -83,6 +85,7 @@ EditTaskDialog::EditTaskDialog(EditMode mode, const QJsonObject &stepData, const
             else if (type == "OCR") ocrForm->loadFromJson(configId, stepData);
             else if (type == "YOLO") yoloForm->loadFromJson(configId, stepData);
             else if (type == "CLICK_ROI") roiClickForm->loadFromJson(configId, stepData);
+            else if (type == "SWIPE") swipeForm->loadFromJson(configId, stepData);
             else if (type == "WAIT") waitForm->loadFromJson(configId, stepData);
         }
     }
@@ -112,6 +115,7 @@ QJsonObject EditTaskDialog::collectData() const {
     else if (type == "OCR") obj = ocrForm->toJson();
     else if (type == "YOLO") obj = yoloForm->toJson();
     else if (type == "CLICK_ROI") obj = roiClickForm->toJson();
+    else if (type == "SWIPE") obj = swipeForm->toJson();
     else if (type == "WAIT") obj = waitForm->toJson();
 
     // 编辑模式下保留原始 stepsId，防止切换类型后各表单 stepDataCopy 为空而生成新 UUID
@@ -131,6 +135,7 @@ QWidget* EditTaskDialog::formForType(const QString& type) const {
     if (type == "OCR") return ocrForm;
     if (type == "YOLO") return yoloForm;
     if (type == "CLICK_ROI") return roiClickForm;
+    if (type == "SWIPE") return swipeForm;
     if (type == "WAIT") return waitForm;
     return nullptr;
 }
@@ -249,6 +254,20 @@ void EditTaskDialog::onTestButtonClick()
             return;
         }
         emit imagePathRequested(savePath); // 发射信号
+    } else if (type == "SWIPE") {
+        QJsonObject json = swipeForm->toJson();
+        const QPointF fromPercent(json["swipeFromX"].toDouble(), json["swipeFromY"].toDouble());
+        const QPointF toPercent(json["swipeToX"].toDouble(), json["swipeToY"].toDouble());
+        QString savePath = ScriptActions::instance().swipeBetweenPoints(
+            fromPercent, toPercent,
+            json["swipeTrajectory"].toString(),
+            json["swipeDurationMs"].toInt(500));
+        if (savePath.isEmpty())
+        {
+            Logger::log(QString("测试滑动失败"));
+            return;
+        }
+        emit imagePathRequested(savePath); // 发射信号
     }
     // 等待（WAIT）无可测试动作
 }
@@ -361,6 +380,26 @@ bool EditTaskDialog::validateRoiClickFormData(const QJsonObject &data)
     return true;
 }
 
+bool EditTaskDialog::validateSwipeFormData(const QJsonObject &data)
+{
+    QString taskName = data["taskName"].toString().trimmed();
+
+    if (taskName.isEmpty()) {
+        QMessageBox::warning(this, "警告", "任务名称不能为空！");
+        return false;
+    }
+
+    // 起止点重合时滑动无位移，会被游戏视为一次点击，属于配置错误
+    const QPointF from(data["swipeFromX"].toDouble(), data["swipeFromY"].toDouble());
+    const QPointF to(data["swipeToX"].toDouble(), data["swipeToY"].toDouble());
+    if (qFuzzyCompare(from.x(), to.x()) && qFuzzyCompare(from.y(), to.y())) {
+        QMessageBox::warning(this, "警告", "点1（按下）与点2（抬起）不能重合！");
+        return false;
+    }
+
+    return true;
+}
+
 // 在 EditTaskDialog 中添加验证方法
 bool EditTaskDialog::validateData() {
     QJsonObject data = resultData();
@@ -382,6 +421,9 @@ bool EditTaskDialog::validateData() {
     }else if (comparesEqual(type, "CLICK_ROI"))
     {
         isValidate = validateRoiClickFormData(data);
+    }else if (comparesEqual(type, "SWIPE"))
+    {
+        isValidate = validateSwipeFormData(data);
     }
 
     return isValidate;

@@ -427,6 +427,99 @@ void GameWindow::clickInWindow(const cv::Point& clickPoint, const QString& click
     }
 }
 
+// 在窗口内执行滑动：起止点均为截图坐标系，映射到客户区后按点击模式分发。
+// 仅 PostMessage 模式实现后台消息滑动，Hook / InputMouse 模式暂未实现（记录日志并跳过）
+void GameWindow::swipeInWindow(const cv::Point& startPoint, const cv::Point& endPoint,
+                               TrajectoryType trajectoryType, const int durationMs,
+                               const QString& swipeContext)
+{
+    if (!IsWindow(hwnd_)) {
+        Logger::log(QString("错误: 无效的窗口句柄"));
+        return;
+    }
+
+    RECT mapClientRect{};
+    GetClientRect(hwnd_, &mapClientRect);
+    const bool isDegenerateClientRect = IsIconic(hwnd_)
+        || mapClientRect.right <= 0
+        || mapClientRect.bottom <= 0;
+
+    const cv::Point clientStart = mapCapturePointToClient(startPoint);
+    const cv::Point clientEnd = mapCapturePointToClient(endPoint);
+    qDebug() << QString("滑动坐标映射: 捕获(%1,%2)->(%3,%4), 客户区(%5,%6)->(%7,%8), 捕获尺寸: %9x%10")
+               .arg(startPoint.x).arg(startPoint.y)
+               .arg(endPoint.x).arg(endPoint.y)
+               .arg(clientStart.x).arg(clientStart.y)
+               .arg(clientEnd.x).arg(clientEnd.y)
+               .arg(lastCaptureSize_.width)
+               .arg(lastCaptureSize_.height);
+
+    // 起止点都必须落在客户区内，越界视为滑动失败
+    if (isDegenerateClientRect) {
+        if (lastCaptureSize_.width <= 0 || lastCaptureSize_.height <= 0) {
+            Logger::log(QString("错误: 滑动坐标 (%1, %2)->(%3, %4) 超出客户区范围")
+                            .arg(clientStart.x).arg(clientStart.y)
+                            .arg(clientEnd.x).arg(clientEnd.y));
+            return;
+        }
+    } else if (!DPIHelper::IsPointInClientRect(hwnd_, clientStart)
+               || !DPIHelper::IsPointInClientRect(hwnd_, clientEnd)) {
+        Logger::log(QString("错误: 滑动坐标 (%1, %2)->(%3, %4) 超出客户区范围")
+                        .arg(clientStart.x).arg(clientStart.y)
+                        .arg(clientEnd.x).arg(clientEnd.y));
+        return;
+    }
+
+    bool success = false;
+    const QString mouseClickMode = SETTING_CONFIG.getMouseClickMode();
+
+    if (mouseClickMode == "Hook" || mouseClickMode == "Dx11Hook") {
+        // Hook 模式滑动需要在注入 DLL 侧扩展点击协议（按下/移动/抬起序列），暂未实现
+        Logger::log(QString("Hook模式滑动暂未实现，已跳过本次滑动"));
+    } else if (mouseClickMode == "InputMouse") {
+        // InputMouse 模式滑动需要 SendInput 前台按住拖动，暂未实现
+        Logger::log(QString("InputMouse模式滑动暂未实现，已跳过本次滑动"));
+    } else {
+        // PostMessage 模式（及兜底策略）：后台消息滑动
+        MouseSimulator simulator;
+        simulator.SetHumanLikeMode(true);
+        simulator.SetRandomDelayRange(20, 100);
+        simulator.SetJitterLevel(3);
+
+        cv::Point messageStart = clientStart;
+        cv::Point messageEnd = clientEnd;
+        HWND messageTarget = hwnd_;
+        if (!isDegenerateClientRect) {
+            // 与点击链路一致：定位起点下真正接收输入的子窗口，
+            // 起点坐标会被换算为子窗口客户区坐标，终点按相同偏移平移
+            messageTarget = resolveMessageTarget(hwnd_, messageStart);
+            if (messageTarget != hwnd_) {
+                messageEnd.x += messageStart.x - clientStart.x;
+                messageEnd.y += messageStart.y - clientStart.y;
+                qDebug() << QString("消息滑动目标为子窗口: (%1, %2)->(%3, %4)")
+                               .arg(clientStart.x).arg(clientStart.y)
+                               .arg(messageStart.x).arg(messageStart.y);
+            }
+        }
+
+        success = simulator.MessageSwipe(messageTarget,
+                                         messageStart.x, messageStart.y,
+                                         messageEnd.x, messageEnd.y,
+                                         trajectoryType, durationMs);
+    }
+
+    // 带上下文标注滑动对象，便于从日志判断滑了什么
+    if (success) {
+        Logger::log(swipeContext.isEmpty()
+                        ? QString("滑动成功")
+                        : QString("滑动成功: %1").arg(swipeContext));
+    } else {
+        Logger::log(swipeContext.isEmpty()
+                        ? QString("滑动失败")
+                        : QString("滑动失败: %1").arg(swipeContext));
+    }
+}
+
 cv::Point GameWindow::mapCapturePointToClient(const cv::Point& capturePoint)
 {
     if (!IsWindow(hwnd_) || lastCaptureSize_.width <= 0 || lastCaptureSize_.height <= 0) {

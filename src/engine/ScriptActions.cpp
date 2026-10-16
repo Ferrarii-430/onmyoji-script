@@ -919,6 +919,60 @@ QString ScriptActions::clickInRoi(const QRectF& roiPercent, const bool randomCli
     return saveResultAndShow(resultImg);
 }
 
+QString ScriptActions::swipeBetweenPoints(const QPointF& fromPercent, const QPointF& toPercent,
+                                          const QString& trajectoryType, const int durationMs,
+                                          const bool skipCollaborationGuard)
+{
+    // 协作弹窗守卫：滑动无识别，被弹窗遮挡不会表现为失败，
+    // 与 clickInRoi 同理改为滑动前先扫协作弹窗（命中则点击取消并等待 1s）
+    if (m_collaborationGuardEnabled && !skipCollaborationGuard)
+    {
+        cancelCollaborationPopup();
+    }
+
+    cv::Mat winImg = capture::captureGameWindow();
+    if (winImg.empty())
+    {
+        Logger::log(QString("swipeBetweenPoints: 截图失败"));
+        return QString();
+    }
+
+    // 百分比 -> 像素，与 clickInRoi 相同的换算方式，并夹取到图片范围内
+    const cv::Point fromPt(
+        cvRound(winImg.cols * fromPercent.x() / 100.0),
+        cvRound(winImg.rows * fromPercent.y() / 100.0));
+    const cv::Point toPt(
+        cvRound(winImg.cols * toPercent.x() / 100.0),
+        cvRound(winImg.rows * toPercent.y() / 100.0));
+    const cv::Point clampFrom(std::clamp(fromPt.x, 0, winImg.cols - 1),
+                              std::clamp(fromPt.y, 0, winImg.rows - 1));
+    const cv::Point clampTo(std::clamp(toPt.x, 0, winImg.cols - 1),
+                            std::clamp(toPt.y, 0, winImg.rows - 1));
+
+    // 轨迹类型字符串 -> MouseSimulator 枚举；未知值回退为贝塞尔曲线
+    TrajectoryType trajectory = TrajectoryType::BEZIER;
+    if (trajectoryType.compare(QStringLiteral("LINEAR"), Qt::CaseInsensitive) == 0) {
+        trajectory = TrajectoryType::LINEAR;
+    } else if (trajectoryType.compare(QStringLiteral("S_CURVE"), Qt::CaseInsensitive) == 0) {
+        trajectory = TrajectoryType::S_CURVE;
+    } else if (trajectoryType.compare(QStringLiteral("RANDOM_WALK"), Qt::CaseInsensitive) == 0) {
+        trajectory = TrajectoryType::RANDOM_WALK;
+    }
+
+    // 保存带起止点、滑动方向标记的结果图
+    cv::Mat resultImg = winImg.clone();
+    cv::arrowedLine(resultImg, clampFrom, clampTo, cv::Scalar(0, 255, 0), 2, cv::LINE_AA);
+    cv::circle(resultImg, clampFrom, 6, cv::Scalar(0, 97, 255), 2, cv::LINE_AA);   // 起点橙红
+    cv::circle(resultImg, clampTo, 6, cv::Scalar(255, 144, 30), 2, cv::LINE_AA);   // 终点蓝橙
+
+    GameWindow::instance().swipeInWindow(clampFrom, clampTo, trajectory, durationMs,
+        QString("滑动(%1,%2)%% -> (%3,%4)%% 轨迹:%5 时长:%6ms")
+            .arg(fromPercent.x()).arg(fromPercent.y())
+            .arg(toPercent.x()).arg(toPercent.y())
+            .arg(trajectoryType, QString::number(durationMs)));
+    return saveResultAndShow(resultImg);
+}
+
 /**
  *
  * @param threshold 得分

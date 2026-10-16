@@ -140,6 +140,21 @@ QString TaskRunner::executeStep(const QJsonObject& step)
                 break;
         }
 
+        case ConfigTypeEnum::SWIPE: {
+                Logger::log(QString("开始进行滑动"));
+                // 起点（按下）/终点（抬起），单位为图片尺寸百分比；旧配置缺字段时用默认值
+                const QPointF fromPercent(step["swipeFromX"].toDouble(0.0), step["swipeFromY"].toDouble(0.0));
+                const QPointF toPercent(step["swipeToX"].toDouble(100.0), step["swipeToY"].toDouble(100.0));
+                // 滑动轨迹类型：LINEAR/BEZIER/S_CURVE/RANDOM_WALK，缺失时按贝塞尔曲线处理
+                const QString trajectory = step["swipeTrajectory"].toString(QStringLiteral("BEZIER"));
+                // 按下到抬起的总时长（毫秒），过短会被游戏判定为点击
+                const int durationMs = step["swipeDurationMs"].toInt(500);
+                savePath = recognizeWithRetry([&]() {
+                    return actions.swipeBetweenPoints(fromPercent, toPercent, trajectory, durationMs);
+                });
+                break;
+        }
+
         case ConfigTypeEnum::WAIT: {
                 int waitTime = step["time"].toInt();
                 bool randomWait = step["randomWait"].toBool();
