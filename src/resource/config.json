@@ -97,5 +97,27 @@
         "type": "SYSTEM_MITAMA"
       }
     ]
+  },
+  {
+    "id": "D942C777-2449-41P2-A595-044486E39SG13",
+    "name": "系统方案-六道之门",
+    "type": "system",
+    "tip": "自动循环执行六道之门活动流程（方案逻辑待实现）。",
+    "steps": [
+      {
+        "identifyErrorHandle": "next",
+        "imagePath": null,
+        "jumpStepsId": null,
+        "ocrText": null,
+        "offsetTime": null,
+        "randomClick": true,
+        "randomWait": null,
+        "score": 0.55,
+        "stepsId": "98959147-b290-9645-5876-58995ub7s6g1",
+        "taskName": "六道之门",
+        "time": null,
+        "type": "SYSTEM_SIX_GATES"
+      }
+    ]
   }
 ]

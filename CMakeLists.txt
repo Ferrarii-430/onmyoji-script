@@ -119,6 +119,8 @@ add_executable(qtTest WIN32
         src/engine/scenarios/BorderBreakthrough.h
         src/engine/scenarios/Budokai.cpp
         src/engine/scenarios/Budokai.h
+        src/engine/scenarios/SixGates.cpp
+        src/engine/scenarios/SixGates.h
 
         # ui: 界面层
         src/ui/main/mainwindow.cpp
