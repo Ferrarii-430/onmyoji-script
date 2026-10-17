@@ -40,17 +40,23 @@ struct Dx11CaptureShared {
 #pragma pack(pop)
 
 // ============================================================================
-// 坐标点击（后台输入注入）共享内存协议。
-// 该文件的结构体布局必须与注入 DLL (onmyoji-dx11-hook/src/main.cpp) 中的
+// 坐标点击/滑动（后台输入注入）共享内存协议。
+// 该文件的结构体布局必须与注入 DLL (D:/CppProduct/dx11_hook/src/main.cpp) 中的
 // Dx11ClickCommand 完全一致。DLL 已注入游戏进程，向 swap chain 输出窗口
-// PostMessage 鼠标消息实现后台点击。script 进程把 (x,y) 写入共享内存并
-// SetEvent 请求事件，轮询 doneSeq 确认 DLL 已投递。
+// PostMessage 鼠标消息实现后台点击/滑动。script 进程把命令写入共享内存并
+// SetEvent 请求事件，轮询 doneSeq 确认 DLL 已投递完成。
 // ============================================================================
 #define DX11_CLICK_SHARED_NAME L"OnmyojiDx11ClickShared"
 #define DX11_CLICK_REQUEST_EVENT_NAME L"OnmyojiDx11ClickRequest"
 
 static const uint32_t DX11_CLICK_MAGIC = 0x314B4C43; // 'CLK1'
-static const uint32_t DX11_CLICK_VERSION = 1;
+static const uint32_t DX11_CLICK_VERSION = 2;
+
+// 滑动轨迹类型常量，取值与 script 侧 MouseSimulator::TrajectoryType 一致
+static const uint32_t DX11_SWIPE_TRAJECTORY_LINEAR = 0;
+static const uint32_t DX11_SWIPE_TRAJECTORY_BEZIER = 1;
+static const uint32_t DX11_SWIPE_TRAJECTORY_S_CURVE = 2;
+static const uint32_t DX11_SWIPE_TRAJECTORY_RANDOM_WALK = 3;
 
 #pragma pack(push, 4)
 struct Dx11ClickCommand {
@@ -58,8 +64,13 @@ struct Dx11ClickCommand {
     uint32_t version;   // DX11_CLICK_VERSION
     uint32_t sequence;  // 写端每次请求自增
     uint32_t doneSeq;   // DLL 执行投递后置为本次 sequence
-    int32_t  x;         // 截图像素坐标（与后备缓冲区一致）
+    int32_t  x;         // 起点，截图像素坐标（与后备缓冲区一致）
     int32_t  y;
+    // ---- v2 新增：滑动扩展字段（单击时 x2==x && y2==y）----
+    int32_t  x2;        // 滑动终点（抬起点）；单击时与 x/y 相同
+    int32_t  y2;
+    uint32_t trajectory; // 滑动轨迹类型，见 DX11_SWIPE_TRAJECTORY_*；单击时忽略
+    uint32_t durationMs; // 按下到抬起的总时长；0 视为单击
 };
 #pragma pack(pop)
 

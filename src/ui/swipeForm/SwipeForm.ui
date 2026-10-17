@@ -157,19 +157,6 @@
      </layout>
     </item>
     <item row="4" column="0">
-     <widget class="QLabel" name="trajectoryLabel">
-      <property name="toolTip">
-       <string>滑动经过的轨迹形状，与鼠标控制模式一致</string>
-      </property>
-      <property name="text">
-       <string>轨迹类型</string>
-      </property>
-     </widget>
-    </item>
-    <item row="4" column="1">
-     <widget class="QComboBox" name="swipeTrajectoryBox"/>
-    </item>
-    <item row="5" column="0">
      <widget class="QLabel" name="durationLabel">
       <property name="toolTip">
        <string>从按下到抬起的总时长；过短会被游戏判定为点击而非滑动</string>
@@ -179,7 +166,7 @@
       </property>
      </widget>
     </item>
-    <item row="5" column="1">
+    <item row="4" column="1">
      <widget class="QSpinBox" name="swipeDurationBox">
       <property name="toolTip">
        <string>从按下到抬起的总时长（毫秒）</string>
@@ -201,7 +188,7 @@
       </property>
      </widget>
     </item>
-    <item row="6" column="0">
+    <item row="5" column="0">
      <widget class="QLabel" name="errorHandleLabel">
       <property name="toolTip">
        <string>滑动失败（截图失败）时的处理方式</string>
@@ -211,20 +198,20 @@
       </property>
      </widget>
     </item>
-    <item row="6" column="1">
+    <item row="5" column="1">
      <widget class="QComboBox" name="errorHandleBox"/>
     </item>
-    <item row="7" column="0">
+    <item row="6" column="0">
      <widget class="QLabel" name="stepInputLabel">
       <property name="text">
        <string>跳转步骤</string>
       </property>
      </widget>
     </item>
-    <item row="7" column="1">
+    <item row="6" column="1">
      <widget class="QComboBox" name="stepInputBox"/>
     </item>
-    <item row="8" column="0">
+    <item row="7" column="0">
      <widget class="QLabel" name="autoCancelCollabLabel">
       <property name="toolTip">
        <string>开启后本步骤滑动前自动扫描协作邀请弹窗并点击关闭，避免滑到弹窗上（仅当前步骤生效，非全局）</string>
@@ -234,32 +221,25 @@
       </property>
      </widget>
     </item>
-    <item row="8" column="1">
+    <item row="7" column="1">
      <widget class="QCheckBox" name="autoCancelCollabCheckBox">
       <property name="text">
        <string/>
       </property>
      </widget>
     </item>
-    <item row="9" column="0">
+    <item row="8" column="0">
      <widget class="QLabel" name="previewLabel">
       <property name="text">
        <string>预览</string>
       </property>
      </widget>
     </item>
-    <item row="9" column="1">
+    <item row="8" column="1">
      <layout class="QHBoxLayout" name="previewBtnLayout">
       <property name="spacing">
        <number>8</number>
       </property>
-      <item>
-       <widget class="QToolButton" name="btnUploadImage">
-        <property name="text">
-         <string>上传图片查看区域</string>
-        </property>
-       </widget>
-      </item>
       <item>
        <widget class="QToolButton" name="btnCaptureImage">
         <property name="toolTip">
@@ -272,7 +252,7 @@
       </item>
      </layout>
     </item>
-    <item row="10" column="0" colspan="2">
+    <item row="9" column="0" colspan="2">
      <widget class="SwipePreviewWidget" name="swipePreview" native="true">
       <property name="sizePolicy">
        <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
@@ -294,7 +274,7 @@
       </property>
      </widget>
     </item>
-    <item row="11" column="0" colspan="2">
+    <item row="10" column="0" colspan="2">
      <spacer name="bottomSpacer">
       <property name="orientation">
        <enum>Qt::Vertical</enum>

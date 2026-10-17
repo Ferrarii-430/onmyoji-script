@@ -474,11 +474,38 @@ void GameWindow::swipeInWindow(const cv::Point& startPoint, const cv::Point& end
     const QString mouseClickMode = SETTING_CONFIG.getMouseClickMode();
 
     if (mouseClickMode == "Hook" || mouseClickMode == "Dx11Hook") {
-        // Hook 模式滑动需要在注入 DLL 侧扩展点击协议（按下/移动/抬起序列），暂未实现
-        Logger::log(QString("Hook模式滑动暂未实现，已跳过本次滑动"));
+        // 通过已注入的 DX11 hook DLL 在游戏进程内部投递滑动消息。
+        // 与点击一致：坐标使用截图(后备缓冲区)坐标系，由 DLL 侧换算为客户区坐标，
+        // 不依赖窗口客户区状态，窗口最小化也能正常工作。
+        const QString pid = processId();
+        if (pid.isEmpty()) {
+            Logger::log(QString("Hook滑动失败：无法获取进程ID"));
+        } else {
+            success = capture::swipeByDllInjection(pid, startPoint.x, startPoint.y,
+                                                   endPoint.x, endPoint.y,
+                                                   static_cast<int>(trajectoryType), durationMs);
+        }
     } else if (mouseClickMode == "InputMouse") {
-        // InputMouse 模式滑动需要 SendInput 前台按住拖动，暂未实现
-        Logger::log(QString("InputMouse模式滑动暂未实现，已跳过本次滑动"));
+        // InputMouse 模式使用 SendInput 模拟硬件滑动，该 API 只将输入路由到前台窗口，
+        // 因此必须先将目标窗口带到前台，否则手势会作用于当前前台窗口
+        BringWindowToTop(hwnd_);
+        SetForegroundWindow(hwnd_);
+        core::waitWithEventProcessing(50);
+
+        POINT screenStart = { clientStart.x, clientStart.y };
+        POINT screenEnd = { clientEnd.x, clientEnd.y };
+        if (!isDegenerateClientRect) {
+            ClientToScreen(hwnd_, &screenStart);
+            ClientToScreen(hwnd_, &screenEnd);
+        }
+
+        MouseSimulator simulator;
+        simulator.SetHumanLikeMode(true);
+        simulator.SetRandomDelayRange(20, 100);
+        simulator.SetJitterLevel(3);
+        success = simulator.HardwareSwipe(screenStart.x, screenStart.y,
+                                          screenEnd.x, screenEnd.y,
+                                          trajectoryType, durationMs);
     } else {
         // PostMessage 模式（及兜底策略）：后台消息滑动
         MouseSimulator simulator;

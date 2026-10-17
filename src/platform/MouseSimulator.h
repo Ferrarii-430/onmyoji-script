@@ -70,6 +70,12 @@ public:
                       TrajectoryType trajectoryType = TrajectoryType::BEZIER,
                       int durationMs = 500);
 
+    // 前台硬件滑动（SendInput/SetCursorPos）：光标移到起点按下，沿指定轨迹
+    // 移动到终点后抬起。该 API 只路由到前台窗口，调用前须先把目标窗口带到前台。
+    bool HardwareSwipe(int startX, int startY, int endX, int endY,
+                       TrajectoryType trajectoryType = TrajectoryType::BEZIER,
+                       int durationMs = 500);
+
     // 辅助方法
     void AddRandomMicroMovements(int targetX, int targetY);
     void PostClickBehavior();

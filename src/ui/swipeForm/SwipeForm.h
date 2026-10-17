@@ -29,7 +29,6 @@ public:
     QJsonObject toJson() const;
 
 private slots:
-    void onUploadImageClicked();
     void onCaptureImageClicked();
     void updateSwipePreview();
 

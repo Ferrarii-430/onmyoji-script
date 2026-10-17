@@ -157,6 +157,12 @@ void addConfigToJsonFile(const QString &filePath, const QString &configId, const
             newObj["excludeRight"]  = safeValue(json, "excludeRight");
             newObj["excludeTop"]    = safeValue(json, "excludeTop");
             newObj["excludeBottom"] = safeValue(json, "excludeBottom");
+            newObj["autoCancelCollab"] = safeValue(json, "autoCancelCollab");
+            newObj["swipeFromX"] = safeValue(json, "swipeFromX");
+            newObj["swipeFromY"] = safeValue(json, "swipeFromY");
+            newObj["swipeToX"]   = safeValue(json, "swipeToX");
+            newObj["swipeToY"]   = safeValue(json, "swipeToY");
+            newObj["swipeDurationMs"] = safeValue(json, "swipeDurationMs");
 
             //获取原来的 steps 数组并修改
             QJsonArray stepsArray = obj.value("steps").toArray();
@@ -238,6 +244,12 @@ void updateConfigInJsonFile(const QString &filePath, const QString &configId, co
                     updatedStep["excludeRight"]  = safeValue(json, "excludeRight");
                     updatedStep["excludeTop"]    = safeValue(json, "excludeTop");
                     updatedStep["excludeBottom"] = safeValue(json, "excludeBottom");
+                    updatedStep["autoCancelCollab"] = safeValue(json, "autoCancelCollab");
+                    updatedStep["swipeFromX"] = safeValue(json, "swipeFromX");
+                    updatedStep["swipeFromY"] = safeValue(json, "swipeFromY");
+                    updatedStep["swipeToX"]   = safeValue(json, "swipeToX");
+                    updatedStep["swipeToY"]   = safeValue(json, "swipeToY");
+                    updatedStep["swipeDurationMs"] = safeValue(json, "swipeDurationMs");
 
                     // 替换原来的步骤对象
                     stepsArray[j] = updatedStep;

@@ -11,6 +11,7 @@
 #include "src/core/ConfigTypeEnum.h"
 
 #include "src/core/Logger.h"
+#include "src/core/SettingManager.h"
 #include "src/engine/ScriptActions.h"
 #include "src/game/GameWindow.h"
 #include "src/ui/typeOpenCVForm/typeopencvform.h"
@@ -258,9 +259,10 @@ void EditTaskDialog::onTestButtonClick()
         QJsonObject json = swipeForm->toJson();
         const QPointF fromPercent(json["swipeFromX"].toDouble(), json["swipeFromY"].toDouble());
         const QPointF toPercent(json["swipeToX"].toDouble(), json["swipeToY"].toDouble());
+        // 轨迹类型与任务执行一致：跟随设置页的全局鼠标控制模式
         QString savePath = ScriptActions::instance().swipeBetweenPoints(
             fromPercent, toPercent,
-            json["swipeTrajectory"].toString(),
+            SETTING_CONFIG.getMouseControlMode(),
             json["swipeDurationMs"].toInt(500));
         if (savePath.isEmpty())
         {

@@ -380,6 +380,62 @@ bool MouseSimulator::MessageSwipe(HWND hWnd, int startX, int startY, int endX, i
     return PostMessage(hWnd, WM_LBUTTONUP, 0, MAKELPARAM(endX, endY)) != 0;
 }
 
+// 前台硬件滑动：SetCursorPos 移动 + SendInput 按下/抬起。
+// 时序与 MessageSwipe 一致：停留 80~150ms 确保游戏识别为拖动而非点击。
+bool MouseSimulator::HardwareSwipe(int startX, int startY, int endX, int endY,
+                                   TrajectoryType trajectoryType, int durationMs) {
+    if (!IsPositionValid(startX, startY) || !IsPositionValid(endX, endY)) {
+        return false;
+    }
+    if (durationMs <= 0) {
+        durationMs = 500;
+    }
+
+    // 先把光标移到起点
+    if (!MoveTo(startX, startY)) {
+        return false;
+    }
+    Sleep(GetRandomInRange(20, 50));
+
+    // 在起点按下左键并短暂停留
+    INPUT inputDown = {0};
+    inputDown.type = INPUT_MOUSE;
+    inputDown.mi.dwFlags = MOUSEEVENTF_LEFTDOWN;
+    if (SendInput(1, &inputDown, sizeof(INPUT)) != 1) {
+        return false;
+    }
+    Sleep(GetRandomInRange(80, 150));
+
+    // 按步进间隔估算轨迹点数，时长均分到每个移动点（与 MessageSwipe 相同策略）
+    constexpr int kStepMs = 15;
+    const int steps = durationMs / kStepMs > 8 ? durationMs / kStepMs : 8;
+    std::vector<POINT> trajectory = GenerateComplexTrajectory(
+        {startX, startY}, {endX, endY}, trajectoryType, steps);
+    if (trajectory.size() > 1) {
+        trajectory.erase(trajectory.begin()); // 首点与按下位置重复，跳过
+    }
+
+    const int perMove = trajectory.empty() ? durationMs : durationMs / (int)trajectory.size();
+    for (const auto& pt : trajectory) {
+        if (!MoveTo(pt.x, pt.y)) {
+            // 途中失败仍需抬起左键，避免系统残留"按住"状态
+            INPUT inputUp = {0};
+            inputUp.type = INPUT_MOUSE;
+            inputUp.mi.dwFlags = MOUSEEVENTF_LEFTUP;
+            SendInput(1, &inputUp, sizeof(INPUT));
+            return false;
+        }
+        const int delay = perMove + GetRandomInRange(-3, 3);
+        Sleep(delay > 1 ? delay : 1);
+    }
+
+    // 在终点抬起左键
+    INPUT inputUp = {0};
+    inputUp.type = INPUT_MOUSE;
+    inputUp.mi.dwFlags = MOUSEEVENTF_LEFTUP;
+    return SendInput(1, &inputUp, sizeof(INPUT)) == 1;
+}
+
 // 辅助方法
 void MouseSimulator::AddRandomMicroMovements(int targetX, int targetY) {
     POINT currentPos = GetCurrentPosition();

@@ -4,7 +4,6 @@
 
 #include "SwipeForm.h"
 
-#include <QFileDialog>
 #include <QJsonObject>
 #include <QMessageBox>
 #include <QUuid>
@@ -24,13 +23,6 @@ SwipeForm::SwipeForm(QWidget *parent) :
     ui->stepInputBox->hide(); // 初始状态隐藏
     ui->stepInputLabel->hide(); // 初始状态隐藏
 
-    // 轨迹类型与 MouseSimulator::TrajectoryType 一一对应，存储英文标识便于持久化
-    ui->swipeTrajectoryBox->addItem("直线", "LINEAR");
-    ui->swipeTrajectoryBox->addItem("贝塞尔曲线", "BEZIER");
-    ui->swipeTrajectoryBox->addItem("S形曲线", "S_CURVE");
-    ui->swipeTrajectoryBox->addItem("随机漫步", "RANDOM_WALK");
-    ui->swipeTrajectoryBox->setCurrentIndex(ui->swipeTrajectoryBox->findData("BEZIER"));
-
     ui->errorHandleBox->addItem("继续执行任务","next");
     ui->errorHandleBox->addItem("跳转步骤","jump");
     ui->errorHandleBox->addItem("跳过本次循环","continue");
@@ -38,7 +30,6 @@ SwipeForm::SwipeForm(QWidget *parent) :
     ui->errorHandleBox->addItem("重试","retry");
     ui->errorHandleBox->setCurrentIndex(ui->errorHandleBox->findData("break"));
 
-    connect(ui->btnUploadImage, &QToolButton::clicked, this, &SwipeForm::onUploadImageClicked);
     connect(ui->btnCaptureImage, &QToolButton::clicked, this, &SwipeForm::onCaptureImageClicked);
     connect(ui->swipeFromXBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &SwipeForm::updateSwipePreview);
     connect(ui->swipeFromYBox, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &SwipeForm::updateSwipePreview);
@@ -104,10 +95,6 @@ void SwipeForm::loadFromJson(const QString &configId, const QJsonObject &obj)
     ui->swipeToYBox->setValue(obj["swipeToY"].toDouble(100.0));
     updateSwipePreview();
 
-    const QString trajectory = obj["swipeTrajectory"].toString("BEZIER");
-    const int trajectoryIndex = ui->swipeTrajectoryBox->findData(trajectory);
-    ui->swipeTrajectoryBox->setCurrentIndex(trajectoryIndex >= 0 ? trajectoryIndex
-                                                                 : ui->swipeTrajectoryBox->findData("BEZIER"));
     ui->swipeDurationBox->setValue(obj["swipeDurationMs"].toInt(500));
 
     QString currentIdentifyErrorHandle = obj["identifyErrorHandle"].toString();
@@ -139,27 +126,6 @@ void SwipeForm::updateSwipePreview()
                                        ui->swipeFromYBox->value());
     ui->swipePreview->setPoint2Percent(ui->swipeToXBox->value(),
                                        ui->swipeToYBox->value());
-}
-
-void SwipeForm::onUploadImageClicked()
-{
-    const QString fileName = QFileDialog::getOpenFileName(
-        this,
-        tr("选择参考图片"),
-        QString(),
-        tr("图片文件 (*.png *.jpg *.jpeg *.bmp)"));
-    if (fileName.isEmpty()) {
-        return;
-    }
-
-    const QPixmap pix(fileName);
-    if (pix.isNull()) {
-        QMessageBox::warning(this, tr("打开失败"), tr("无法加载所选图片。"));
-        return;
-    }
-
-    ui->swipePreview->setImage(pix);
-    updateSwipePreview();
 }
 
 void SwipeForm::onCaptureImageClicked()
@@ -229,7 +195,6 @@ QJsonObject SwipeForm::toJson() const {
     obj["swipeFromY"] = ui->swipeFromYBox->value();
     obj["swipeToX"] = ui->swipeToXBox->value();
     obj["swipeToY"] = ui->swipeToYBox->value();
-    obj["swipeTrajectory"] = ui->swipeTrajectoryBox->currentData().toString();
     obj["swipeDurationMs"] = ui->swipeDurationBox->value();
     obj["identifyErrorHandle"] = ui->errorHandleBox->currentData().toString();
 

@@ -255,9 +255,11 @@ bool isClickEventAvailable()
     return true;
 }
 
-// 快速路径：把 (x,y) 写入点击共享内存并 SetEvent，轮询 doneSeq 确认 DLL 已投递。
-// 返回 true 表示 DLL 点击工作线程已确认完成投递。
-bool clickViaEvent(int x, int y)
+// 快速路径通用实现：把一条点击/滑动命令写入共享内存并 SetEvent，
+// 轮询 doneSeq 确认 DLL 已投递完成。滑动时 DLL 在整个手势投递完成后才置位
+// doneSeq，确认超时按 durationMs 放宽。返回 true 表示 DLL 工作线程已确认完成。
+bool submitClickCommand(int x1, int y1, int x2, int y2,
+                        uint32_t trajectory, uint32_t durationMs)
 {
     HANDLE mapping = OpenFileMappingW(FILE_MAP_READ | FILE_MAP_WRITE,
                                       FALSE, DX11_CLICK_SHARED_NAME);
@@ -274,8 +276,12 @@ bool clickViaEvent(int x, int y)
     const uint32_t mySeq = cmd->sequence + 1;
     cmd->magic = DX11_CLICK_MAGIC;
     cmd->version = DX11_CLICK_VERSION;
-    cmd->x = x;
-    cmd->y = y;
+    cmd->x = x1;
+    cmd->y = y1;
+    cmd->x2 = x2;
+    cmd->y2 = y2;
+    cmd->trajectory = trajectory;
+    cmd->durationMs = durationMs;
     cmd->sequence = mySeq;
     cmd->doneSeq = 0;
 
@@ -288,11 +294,14 @@ bool clickViaEvent(int x, int y)
     SetEvent(hEvent);
     CloseHandle(hEvent);
 
-    // 轮询确认 DLL 工作线程已投递鼠标消息（DLL 侧投递含 ~60ms 延时）
+    // 轮询确认 DLL 工作线程已投递完成：单击含 ~60ms 延时给 1s；
+    // 滑动需等整个手势（durationMs）投递完，再加 3s 余量
+    const bool isSwipe = (x2 != x1 || y2 != y1) && durationMs > 0;
+    const int waitMs = isSwipe ? static_cast<int>(durationMs) + 3000 : 1000;
     bool done = false;
     QElapsedTimer timer;
     timer.start();
-    while (timer.elapsed() < 1000) {
+    while (timer.elapsed() < waitMs) {
         if (cmd->doneSeq == mySeq) { done = true; break; }
         QThread::msleep(2);
     }
@@ -300,6 +309,12 @@ bool clickViaEvent(int x, int y)
     UnmapViewOfFile(view);
     CloseHandle(mapping);
     return done;
+}
+
+// 快速路径：单击命令
+bool clickViaEvent(int x, int y)
+{
+    return submitClickCommand(x, y, x, y, 0, 0);
 }
 
 // 注入器运行后检测 DLL 注入状态：从未注入变为已注入时记录一条成功日志。
@@ -650,6 +665,80 @@ bool clickByDllInjection(const QString& targetPid, int x, int y)
 
     logDllInjectionStateChange(wasInjectedBefore, targetPid);
     Logger::log(QString("点击成功(注入器) (%1, %2)").arg(x).arg(y));
+    return true;
+}
+
+bool swipeByDllInjection(const QString& targetPid, int x1, int y1, int x2, int y2,
+                         const int trajectory, const int durationMs)
+{
+    // =========================================================================
+    // 快速路径：DLL 已注入时直接通过跨进程事件触发滑动，无需启动进程。
+    // =========================================================================
+    if (isClickEventAvailable()
+        && submitClickCommand(x1, y1, x2, y2,
+                              static_cast<uint32_t>(trajectory),
+                              static_cast<uint32_t>(durationMs))) {
+        qDebug() << QString("滑动成功(快速路径) (%1, %2)->(%3, %4)").arg(x1).arg(y1).arg(x2).arg(y2);
+        return true;
+    }
+
+    // =========================================================================
+    // 回退路径：启动注入器 -swipe 完成注入 + 滑动。
+    // =========================================================================
+    const QString remoteCaptureExe = AppPaths::instance().remoteCaptureExePath();
+    const QString dllPath = QDir::toNativeSeparators(AppPaths::instance().dx11HookDllPath());
+    const QString dllName = AppPaths::instance().dx11HookDllName();
+
+    if (targetPid.isEmpty()) {
+        qWarning() << "滑动失败：无法获取目标进程ID";
+        return false;
+    }
+    if (!QFile::exists(remoteCaptureExe) || !QFile::exists(dllPath)) {
+        qWarning() << "滑动失败：注入器或 DLL 不存在" << remoteCaptureExe << dllPath;
+        return false;
+    }
+
+    // 记录注入器运行前的注入状态，运行后用于检测"注入成功"并记录日志
+    const bool wasInjectedBefore = isDllInjected();
+
+    QProcess process;
+    process.setProcessChannelMode(QProcess::MergedChannels);
+    QStringList arguments;
+    arguments << "-swipe"
+              << targetPid
+              << dllPath
+              << dllName
+              << QString::number(x1)
+              << QString::number(y1)
+              << QString::number(x2)
+              << QString::number(y2)
+              << QString::number(trajectory)
+              << QString::number(durationMs);
+
+    process.start(remoteCaptureExe, arguments);
+
+    // 手势执行需 durationMs + DLL 确认余量，注入器等待按此放宽
+    if (!waitForProcessResponsive(process, 20000 + durationMs)) {
+        qWarning() << "滑动命令执行超时，注入器已被终止；已有输出:"
+                   << process.readAll();
+        process.kill();
+        waitForProcessResponsive(process, 1000);
+        logDllInjectionStateChange(wasInjectedBefore, targetPid);
+        return false;
+    }
+
+    const int exitCode = process.exitCode();
+    const QByteArray output = process.readAll();
+    if (exitCode != 0) {
+        // 旧版注入器/DLL 不支持 -swipe / InjectSwipe 导出，提示重新编译部署
+        qWarning() << "注入器 -swipe 失败（注入器或 libdx11_hook.dll 可能是"
+                      "不支持滑动的旧版本，请重新编译部署），退出码:"
+                   << exitCode << "输出:" << output;
+        return false;
+    }
+
+    logDllInjectionStateChange(wasInjectedBefore, targetPid);
+    Logger::log(QString("滑动成功(注入器) (%1, %2)->(%3, %4)").arg(x1).arg(y1).arg(x2).arg(y2));
     return true;
 }
 

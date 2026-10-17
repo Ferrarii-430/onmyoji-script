@@ -43,7 +43,8 @@ public:
     void clickInWindow(const cv::Point& clickPoint, const QString& clickContext = QString());
 
     // 在窗口内执行滑动（起止点均为截图坐标系）：从 startPoint 按下滑动到 endPoint 后抬起。
-    // 仅 PostMessage 模式实现后台消息滑动；Hook / InputMouse 模式暂未实现（记录日志并跳过）。
+    // 按点击模式分发：Hook/Dx11Hook 经注入 DLL 后台投递，InputMouse 前台 SendInput，
+    // PostMessage 后台消息投递（见 swipeInWindow 实现）。
     // swipeContext 用于日志标注本次滑动对象，为空时日志显示通用的「滑动成功/滑动失败」
     void swipeInWindow(const cv::Point& startPoint, const cv::Point& endPoint,
                        TrajectoryType trajectoryType, int durationMs,

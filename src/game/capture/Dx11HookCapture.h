@@ -13,6 +13,13 @@ bool captureByDllInjection(const QString& targetPid, cv::Mat& winImg);
 // 优先走跨进程事件快速路径，失败回退到注入器 -click。
 bool clickByDllInjection(const QString& targetPid, int x, int y);
 
+// 通过注入的 DX11 hook DLL 执行一次后台滑动（起止点均为截图坐标系）。
+// trajectory 取值见 Dx11CaptureShared.h 的 DX11_SWIPE_TRAJECTORY_* 常量
+// （与 MouseSimulator::TrajectoryType 一致）；durationMs 为按下到抬起总时长。
+// 优先走跨进程事件快速路径，失败回退到注入器 -swipe。
+bool swipeByDllInjection(const QString& targetPid, int x1, int y1, int x2, int y2,
+                         int trajectory, int durationMs);
+
 // 修改注入 DLL 的日志输出路径
 bool dllSetLogPath(const QString& targetPid);
 
