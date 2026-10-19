@@ -66,7 +66,9 @@ namespace scenarios {
             }
         }
         Logger::log(QString("已选中椒图"));
+        waitRandomWithEventProcessing(1200,200);
 
+        //点击式神录切换御魂
 
         // TODO: 六道之门单轮流程待实现，参考 Anniversary999.cpp 的步骤骨架：
         //   1. 首轮初始化（用 sixGates_isRoundInitialized 判断是否为当次任务的第一局）

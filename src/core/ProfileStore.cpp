@@ -65,6 +65,7 @@ void addConfigToJsonFile(const QString &filePath, const QString &name)
     QJsonObject newObj;
     newObj["id"]   = QUuid::createUuid().toString(QUuid::WithoutBraces);  // UUID
     newObj["name"] = name;
+    newObj["visible"] = true;  // 新增方案默认在列表中显示
     newObj["type"] = "normal";
     newObj["steps"] = QJsonArray();  // 空数组
 

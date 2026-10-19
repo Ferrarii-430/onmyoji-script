@@ -246,8 +246,18 @@ void mainwindow::loadListWidgetData()
     ui->listWidget->clear();
 
     QJsonArray arr = m_configArray;
+
+    // 显隐字段过滤：visible 为 false 的方案不在列表中显示；
+    // 缺省视为 true，兼容无该字段的旧配置
+    QJsonArray visibleArr;
     for (int i = 0; i < arr.size(); i++) {
-        QJsonObject obj = arr[i].toObject();
+        if (arr[i].toObject()["visible"].toBool(true)) {
+            visibleArr.append(arr[i]);
+        }
+    }
+
+    for (int i = 0; i < visibleArr.size(); i++) {
+        QJsonObject obj = visibleArr[i].toObject();
 
         QString name = obj["name"].toString();
         QString id   = obj["id"].toString();   // 假设 JSON 里有 id 字段
@@ -262,14 +272,23 @@ void mainwindow::loadListWidgetData()
         ui->listWidget->addItem(item);
     }
 
-    if (arr.size() > 0)
+    if (visibleArr.size() > 0)
     {
-        QJsonObject step = arr[0].toObject();
+        QJsonObject step = visibleArr[0].toObject();
         QString id = step["id"].toString();
         QString name = step["name"].toString();
         commonSetCurrentItem(id,name);
         ui->currentTaskName->setText(name);
-        showStepsInTable(arr[0].toObject()["steps"].toArray()); //默认显示第一配置的方案内容
+        showStepsInTable(visibleArr[0].toObject()["steps"].toArray()); //默认显示第一个可见配置的方案内容
+    }
+    else
+    {
+        // 所有方案均隐藏：清空选中状态与方案内容表格
+        commonSetCurrentItem(QString(), QString());
+        ui->currentTaskName->setText(QStringLiteral("（无方案）"));
+        ui->tableWidget->clear();
+        ui->tableWidget->setRowCount(0);
+        ui->tableWidget->setColumnCount(0);
     }
 }
 

@@ -2,12 +2,14 @@
   {
     "id": "DC42C888-2449-41D2-A894-095606E38D12",
     "name": "空的配置",
+    "visible": true,
     "steps": [],
     "type": "normal"
   },
   {
     "id": "D942C888-2449-41D2-A794-055586E39P13",
     "name": "系统方案-结界突破",
+    "visible": true,
     "type": "system",
     "tip": "自动循环执行结界突破，识别并攻击可突破的结界，突破完成后自动返回继续下一轮。",
     "systemConfig": [
@@ -39,6 +41,7 @@
   {
     "id": "A1B2C3D4-2449-41D2-A794-055586E3ARENA",
     "name": "系统方案-自动挂机斗技",
+    "visible": true,
     "type": "system",
     "tip": "自动挂机斗技，匹配对手并自动战斗，适合刷取每日信誉值。",
     "systemConfig": [
@@ -70,6 +73,7 @@
   {
     "id": "D942C666-2449-41P2-A484-044486E39P13",
     "name": "系统方案-自动御魂",
+    "visible": true,
     "type": "system",
     "tip": "自动循环刷御魂副本，支持单人或组队模式。组队模式下自动识别队长/队友身份并执行对应流程。",
     "systemConfig": [
@@ -101,6 +105,7 @@
   {
     "id": "D942C777-2449-41P2-A595-044486E39SG13",
     "name": "系统方案-六道之门",
+    "visible": true,
     "type": "system",
     "tip": "自动循环执行六道之门活动流程（方案逻辑待实现）。",
     "steps": [
@@ -117,6 +122,55 @@
         "taskName": "六道之门",
         "time": null,
         "type": "SYSTEM_SIX_GATES"
+      }
+    ]
+  },
+  {
+    "id": "E5A7D999-1357-41C2-B684-066597E40GC1",
+    "name": "系统方案-对弈竞猜采集",
+    "visible": false,
+    "type": "system",
+    "tip": "对弈竞猜数据常驻定时采集：每天 10:01 起每 2h 一局，自动采集双方式神数据并下注，整点后 1 分钟采集答案并录入后端；00:01 收尾最后一局，手动点击停止前不退出。",
+    "systemConfig": [
+      {
+        "key": "host",
+        "label": "HOST地址",
+        "control": "input",
+        "value": "host",
+        "placeholder": "HOST地址",
+        "tip": ""
+      },
+      {
+        "key": "resultUrl",
+        "label": "结果录入接口",
+        "control": "input",
+        "value": "/api/guess/round/result",
+        "placeholder": "结果录入接口",
+        "tip": ""
+      },
+      {
+        "key": "shikigamiUrl",
+        "label": "式神采集接口",
+        "control": "input",
+        "value": "/api/guess/shikigami",
+        "placeholder": "式神采集接口",
+        "tip": ""
+      }
+    ],
+    "steps": [
+      {
+        "identifyErrorHandle": "next",
+        "imagePath": null,
+        "jumpStepsId": null,
+        "ocrText": null,
+        "offsetTime": null,
+        "randomClick": true,
+        "randomWait": null,
+        "score": 0.55,
+        "stepsId": "E5A7D999-b290-9645-5876-58995ugc001",
+        "taskName": "对弈竞猜数据采集",
+        "time": null,
+        "type": "SYSTEM_GUESS_COLLECT"
       }
     ]
   }
