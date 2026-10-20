@@ -107,7 +107,25 @@
     "name": "系统方案-六道之门",
     "visible": true,
     "type": "system",
-    "tip": "自动循环执行六道之门活动流程（方案逻辑待实现）。",
+    "tip": "自动循环执行六道之门，月之海-椒图4柔风速刷方案，需要在月之海界面启动。",
+    "systemConfig": [
+      {
+        "key": "schemeName",
+        "label": "方案名称",
+        "control": "input",
+        "value": "活动",
+        "placeholder": "输入方案名称",
+        "tip": "当前六道之门使用的方案分组名称。"
+      },
+      {
+        "key": "lineupName",
+        "label": "阵容名称",
+        "control": "input",
+        "value": "月之海",
+        "placeholder": "输入阵容名称",
+        "tip": "阵容的名称，用于自动选择阵容。"
+      }
+    ],
     "steps": [
       {
         "identifyErrorHandle": "next",

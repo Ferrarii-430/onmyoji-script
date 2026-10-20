@@ -1,5 +1,6 @@
 #include "src/engine/scenarios/Budokai.h"
 #include "src/engine/scenarios/ScenarioRegistry.h"
+#include "src/utils/ScenarioHelpers.h"
 
 #include <QJsonArray>
 #include <QJsonObject>
@@ -34,34 +35,6 @@ constexpr bool randomClick = true;
 
 //0->未知状态   1->单体状态     2->群体状态
 int status = 0;
-
-// 从 OCR box（4 个角点）计算外接矩形，坐标已在 DX11 捕获坐标系
-cv::Rect boxToRect(const QJsonArray& box)
-{
-    if (box.size() < 4) return {};
-    int minX = INT_MAX, minY = INT_MAX, maxX = INT_MIN, maxY = INT_MIN;
-    for (const QJsonValue& ptVal : box) {
-        const QJsonArray pt = ptVal.toArray();
-        if (pt.size() < 2) continue;
-        const int x = pt[0].toInt();
-        const int y = pt[1].toInt();
-        minX = std::min(minX, x);
-        minY = std::min(minY, y);
-        maxX = std::max(maxX, x);
-        maxY = std::max(maxY, y);
-    }
-    if (minX > maxX || minY > maxY) return {};
-    return {minX, minY, maxX - minX, maxY - minY};
-}
-
-// 计算点击点：randomClick 时在矩形内随机，否则取中心
-cv::Point makeClickPoint(const cv::Rect& rect)
-{
-    if (randomClick) {
-        return vision::randomPointInRect(rect);
-    }
-    return {rect.x + rect.width / 2, rect.y + rect.height / 2};
-}
 
 } // namespace
 
@@ -104,9 +77,9 @@ bool executeBudokai()
         for (const QJsonValue& val : groupingData) {
             const QJsonObject item = val.toObject();
             if (item["text"].toString() == schemeName) {
-                const cv::Rect rect = boxToRect(item["box"].toArray());
+                const cv::Rect rect = utils::boxToRect(item["box"].toArray());
                 if (rect.width > 0 && rect.height > 0) {
-                    GameWindow::instance().clickInWindow(makeClickPoint(rect));
+                    GameWindow::instance().clickInWindow(utils::makeClickPoint(rect, randomClick));
                     foundGrouping = true;
                     Logger::log(QString("已点击分组: %1").arg(schemeName));
                 }
@@ -133,7 +106,7 @@ bool executeBudokai()
             Logger::log(QString("未找到预设阵容: %1").arg(lineupName));
             return false;
         }
-        const cv::Rect presetRect = boxToRect(targetPresetBox);
+        const cv::Rect presetRect = utils::boxToRect(targetPresetBox);
         if (presetRect.width <= 0 || presetRect.height <= 0) {
             Logger::log(QString("预设阵容 box 解析失败: %1").arg(lineupName));
             return false;
@@ -158,7 +131,7 @@ bool executeBudokai()
             }
         }
         if (best) {
-            GameWindow::instance().clickInWindow(makeClickPoint(best->rect));
+            GameWindow::instance().clickInWindow(utils::makeClickPoint(best->rect, randomClick));
             Logger::log(QString("点击预设队伍切换: score=%1 位置(%2,%3) 目标Y=%4 偏差=%5")
                         .arg(best->score, 0, 'f', 2).arg(best->center.x).arg(best->center.y)
                         .arg(targetY).arg(minDY));
@@ -255,9 +228,9 @@ bool executeBudokai()
     for (const QJsonValue& val : groupingData) {
         const QJsonObject item = val.toObject();
         if (item["text"].toString() == schemeName) {
-            const cv::Rect rect = boxToRect(item["box"].toArray());
+            const cv::Rect rect = utils::boxToRect(item["box"].toArray());
             if (rect.width > 0 && rect.height > 0) {
-                GameWindow::instance().clickInWindow(makeClickPoint(rect));
+                GameWindow::instance().clickInWindow(utils::makeClickPoint(rect, randomClick));
                 foundGrouping = true;
                 Logger::log(QString("已点击分组: %1").arg(schemeName));
             }
@@ -284,9 +257,9 @@ bool executeBudokai()
     for (const QJsonValue& val : presetData) {
         const QJsonObject item = val.toObject();
         if (item["text"].toString() == presetName) {
-            const cv::Rect rect = boxToRect(item["box"].toArray());
+            const cv::Rect rect = utils::boxToRect(item["box"].toArray());
             if (rect.width > 0 && rect.height > 0) {
-                GameWindow::instance().clickInWindow(makeClickPoint(rect));
+                GameWindow::instance().clickInWindow(utils::makeClickPoint(rect, randomClick));
                 foundPreset = true;
                 Logger::log(QString("已点击阵容预设: %1").arg(presetName));
             }

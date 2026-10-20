@@ -121,6 +121,8 @@ add_executable(qtTest WIN32
         src/engine/scenarios/Budokai.h
         src/engine/scenarios/SixGates.cpp
         src/engine/scenarios/SixGates.h
+        src/utils/ScenarioHelpers.cpp
+        src/utils/ScenarioHelpers.h
 
         # ui: 界面层
         src/ui/main/mainwindow.cpp
