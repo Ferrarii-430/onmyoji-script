@@ -81,7 +81,7 @@ namespace scenarios {
         waitRandomWithEventProcessing(1200,200);
 
         //点击开启
-        if (actions.ocrRecognizesAndClick("开启", 0.55, true, QRectF(84.4, 76.9, 15.6, 23.1), ocr::Enhance::Upscale).isEmpty())
+        if (actions.opencvRecognizesAndClick(screenshotPath + "turn-on.png", 0.75, false, true).isEmpty())
         {
             Logger::log(QString("点击【开启】失败"));
             return false;
@@ -233,7 +233,7 @@ namespace scenarios {
                         .arg(targetY).arg(minDY));
         }
 
-        waitWithEventProcessing(2000);
+        waitRandomWithEventProcessing(2000,200);
 
         //点击确认切换御魂
         if (actions.yoloContainsLabels(0.60, {"common-popup-confirm"}, false))
@@ -245,6 +245,8 @@ namespace scenarios {
             }
         }
 
+        waitRandomWithEventProcessing(2000,200);
+
         // 点击返回
         if (actions.yoloRecognizesAndClick(0.60, false, "common-exit-yellow").isEmpty())
         {
@@ -252,15 +254,18 @@ namespace scenarios {
             return false;
         }
 
-        //点击确定
-        //TODO 此处需要切换为 opencv
-        if (actions.ocrRecognizesAndClick("确定", 0.55, true, QRectF(83.7, 76.9, 16.3, 23.1), ocr::Enhance::Upscale).isEmpty())
+        waitRandomWithEventProcessing(2000,200);
+
+        //点击确认
+        if (actions.opencvRecognizesAndClick(screenshotPath + "confirm.png", 0.75, false, true).isEmpty())
         {
-            Logger::log(QString("点击【确定】失败"));
+            Logger::log(QString("点击【确认】失败"));
             return false;
         }
 
-        waitWithEventProcessing(2000);
+        waitRandomWithEventProcessing(2000,200);
+
+
 
         // TODO: 六道之门单轮流程待实现，参考 Anniversary999.cpp 的步骤骨架：
         //   1. 首轮初始化（用 sixGates_isRoundInitialized 判断是否为当次任务的第一局）
