@@ -113,7 +113,7 @@
         "key": "schemeName",
         "label": "方案名称",
         "control": "input",
-        "value": "活动",
+        "value": "六道之门",
         "placeholder": "输入方案名称",
         "tip": "当前六道之门使用的方案分组名称。"
       },
@@ -121,7 +121,7 @@
         "key": "lineupName",
         "label": "阵容名称",
         "control": "input",
-        "value": "月之海",
+        "value": "速刷-月之海",
         "placeholder": "输入阵容名称",
         "tip": "阵容的名称，用于自动选择阵容。"
       }

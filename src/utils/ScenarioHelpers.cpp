@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <climits>
+#include <utility>
 
 #include "src/vision/Geometry.h"
 
@@ -37,6 +38,32 @@ cv::Point makeClickPoint(const cv::Rect& rect, const bool randomClick)
         return vision::randomPointInRect(rect);
     }
     return {rect.x + rect.width / 2, rect.y + rect.height / 2};
+}
+
+QStringList ocrTexts(const QJsonArray& ocrData)
+{
+    QStringList texts;
+    texts.reserve(ocrData.size());
+    for (const QJsonValue& val : ocrData) {
+        const QString text = val.toObject().value("text").toString().trimmed();
+        if (!text.isEmpty()) {
+            texts.append(text);
+        }
+    }
+    texts.sort();
+    return texts;
+}
+
+bool OcrTextTracker::unchangedSinceLast(const QJsonArray& ocrData)
+{
+    QStringList texts = ocrTexts(ocrData);
+    if (texts.isEmpty()) {
+        // 识别失败不能当作“列表未变化”，也不覆盖上一次快照
+        return false;
+    }
+    const bool unchanged = texts == lastTexts_;
+    lastTexts_ = std::move(texts);
+    return unchanged;
 }
 
 } // namespace utils

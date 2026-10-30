@@ -7,7 +7,7 @@
 
 #include "src/utils/ScenarioHelpers.h"
 
-#include <QJsonDocument>
+#include <QJsonObject>
 #include <QString>
 
 #include "src/core/AppPaths.h"
@@ -66,12 +66,12 @@ namespace scenarios {
                 return false;
             }
             waitRandomWithEventProcessing(2000,200);
-            if (!actions.ocrContainsText("椒图", 0.55, QRectF(41.9, 25.9, 16.6, 44), ocr::Enhance::Upscale))
+            if (!actions.ocrContainsText("椒图", 0.55, QRectF(41.9, 25.9, 16.6, 44), ocr::Enhance::Upscale | ocr::Enhance::AutoInvert))
             {
                 Logger::log(QString("未识别到[椒图]"));
                 return false;
             }
-            if (!actions.clickInRoi(QRectF(43.3, 54.7, 14.2, 20.7), true).isEmpty())
+            if (actions.clickInRoi(QRectF(43.3, 54.7, 14.2, 20.7), true).isEmpty())
             {
                 Logger::log(QString("选中椒图失败"));
                 return false;
@@ -90,7 +90,7 @@ namespace scenarios {
         waitRandomWithEventProcessing(5000,500);
 
         //点击式神录切换御魂
-        if (actions.ocrRecognizesAndClick("式神录", 0.55, true, QRectF(86.1, 60.2, 13.2, 19.1), ocr::Enhance::Upscale).isEmpty())
+        if (actions.ocrRecognizesAndClick("式神录", 0.55, false, QRectF(86.1, 60.2, 13.2, 19.1), ocr::Enhance::Upscale | ocr::Enhance::AutoInvert).isEmpty())
         {
             Logger::log(QString("点击【式神录】失败"));
             return false;
@@ -108,28 +108,40 @@ namespace scenarios {
 
         waitRandomWithEventProcessing(1200,200);
 
-        //滑动到顶部
-        if (actions.swipeBetweenPoints(QPointF(50, 60),QPointF(50, 15),SETTING_CONFIG.getMouseControlMode(), 500).isEmpty())
+        //滑动到分组列表顶部
+        utils::OcrTextTracker groupTopTracker;
+        for (int i = 0; i < 10; ++i)
         {
-            Logger::log(QString("滑动失败"));
-            return false;
+            QJsonArray groupData = actions.ocrRecognizes(QRectF(84.7, 13.7, 12.5, 72.5), ocr::Enhance::Upscale);
+
+            //文本内容与上次一致（忽略 box/score 波动），说明滑动未改变列表内容，已到顶部，结束循环
+            if (groupTopTracker.unchangedSinceLast(groupData)) {
+                Logger::log(QString("分组列表别结果与上次一致，已滑动到顶部"));
+                break;
+            }
+
+            //向上滑动
+            if (actions.swipeBetweenPoints(QPointF(91.5, 27.5), QPointF(91.1, 67.8),SETTING_CONFIG.getMouseControlMode(), 500).isEmpty())
+            {
+                Logger::log(QString("滑动失败"));
+                return false;
+            }
+            //等列表滚动动画结束再识别，否则可能读到滑动前的旧画面
+            waitRandomWithEventProcessing(2000,200);
         }
 
-        waitRandomWithEventProcessing(1200,200);
-
+        //寻找目标分组列表
         bool foundGrouping = false;
-        QString previousGroupingData;
+        utils::OcrTextTracker groupingTracker;
         for (int i = 0; i < 10; ++i)
         {
             QJsonArray groupingData = actions.ocrRecognizes(QRectF(84.7, 13.7, 12.5, 72.5), ocr::Enhance::Upscale);
 
-            //识别结果与上次完全一致，说明滑动未改变列表内容，已到底部，结束循环
-            const QString currentGroupingData = QString::fromUtf8(QJsonDocument(groupingData).toJson(QJsonDocument::Compact));
-            if (!previousGroupingData.isEmpty() && currentGroupingData == previousGroupingData) {
+            //文本内容与上次一致（忽略 box/score 波动），说明滑动未改变列表内容，已到底部，结束循环
+            if (groupingTracker.unchangedSinceLast(groupingData)) {
                 Logger::log(QString("分组列表识别结果与上次一致，已滑动到底部"));
                 break;
             }
-            previousGroupingData = currentGroupingData;
 
             for (const QJsonValue& val : groupingData) {
                 const QJsonObject item = val.toObject();
@@ -145,12 +157,17 @@ namespace scenarios {
             }
 
             //向下滑动
-            if (actions.swipeBetweenPoints(QPointF(50, 15),QPointF(50, 60),SETTING_CONFIG.getMouseControlMode(), 500).isEmpty())
+            if (actions.swipeBetweenPoints(QPointF(91.1, 67.8),QPointF(91.5, 27.5), SETTING_CONFIG.getMouseControlMode(), 500).isEmpty())
             {
                 Logger::log(QString("滑动失败"));
                 return false;
             }
             waitRandomWithEventProcessing(2000,200);
+
+            if (foundGrouping) {
+                //找到数据结束循环
+                break;
+            }
         }
         if (!foundGrouping) {
             Logger::log(QString("未找到分组: %1").arg(schemeName));
@@ -159,21 +176,42 @@ namespace scenarios {
 
         waitWithEventProcessing(1500);
 
-        //识别队伍预设名称，记录目标预设的 box
-        bool foundPresets = false;
-        QJsonArray targetPresetBox; // {"box":[[47,120],[77,120],[77,136],[47,136]]}
-        QString previousPresetData;
+        //先回到列表顶部，避免目标预设在上方时漏检
+        utils::OcrTextTracker presetTopTracker;
         for (int i = 0; i < 10; ++i)
         {
             QJsonArray presetData = actions.ocrRecognizes(QRectF(40, 20.3, 28.4, 59.7), ocr::Enhance::Upscale);
 
-            //识别结果与上次完全一致，说明滑动未改变列表内容，已到底部，结束循环
-            const QString currentPresetData = QString::fromUtf8(QJsonDocument(presetData).toJson(QJsonDocument::Compact));
-            if (!previousPresetData.isEmpty() && currentPresetData == previousPresetData) {
+            //文本内容与上次一致（忽略 box/score 波动），说明滑动未改变列表内容，已到顶部，结束循环
+            if (presetTopTracker.unchangedSinceLast(presetData)) {
+                Logger::log(QString("预设列表识别结果与上次一致，已滑动到顶部"));
+                break;
+            }
+
+            //向上滑动
+            if (actions.swipeBetweenPoints(QPointF(58, 21), QPointF(58, 63),SETTING_CONFIG.getMouseControlMode(), 500).isEmpty())
+            {
+                Logger::log(QString("滑动失败"));
+                return false;
+            }
+            //等列表滚动动画结束再识别，否则可能读到滑动前的旧画面
+            waitRandomWithEventProcessing(2000,200);
+        }
+
+        //识别队伍预设名称，记录目标预设的 box
+        bool foundPresets = false;
+        QJsonArray targetPresetBox; // {"box":[[47,120],[77,120],[77,136],[47,136]]}
+        utils::OcrTextTracker presetSearchTracker;
+        for (int i = 0; i < 10; ++i)
+        {
+            QJsonArray presetData = actions.ocrRecognizes(QRectF(40, 20.3, 28.4, 59.7), ocr::Enhance::Upscale);
+            qDebug() << "presetData:" << presetData;
+
+            //文本内容与上次一致（忽略 box/score 波动），说明滑动未改变列表内容，已到底部，结束循环
+            if (presetSearchTracker.unchangedSinceLast(presetData)) {
                 Logger::log(QString("预设列表识别结果与上次一致，已滑动到底部"));
                 break;
             }
-            previousPresetData = currentPresetData;
 
             for (const QJsonValue& val : presetData) {
                 const QJsonObject item = val.toObject();
@@ -265,15 +303,62 @@ namespace scenarios {
 
         waitRandomWithEventProcessing(2000,200);
 
+        //点击开启
+        if (actions.opencvRecognizesAndClick(screenshotPath + "turn-on.png", 0.75, false, true).isEmpty())
+        {
+            Logger::log(QString("点击【开启】失败"));
+            return false;
+        }
 
+        waitRandomWithEventProcessing(2000,200);
 
-        // TODO: 六道之门单轮流程待实现，参考 Anniversary999.cpp 的步骤骨架：
-        //   1. 首轮初始化（用 sixGates_isRoundInitialized 判断是否为当次任务的第一局）
-        //   2. 识别并点击进入活动/挑战
-        //   3. 等待进入战斗（yoloContainsLabels 等）
-        //   4. 循环等待战斗结束
-        //   5. 领取奖励 / 结算，本局完成后 return true 进入下一轮
-        // 失败路径 return false 终止任务循环；各步骤间穿插 hasCollaboration() 处理协作弹窗
+        //点击确认开启副本
+        if (actions.yoloContainsLabels(0.60, {"common-popup-confirm"}, false))
+        {
+            if (actions.yoloRecognizesAndClick(0.80, false, "common-btn-yellow_confirm").isEmpty())
+            {
+                Logger::log(QString("无法识别到【确定】按钮"));
+                return false;
+            }
+        }
+
+        waitRandomWithEventProcessing(2000,200);
+
+        //点击跳过
+        if (!actions.ocrRecognizesAndClick("跳过", 0.55, true, QRectF(25.5, 11.4, 7.7, 8.8), ocr::Enhance::Upscale).isEmpty())
+        {
+            Logger::log(QString("点击【跳过】"));
+
+            waitRandomWithEventProcessing(2000,200);
+
+            //点击确认跳过
+            if (actions.yoloContainsLabels(0.60, {"common-popup-confirm"}, false))
+            {
+                if (actions.yoloRecognizesAndClick(0.80, false, "common-btn-yellow_confirm").isEmpty())
+                {
+                    Logger::log(QString("无法识别到【确定】按钮"));
+                    return false;
+                }
+            }
+        }else
+        {
+            Logger::log(QString("无需【跳过】"));
+        }
+
+        waitRandomWithEventProcessing(3000,200);
+
+        //选择柔风抱暖：三张卡片的「选择」按钮中，点击与标题水平位置最近的一项；
+        //随机点击并排除按钮边框（0.3/0.2/0.1/0.1），避免点到描边等无效区域
+        constexpr ClickExclude chooseExclude{0.1, 0.1, 0.1, 0.1};
+        if (actions.ocrRecognizesAndClickNearestX("选择", "柔风抱暖", 0.55, true,
+                                                  QRectF(0, 0, 100, 100), ocr::Enhance::Upscale,
+                                                  chooseExclude).isEmpty())
+        {
+            Logger::log(QString("未找到并点击【选择】"));
+            return false;
+        }
+
+        waitRandomWithEventProcessing(2000,200);
 
         Logger::log(QString("六道之门方案已完成"));
         return true;

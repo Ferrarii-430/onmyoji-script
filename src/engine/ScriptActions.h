@@ -112,6 +112,16 @@ public:
                                      const QRectF& roiPercent = QRectF(),
                                      ocr::Enhance enhance = ocr::Enhance::Upscale,
                                      bool skipCollaborationGuard = false);
+    // 单次 OCR 识别，点击与锚点文字水平中心最接近的候选文字，成功返回结果图路径。
+    // 用于「同类按钮多处出现（如多张卡片的「选择」），需按卡片标题就近选择」的场景：
+    // 先按 anchorText 定位水平中心，再在 ocrText 候选中取中心 x 偏差最小的一项点击。
+    // exclude 为随机点击时排除的边框区域比例，仅在 randomClick=true 时生效
+    QString ocrRecognizesAndClickNearestX(const QString& ocrText, const QString& anchorText,
+                                          double threshold, bool randomClick,
+                                          const QRectF& roiPercent = QRectF(),
+                                          ocr::Enhance enhance = ocr::Enhance::Upscale,
+                                          const ClickExclude& exclude = ClickExclude{},
+                                          bool skipCollaborationGuard = false);
 
     // 判断区域内是否出现目标文字（纯检测，不点击）：
     // 识别结果与 ocrText 完全相等（== 全等匹配，非子串）且分数 >= threshold 时返回 true；
@@ -202,6 +212,10 @@ private:
                                       const QRectF& roiPercent, ocr::Enhance enhance);
     QString ocrRecognizesAndClickAnyImpl(const QStringList& ocrTexts, double threshold, bool randomClick,
                                          const QRectF& roiPercent, ocr::Enhance enhance);
+    QString ocrRecognizesAndClickNearestXImpl(const QString& ocrText, const QString& anchorText,
+                                              double threshold, bool randomClick,
+                                              const QRectF& roiPercent, ocr::Enhance enhance,
+                                              const ClickExclude& exclude);
     QString clickFirstDetectionByLabelsImpl(const QStringList& targetLabels, double threshold,
                                             bool randomClick, const ClickExclude& exclude);
 
@@ -213,8 +227,10 @@ private:
                         const ClickExclude& exclude = ClickExclude{});
     // 命中某条 OCR 文字后：换算坐标、画框、保存调试图、回显并点击，返回结果图路径
     // roiScale 为裁剪图送入 OCR 前的放大倍数，用于把 OCR 坐标还原回裁剪图原始像素
+    // exclude 为随机点击时排除的边框区域比例，仅在 randomClick=true 时生效
     QString ocrClickMatchedItem(const cv::Mat& winImg, const QJsonObject& item, const cv::Rect& roiRect,
-                                bool useRoi, double roiScale, bool randomClick);
+                                bool useRoi, double roiScale, bool randomClick,
+                                const ClickExclude& exclude = ClickExclude{});
 
     // 统一处理识别结果图：persistScreenshot 开启时写盘并回显文件路径，
     // 关闭时只存内存并回显内存 key，替代每次识别的磁盘 IO。

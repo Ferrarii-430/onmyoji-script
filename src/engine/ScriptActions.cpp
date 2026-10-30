@@ -1,8 +1,10 @@
 #include "src/engine/ScriptActions.h"
 
 #include <windows.h>
-#include <cmath>
 #include <algorithm>
+#include <climits>
+#include <cmath>
+#include <limits>
 #include <QDebug>
 #include <QDateTime>
 #include <QDir>
@@ -122,6 +124,66 @@ void drawClickMarker(cv::Mat& img, const cv::Point& clickPt)
     cv::circle(img, clickPt, radius, cv::Scalar(0, 0, 255), -1);
     cv::drawMarker(img, clickPt, cv::Scalar(255, 255, 255),
                    cv::MARKER_CROSS, radius * 2, 1);
+}
+
+// 按比例生成四边排除条带（left/right/top/bottom），供随机点击避开按钮边框。
+// 右侧/下侧条带直接延伸到框边缘，+1 补偿整型截断，避免最右/最下 1px 漏网
+std::vector<cv::Rect> buildExcludeAreas(const cv::Rect& rect, const ClickExclude& exclude)
+{
+    std::vector<cv::Rect> excludeAreas;
+    if (exclude.left > 0.0) {
+        excludeAreas.push_back(vision::widthExcludeRect(rect, 0.0, exclude.left));
+    }
+    if (exclude.right > 0.0) {
+        const int stripW = static_cast<int>(rect.width * exclude.right) + 1;
+        excludeAreas.emplace_back(rect.x + rect.width - stripW, rect.y, stripW, rect.height);
+    }
+    if (exclude.top > 0.0) {
+        excludeAreas.push_back(vision::heightExcludeRect(rect, 0.0, exclude.top));
+    }
+    if (exclude.bottom > 0.0) {
+        const int stripH = static_cast<int>(rect.height * exclude.bottom) + 1;
+        excludeAreas.emplace_back(rect.x, rect.y + rect.height - stripH, rect.width, stripH);
+    }
+    return excludeAreas;
+}
+
+// 随机点击点：不排除时全框随机；排除时避开四边条带（达到最大尝试次数时由 vision 侧回退中心点）
+cv::Point randomClickPoint(const cv::Rect& rect, const ClickExclude& exclude)
+{
+    if (exclude.empty()) {
+        return vision::randomPointInRect(rect);
+    }
+    return vision::randomPointInRectExcludeAreas(rect, buildExcludeAreas(rect, exclude));
+}
+
+// OCR box（4 角点）→ 全图坐标矩形：先除以 roiScale 还原裁剪图原始像素，再加 roiRect 偏移
+cv::Rect ocrBoxToRect(const QJsonArray& box, const cv::Rect& roiRect, const double roiScale)
+{
+    if (box.size() != 4) {
+        return {};
+    }
+
+    int minX = INT_MAX;
+    int minY = INT_MAX;
+    int maxX = INT_MIN;
+    int maxY = INT_MIN;
+    for (const QJsonValue& pointValue : box) {
+        const QJsonArray point = pointValue.toArray();
+        if (point.size() < 2) {
+            continue;
+        }
+        const int x = static_cast<int>(point[0].toInt() / roiScale);
+        const int y = static_cast<int>(point[1].toInt() / roiScale);
+        minX = std::min(minX, x);
+        minY = std::min(minY, y);
+        maxX = std::max(maxX, x);
+        maxY = std::max(maxY, y);
+    }
+    if (minX > maxX || minY > maxY) {
+        return {};
+    }
+    return {minX + roiRect.x, minY + roiRect.y, maxX - minX, maxY - minY};
 }
 
 // RapidOCR 预处理白边宽度：裁剪模式增大以给检测网络更多边缘上下文，整图模式用较小值避免无谓开销
@@ -432,36 +494,11 @@ QString ScriptActions::opencvRecognizesAndClickImpl(const QString& templPath, co
         return nullptr;
     }
 
-    cv::Point clickPt;
-    if (randomClick) {
-        if (exclude.empty()) {
-            clickPt = vision::randomPointInRect(matchRect);
-        } else {
-            // 按比例生成边框排除条带（同结界突破的排除逻辑），
-            // 超过最大尝试次数时备选中心点
-            std::vector<cv::Rect> excludeAreas;
-            if (exclude.left > 0.0) {
-                excludeAreas.push_back(vision::widthExcludeRect(matchRect, 0.0, exclude.left));
-            }
-            if (exclude.right > 0.0) {
-                // 右侧条带直接延伸到框边缘，+1 补偿整型截断，避免最右 1px 漏网
-                const int stripW = static_cast<int>(matchRect.width * exclude.right) + 1;
-                excludeAreas.emplace_back(matchRect.x + matchRect.width - stripW, matchRect.y, stripW, matchRect.height);
-            }
-            if (exclude.top > 0.0) {
-                excludeAreas.push_back(vision::heightExcludeRect(matchRect, 0.0, exclude.top));
-            }
-            if (exclude.bottom > 0.0) {
-                // 下侧条带同理延伸到框底边缘
-                const int stripH = static_cast<int>(matchRect.height * exclude.bottom) + 1;
-                excludeAreas.emplace_back(matchRect.x, matchRect.y + matchRect.height - stripH, matchRect.width, stripH);
-            }
-            clickPt = vision::randomPointInRectExcludeAreas(matchRect, excludeAreas);
-        }
-    } else {
-        clickPt = cv::Point(matchRect.x + matchRect.width / 2,
-                           matchRect.y + matchRect.height / 2);
-    }
+    // 随机点击点：按 exclude 比例避开四边边框条带
+    const cv::Point clickPt = randomClick
+        ? randomClickPoint(matchRect, exclude)
+        : cv::Point(matchRect.x + matchRect.width / 2,
+                    matchRect.y + matchRect.height / 2);
 
     // 记录点击点在匹配框内的相对位置（百分比），用于验证边框排除是否生效
     qDebug() << QString("OpenCV点击点相对匹配框: x=%1%% y=%2%%")
@@ -629,46 +666,19 @@ QJsonArray ScriptActions::ocrRecognizes(const QRectF& roiPercent, const ocr::Enh
 
 QString ScriptActions::ocrClickMatchedItem(const cv::Mat& winImg, const QJsonObject& item, const cv::Rect& roiRect,
                                            const bool useRoi, const double roiScale,
-                                           const bool randomClick)
+                                           const bool randomClick, const ClickExclude& exclude)
 {
-    QJsonArray box = item["box"].toArray();
-    if (box.size() != 4) {
-        qWarning() << "box数组大小不正确，期望4个点，实际:" << box.size();
+    const cv::Rect matchRect = ocrBoxToRect(item["box"].toArray(), roiRect, roiScale);
+    if (matchRect.width <= 0 || matchRect.height <= 0) {
+        qWarning() << "OCR box 数据无效，跳过点击:" << item;
         return QString();
     }
 
-    // 提取四个点的坐标
-    QJsonArray point1 = box[0].toArray();
-    QJsonArray point2 = box[1].toArray();
-    QJsonArray point3 = box[2].toArray();
-    QJsonArray point4 = box[3].toArray();
-
-    // OCR 坐标基于（可能放大后的）裁剪图，需先除以 roiScale 还原到裁剪图原始像素，再加 roiRect 偏移
-    int x1 = static_cast<int>(point1[0].toInt() / roiScale);
-    int y1 = static_cast<int>(point1[1].toInt() / roiScale);
-    int x2 = static_cast<int>(point2[0].toInt() / roiScale);
-    int y2 = static_cast<int>(point2[1].toInt() / roiScale);
-    int x3 = static_cast<int>(point3[0].toInt() / roiScale);
-    int y3 = static_cast<int>(point3[1].toInt() / roiScale);
-    int x4 = static_cast<int>(point4[0].toInt() / roiScale);
-    int y4 = static_cast<int>(point4[1].toInt() / roiScale);
-
-    // 计算矩形的最小外接矩形
-    int minX = std::min({x1, x2, x3, x4});
-    int minY = std::min({y1, y2, y3, y4});
-    int maxX = std::max({x1, x2, x3, x4});
-    int maxY = std::max({y1, y2, y3, y4});
-
-    // OCR 坐标相对于裁剪区域，换算回全图坐标
-    cv::Rect matchRect(minX + roiRect.x, minY + roiRect.y, maxX - minX, maxY - minY);
-
-    cv::Point clickPt;
-    if (randomClick) {
-        clickPt = vision::randomPointInRect(matchRect);
-    } else {
-        clickPt = cv::Point(matchRect.x + matchRect.width / 2,
-                           matchRect.y + matchRect.height / 2);
-    }
+    // 随机点击点：按 exclude 比例避开文字边框，避免点到描边/高光等无效区域
+    const cv::Point clickPt = randomClick
+        ? randomClickPoint(matchRect, exclude)
+        : cv::Point(matchRect.x + matchRect.width / 2,
+                    matchRect.y + matchRect.height / 2);
 
     // 保存带识别框和点击位置的图片
     cv::Mat resultImg = winImg.clone();
@@ -815,6 +825,109 @@ QString ScriptActions::ocrRecognizesAndClickAnyImpl(const QStringList& ocrTexts,
     Logger::log(QString("[OCR] 未识别到文字：" + ocrTexts.join("/")));
     qDebug() << result;
     return QString();
+}
+
+QString ScriptActions::ocrRecognizesAndClickNearestX(const QString& ocrText, const QString& anchorText,
+                                                     const double threshold, const bool randomClick,
+                                                     const QRectF& roiPercent, const ocr::Enhance enhance,
+                                                     const ClickExclude& exclude,
+                                                     const bool skipCollaborationGuard)
+{
+    QString result = ocrRecognizesAndClickNearestXImpl(ocrText, anchorText, threshold, randomClick,
+                                                       roiPercent, enhance, exclude);
+    if (result.isEmpty() && m_collaborationGuardEnabled && !skipCollaborationGuard && cancelCollaborationPopup())
+    {
+        // 协作弹窗已取消，重试一次识别点击
+        result = ocrRecognizesAndClickNearestXImpl(ocrText, anchorText, threshold, randomClick,
+                                                   roiPercent, enhance, exclude);
+    }
+    return result;
+}
+
+QString ScriptActions::ocrRecognizesAndClickNearestXImpl(const QString& ocrText, const QString& anchorText,
+                                                         const double threshold, const bool randomClick,
+                                                         const QRectF& roiPercent, const ocr::Enhance enhance,
+                                                         const ClickExclude& exclude)
+{
+    cv::Mat winImg = capture::captureGameWindow();
+    if (winImg.empty())
+    {
+        return QString();
+    }
+
+    cv::Mat ocrImg;
+    double roiScale = 1.0;
+    bool cropped = false;
+    const cv::Rect roiRect = computeOcrRoi(winImg, roiPercent, roiScale, cropped, enhance, ocrImg);
+    if (ocrImg.empty()) {
+        ocrImg = winImg; // 无裁剪无增强：直接识别原始截图
+    }
+
+    // 只做一次 OCR：先定位锚点文字（如卡片标题），再挑水平最近的候选文字点击
+    // 裁剪模式增大 padding，给检测网络更多边缘上下文
+    const QJsonObject result = vision::runRapidOCR(ocrImg, cropped ? OCR_PADDING_ROI : OCR_PADDING_FULL);
+    if (result.isEmpty()) {
+        Logger::log(QString("[OCR] 未识别到文字：") + anchorText + "/" + ocrText);
+        return QString();
+    }
+
+    const QJsonArray dataArray = result["data"].toArray();
+
+    // 1. 定位锚点文字的水平中心
+    bool hasAnchor = false;
+    double anchorCenterX = 0.0;
+    for (const QJsonValue& val : dataArray) {
+        const QJsonObject item = val.toObject();
+        if (!comparesEqual(item["text"].toString(), anchorText) || item["score"].toDouble() < threshold) {
+            continue;
+        }
+        const cv::Rect rect = ocrBoxToRect(item["box"].toArray(), roiRect, roiScale);
+        if (rect.width <= 0 || rect.height <= 0) {
+            continue;
+        }
+        anchorCenterX = rect.x + rect.width / 2.0;
+        hasAnchor = true;
+        break;
+    }
+    if (!hasAnchor) {
+        Logger::log(QString("[OCR] 未识别到锚点文字：") + anchorText);
+        qDebug() << result;
+        return QString();
+    }
+
+    // 2. 在候选文字中取水平中心与锚点偏差最小的一项
+    QJsonObject bestItem;
+    double bestCenterX = 0.0;
+    double minDx = std::numeric_limits<double>::max();
+    for (const QJsonValue& val : dataArray) {
+        const QJsonObject item = val.toObject();
+        if (!comparesEqual(item["text"].toString(), ocrText) || item["score"].toDouble() < threshold) {
+            continue;
+        }
+        const cv::Rect rect = ocrBoxToRect(item["box"].toArray(), roiRect, roiScale);
+        if (rect.width <= 0 || rect.height <= 0) {
+            continue;
+        }
+        const double centerX = rect.x + rect.width / 2.0;
+        const double dx = std::abs(centerX - anchorCenterX);
+        if (dx < minDx) {
+            minDx = dx;
+            bestCenterX = centerX;
+            bestItem = item;
+        }
+    }
+    if (bestItem.isEmpty()) {
+        Logger::log(QString("[OCR] 未识别到候选文字：") + ocrText);
+        qDebug() << result;
+        return QString();
+    }
+
+    Logger::log(QString("[OCR] 就近点击 %1：锚点%2 中心x=%3，候选中心x=%4，偏差=%5")
+                .arg(ocrText, anchorText)
+                .arg(anchorCenterX, 0, 'f', 1)
+                .arg(bestCenterX, 0, 'f', 1)
+                .arg(minDx, 0, 'f', 1));
+    return ocrClickMatchedItem(winImg, bestItem, roiRect, cropped, roiScale, randomClick, exclude);
 }
 
 bool ScriptActions::ocrContainsText(const QString& ocrText, const double threshold,
@@ -1028,35 +1141,10 @@ QString ScriptActions::yoloRecognizesAndClickImpl(const double threshold, const 
 
     if (!matchRect.empty())
     {
-        if (randomClick) {
-            if (!exclude.empty()) {
-                // 四边排除：与 OpenCV 识别点击相同的边框排除逻辑，
-                // 超过最大尝试次数时备选中心点
-                std::vector<cv::Rect> excludeAreas;
-                if (exclude.left > 0.0) {
-                    excludeAreas.push_back(vision::widthExcludeRect(matchRect, 0.0, exclude.left));
-                }
-                if (exclude.right > 0.0) {
-                    // 右侧条带直接延伸到框边缘，+1 补偿整型截断，避免最右 1px 漏网
-                    const int stripW = static_cast<int>(matchRect.width * exclude.right) + 1;
-                    excludeAreas.emplace_back(matchRect.x + matchRect.width - stripW, matchRect.y, stripW, matchRect.height);
-                }
-                if (exclude.top > 0.0) {
-                    excludeAreas.push_back(vision::heightExcludeRect(matchRect, 0.0, exclude.top));
-                }
-                if (exclude.bottom > 0.0) {
-                    // 下侧条带同理延伸到框底边缘
-                    const int stripH = static_cast<int>(matchRect.height * exclude.bottom) + 1;
-                    excludeAreas.emplace_back(matchRect.x, matchRect.y + matchRect.height - stripH, matchRect.width, stripH);
-                }
-                clickPt = vision::randomPointInRectExcludeAreas(matchRect, excludeAreas);
-            } else {
-                clickPt = vision::randomPointInRect(matchRect);
-            }
-        } else {
-            clickPt = cv::Point(matchRect.x + matchRect.width / 2,
-                               matchRect.y + matchRect.height / 2);
-        }
+        // 随机点击点：按 exclude 比例避开四边边框条带
+        clickPt = randomClick
+            ? randomClickPoint(matchRect, exclude)
+            : cv::Point(matchRect.x + matchRect.width / 2, matchRect.y + matchRect.height / 2);
 
         // 记录点击点在匹配框内的相对位置（百分比），用于验证边框排除是否生效
         Logger::log(QString("YOLO点击点相对匹配框: x=%1%% y=%2%%")
@@ -1202,35 +1290,10 @@ bool ScriptActions::hasDetectionWithLabel(const std::vector<Detection>& detectio
 
 void ScriptActions::clickDetection(const Detection& det, bool randomClick, const ClickExclude& exclude)
 {
-    cv::Point physicalClickPt;
-    if (randomClick) {
-        if (!exclude.empty()) {
-            // 四边排除：与 yoloRecognizesAndClick 相同的边框排除逻辑
-            std::vector<cv::Rect> excludeAreas;
-            if (exclude.left > 0.0) {
-                excludeAreas.push_back(vision::widthExcludeRect(det.bbox, 0.0, exclude.left));
-            }
-            if (exclude.right > 0.0) {
-                // 右侧条带直接延伸到框边缘，+1 补偿整型截断，避免最右 1px 漏网
-                const int stripW = static_cast<int>(det.bbox.width * exclude.right) + 1;
-                excludeAreas.emplace_back(det.bbox.x + det.bbox.width - stripW, det.bbox.y, stripW, det.bbox.height);
-            }
-            if (exclude.top > 0.0) {
-                excludeAreas.push_back(vision::heightExcludeRect(det.bbox, 0.0, exclude.top));
-            }
-            if (exclude.bottom > 0.0) {
-                // 下侧条带同理延伸到框底边缘
-                const int stripH = static_cast<int>(det.bbox.height * exclude.bottom) + 1;
-                excludeAreas.emplace_back(det.bbox.x, det.bbox.y + det.bbox.height - stripH, det.bbox.width, stripH);
-            }
-            physicalClickPt = vision::randomPointInRectExcludeAreas(det.bbox, excludeAreas);
-        } else {
-            physicalClickPt = vision::randomPointInRect(det.bbox);
-        }
-    } else {
-        physicalClickPt = cv::Point(det.bbox.x + det.bbox.width / 2,
-                                    det.bbox.y + det.bbox.height / 2);
-    }
+    // 随机点击点：按 exclude 比例避开四边边框条带
+    const cv::Point physicalClickPt = randomClick
+        ? randomClickPoint(det.bbox, exclude)
+        : cv::Point(det.bbox.x + det.bbox.width / 2, det.bbox.y + det.bbox.height / 2);
 
     QString capturePath = AppPaths::instance().dx11CapturePath();
     cv::Mat captureImg = vision::imreadQt(capturePath);
