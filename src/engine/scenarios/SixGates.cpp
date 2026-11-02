@@ -36,6 +36,79 @@ namespace scenarios {
         skillLevel = 0;
     }
 
+    namespace
+    {
+        // 六道之门地图场景
+        enum class SixGatesScene
+        {
+            None,
+            Mystery,
+            Chaos,
+            Fighting,
+            Rest,
+            HeartIsland
+        };
+
+        struct SceneTemplate
+        {
+            SixGatesScene scene;
+            const char* fileName;
+            const char* sceneName;
+        };
+
+        // 数组顺序即进入优先级：神秘 > 混沌 > 鏖战 > 宁息 > 心之岛
+        constexpr SceneTemplate kSceneTemplates[] = {
+            {SixGatesScene::Mystery, "six-gates-mystery.png", "神秘"},
+            {SixGatesScene::Chaos, "six-gates-chaos.png", "混沌"},
+            {SixGatesScene::Fighting, "six-gates-fighting.png", "鏖战"},
+            {SixGatesScene::Rest, "six-gates-rest.png", "宁息"},
+            {SixGatesScene::HeartIsland, "six-gates-heart-island.png", "心之岛"},
+        };
+
+        constexpr double kSceneMatchThreshold = 0.7;
+
+        // 按优先级依次匹配场景模板，返回第一个命中的场景
+        SixGatesScene detectSixGatesScene(const QString& screenshotPath)
+        {
+            ScriptActions& actions = ScriptActions::instance();
+            for (const SceneTemplate& templ : kSceneTemplates)
+            {
+                if (!actions.opencvFindAll(screenshotPath + templ.fileName, kSceneMatchThreshold, false).empty())
+                {
+                    Logger::log(QString("识别到六道之门场景: %1").arg(templ.sceneName));
+                    return templ.scene;
+                }
+            }
+            return SixGatesScene::None;
+        }
+
+        // 各场景处理逻辑留空，待补充
+        bool handleMysteryScene()
+        {
+            return true;
+        }
+
+        bool handleChaosScene()
+        {
+            return true;
+        }
+
+        bool handleFightingScene()
+        {
+            return true;
+        }
+
+        bool handleRestScene()
+        {
+            return true;
+        }
+
+        bool handleHeartIslandScene()
+        {
+            return true;
+        }
+    } // namespace
+
     bool executeSixGates()
     {
         const QString configId = currentItem.id;
@@ -357,8 +430,44 @@ namespace scenarios {
             Logger::log(QString("未找到并点击【选择】"));
             return false;
         }
+        //技能等级+1
+        skillLevel++;
 
         waitRandomWithEventProcessing(2000,200);
+
+        //TODO 识别剩余战斗次数
+
+
+        //开始识别场景
+        // 同一画面可能同时出现多种场景，按优先级进入第一个命中的场景；
+        // 心之岛只会单独出现，仍放在最低优先级兜底
+        bool handled = false;
+        switch (detectSixGatesScene(screenshotPath))
+        {
+            case SixGatesScene::Mystery:
+                handled = handleMysteryScene();
+                break;
+            case SixGatesScene::Chaos:
+                handled = handleChaosScene();
+                break;
+            case SixGatesScene::Fighting:
+                handled = handleFightingScene();
+                break;
+            case SixGatesScene::Rest:
+                handled = handleRestScene();
+                break;
+            case SixGatesScene::HeartIsland:
+                handled = handleHeartIslandScene();
+                break;
+            case SixGatesScene::None:
+            default:
+                Logger::log(QString("未识别到六道之门场景"));
+                return false;
+        }
+        if (!handled)
+        {
+            return false;
+        }
 
         Logger::log(QString("六道之门方案已完成"));
         return true;
