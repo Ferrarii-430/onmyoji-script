@@ -27,13 +27,16 @@ namespace scenarios {
     // 跨轮次状态示例：仅在单次任务运行的多次循环内保持的标记，
     // 需要更多跨轮次状态时在此追加，并同步在 resetSixGatesStatus 中重置
     bool sixGates_isRoundInitialized = false;
-    int skillLevel = 0;
+    int skillLevel = 0; //技能等级
+    int roundNum = 0; //当前回合数
+    int ROUND_TOTAL = 25; //总回合数
 
     // 重置跨轮次状态：任务结束/停止后由 TaskRunner 调用，下次启动任务重新走初始化流程
     void resetSixGatesStatus()
     {
         sixGates_isRoundInitialized = false;
         skillLevel = 0;
+        roundNum = 0;
     }
 
     namespace
@@ -66,6 +69,7 @@ namespace scenarios {
         };
 
         constexpr double kSceneMatchThreshold = 0.7;
+        ScriptActions& actions = ScriptActions::instance();
 
         // 按优先级依次匹配场景模板，返回第一个命中的场景
         SixGatesScene detectSixGatesScene(const QString& screenshotPath)
@@ -83,26 +87,37 @@ namespace scenarios {
         }
 
         // 各场景处理逻辑留空，待补充
+        // 神秘场景处理（优先级 1，识别到 six-gates-mystery.png 时进入）
         bool handleMysteryScene()
         {
             return true;
         }
 
+        // 混沌场景处理（优先级 2，识别到 six-gates-chaos.png 时进入）
         bool handleChaosScene()
         {
+            QJsonArray ocrData = actions.ocrRecognizes(QRectF(31.5, 26.4, 42.9, 38.0), ocr::Enhance::Upscale);
+
+            //混沌可能有多种
+            //1.幸运宝箱
+
+
             return true;
         }
 
+        // 鏖战场景处理（优先级 3，识别到 six-gates-fighting.png 时进入）
         bool handleFightingScene()
         {
             return true;
         }
 
+        // 宁息场景处理（优先级 4，识别到 six-gates-rest.png 时进入）
         bool handleRestScene()
         {
             return true;
         }
 
+        // 心之岛场景处理（优先级 5，识别到 six-gates-heart-island.png 时进入）
         bool handleHeartIslandScene()
         {
             return true;
@@ -435,15 +450,15 @@ namespace scenarios {
 
         waitRandomWithEventProcessing(2000,200);
 
-        //TODO 识别剩余战斗次数
-
-
         //开始识别场景
-        // 同一画面可能同时出现多种场景，按优先级进入第一个命中的场景；
-        // 心之岛只会单独出现，仍放在最低优先级兜底
-        bool handled = false;
-        switch (detectSixGatesScene(screenshotPath))
+        for (int i = 0; i < ROUND_TOTAL; ++i)
         {
+            // 同一画面可能同时出现多种场景，按优先级进入第一个命中的场景；
+            // 心之岛只会单独出现，仍放在最低优先级兜底
+            bool handled = false;
+            // 优先级顺序：1.神秘 → 2.混沌 → 3.鏖战 → 4.宁息 → 5.心之岛
+            switch (detectSixGatesScene(screenshotPath))
+            {
             case SixGatesScene::Mystery:
                 handled = handleMysteryScene();
                 break;
@@ -463,10 +478,13 @@ namespace scenarios {
             default:
                 Logger::log(QString("未识别到六道之门场景"));
                 return false;
-        }
-        if (!handled)
-        {
-            return false;
+            }
+            if (!handled)
+            {
+                return false;
+            }
+
+            Logger::log(QString("当前回合数 (%1/%2)").arg(i+1).arg(ROUND_TOTAL));
         }
 
         Logger::log(QString("六道之门方案已完成"));
