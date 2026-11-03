@@ -31,6 +31,10 @@ namespace scenarios {
     int roundNum = 0; //当前回合数
     int ROUND_TOTAL = 25; //总回合数
 
+    // 六道之门内部共享实例与截图路径：本文件内所有处理方法统一复用
+    static ScriptActions& actions = ScriptActions::instance();
+    static QString screenshotPath = AppPaths::instance().screenshotPath();
+
     // 重置跨轮次状态：任务结束/停止后由 TaskRunner 调用，下次启动任务重新走初始化流程
     void resetSixGatesStatus()
     {
@@ -69,19 +73,27 @@ namespace scenarios {
         };
 
         constexpr double kSceneMatchThreshold = 0.7;
-        ScriptActions& actions = ScriptActions::instance();
 
-        // 按优先级依次匹配场景模板，返回第一个命中的场景
-        SixGatesScene detectSixGatesScene(const QString& screenshotPath)
+        // 按优先级依次匹配场景模板，命中后点击匹配框中心（关闭随机点击），返回该场景
+        SixGatesScene detectSixGatesScene()
         {
-            ScriptActions& actions = ScriptActions::instance();
             for (const SceneTemplate& templ : kSceneTemplates)
             {
-                if (!actions.opencvFindAll(screenshotPath + templ.fileName, kSceneMatchThreshold, false).empty())
+                const std::vector<OpenCvMatch> matches =
+                    actions.opencvFindAll(screenshotPath + templ.fileName, kSceneMatchThreshold, false);
+                if (matches.empty())
                 {
-                    Logger::log(QString("识别到六道之门场景: %1").arg(templ.sceneName));
-                    return templ.scene;
+                    continue;
                 }
+
+                // opencvFindAll 按分数降序返回，取最优匹配；randomClick=false 表示点击匹配框中心
+                const OpenCvMatch& best = matches.front();
+                GameWindow::instance().clickInWindow(utils::makeClickPoint(best.rect, false));
+                // 等待场景加载完成后再返回，继续执行对应场景的处理步骤
+                Logger::log(QString("识别到六道之门场景: %1，已点击匹配框中心 (%2,%3)")
+                            .arg(templ.sceneName).arg(best.center.x).arg(best.center.y));
+                waitRandomWithEventProcessing(2000, 200);
+                return templ.scene;
             }
             return SixGatesScene::None;
         }
@@ -99,15 +111,110 @@ namespace scenarios {
             QJsonArray ocrData = actions.ocrRecognizes(QRectF(31.5, 26.4, 42.9, 38.0), ocr::Enhance::Upscale);
 
             //混沌可能有多种
-            //1.幸运宝箱
+            for (const QJsonValue& val : ocrData) {
+                const QJsonObject item = val.toObject();
+                //1.幸运宝箱
+                if (item["text"].toString() == "幸运宝箱") {
+                    const cv::Rect rect = utils::boxToRect(item["box"].toArray());
+                    if (rect.width > 0 && rect.height > 0) {
+                        GameWindow::instance().clickInWindow(utils::makeClickPoint(rect, false));
+                        Logger::log(QString("已点击【幸运宝箱】"));
+                    }
+
+                    waitRandomWithEventProcessing(2000,200);
+
+                    //点击开启
+                    if (actions.opencvRecognizesAndClick(screenshotPath + "turn-on.png", 0.75, false, true).isEmpty())
+                    {
+                        Logger::log(QString("点击【开启】失败"));
+                        return false;
+                    }
+
+                    waitRandomWithEventProcessing(1200,200);
+
+                    //识别是否有“获得奖励”
+                    if (actions.ocrRecognizesAndClick("获得奖励", 0.55, false, QRectF(15.6, 10.4, 67.2, 72.4), ocr::Enhance::Upscale).isEmpty())
+                    {
+                        Logger::log(QString("点击【获得奖励】失败"));
+                        return false;
+                    }
+                    break;
+                }
+
+                //2.其他
+            }
 
 
+            waitRandomWithEventProcessing(3000,200);
             return true;
         }
 
         // 鏖战场景处理（优先级 3，识别到 six-gates-fighting.png 时进入）
         bool handleFightingScene()
         {
+            //只打技能怪物
+            bool hasSkill = false;
+            for (int i = 0; i < 5; ++i)
+            {
+                //点击技能
+                if (!actions.opencvRecognizesAndClick(screenshotPath + "six-gates-skill.png", 0.60, false, false).isEmpty())
+                {
+                    Logger::log(QString("点击【技能】"));
+                    hasSkill = true;
+                    break;
+                }
+                waitWithEventProcessing(1000);
+            }
+            if (!hasSkill)
+            {
+                Logger::log(QString("无法识别到【技能】"));
+                return false;
+            }
+
+            waitRandomWithEventProcessing(2000,200);
+
+            //点击挑战
+            if (actions.opencvRecognizesAndClick(screenshotPath + "six-gates-challenge.png", 0.75, false, true).isEmpty())
+            {
+                Logger::log(QString("点击【挑战】失败"));
+                return false;
+            }
+
+            //有准备就点一下，没有则不用管
+            if (actions.yoloRecognizesAndClick(0.50, true, "battle-ready").isEmpty())
+            {
+                Logger::log(QString("点击【准备】"));
+            }
+
+            //等待战斗结束 总共30秒
+            bool isEndOfBattle = false;
+            for (int i = 0; i < 15; ++i)
+            {
+                //识别是否有“获得奖励”
+                QJsonArray ocrData = actions.ocrRecognizes(QRectF(15.6, 10.4, 67.2, 72.4), ocr::Enhance::Upscale);
+                for (const QJsonValue& val : ocrData) {
+                    const QJsonObject item = val.toObject();
+                    if (item["text"].toString() == "获得奖励") {
+                        const cv::Rect rect = utils::boxToRect(item["box"].toArray());
+                        if (rect.width > 0 && rect.height > 0) {
+                            waitWithEventProcessing(2000);
+                            GameWindow::instance().clickInWindow(utils::makeClickPoint(rect, true));
+                            isEndOfBattle = true;
+                            Logger::log(QString("点击【获得奖励】"));
+                        }
+                        break;
+                    }
+                }
+
+                waitWithEventProcessing(2000);
+            }
+            if (!isEndOfBattle)
+            {
+                Logger::log(QString("等待战斗结束超时"));
+            }
+
+            //开始选择技能
+
             return true;
         }
 
@@ -120,15 +227,86 @@ namespace scenarios {
         // 心之岛场景处理（优先级 5，识别到 six-gates-heart-island.png 时进入）
         bool handleHeartIslandScene()
         {
+            //点击左侧招福达摩，不打星之子
+            if (actions.ocrRecognizesAndClick("招福达摩", 0.55, false, QRectF(27.0, 34.3, 46.9, 39.3), ocr::Enhance::Upscale).isEmpty())
+            {
+                Logger::log(QString("点击【招福达摩】失败"));
+                return false;
+            }
+
+            waitRandomWithEventProcessing(2000,200);
+
+            //点击挑战
+            if (actions.opencvRecognizesAndClick(screenshotPath + "six-gates-challenge.png", 0.75, false, true).isEmpty())
+            {
+                Logger::log(QString("点击【挑战】失败"));
+                return false;
+            }
+
+            waitRandomWithEventProcessing(2000,200);
+
+            //有准备就点一下，没有则不用管
+            if (actions.yoloRecognizesAndClick(0.50, true, "battle-ready").isEmpty())
+            {
+                Logger::log(QString("点击【准备】"));
+            }
+
+            //等待战斗结束 总共30秒
+            bool isEndOfBattle = false;
+            for (int i = 0; i < 15; ++i)
+            {
+                //识别是否有“获得奖励”
+                QJsonArray ocrData = actions.ocrRecognizes(QRectF(15.6, 10.4, 67.2, 72.4), ocr::Enhance::Upscale);
+                for (const QJsonValue& val : ocrData) {
+                    const QJsonObject item = val.toObject();
+                    if (item["text"].toString() == "获得奖励") {
+                        const cv::Rect rect = utils::boxToRect(item["box"].toArray());
+                        if (rect.width > 0 && rect.height > 0) {
+                            waitWithEventProcessing(2000);
+                            GameWindow::instance().clickInWindow(utils::makeClickPoint(rect, true));
+                            isEndOfBattle = true;
+                            Logger::log(QString("点击【获得奖励】"));
+                        }
+                        break;
+                    }
+                }
+
+                waitWithEventProcessing(2000);
+            }
+            if (!isEndOfBattle)
+            {
+                Logger::log(QString("等待战斗结束超时"));
+            }
+
+            waitRandomWithEventProcessing(3000,200);
             return true;
         }
     } // namespace
 
+    bool selectSixGatesSkill(const QString& skillName)
+    {
+        // 三张技能卡的「选择」按钮中，点击与技能标题水平位置最近的一项；
+        // 随机点击并排除按钮边框（0.1/0.1/0.1/0.1），避免点到描边等无效区域
+        constexpr ClickExclude chooseExclude{0.1, 0.1, 0.1, 0.1};
+        if (actions.ocrRecognizesAndClickNearestX("选择", skillName, 0.55, true,
+                                                  QRectF(0, 0, 100, 100), ocr::Enhance::Upscale,
+                                                  chooseExclude).isEmpty())
+        {
+            Logger::log(QString("未找到并点击技能【%1】的【选择】").arg(skillName));
+            //TODO 点击刷新 逻辑还没写
+
+            return false;
+        }
+
+        skillLevel++;
+        Logger::log(QString("已选择技能【%1】，当前技能等级: %2").arg(skillName).arg(skillLevel));
+        waitRandomWithEventProcessing(2000, 200);
+        return true;
+    }
+
     bool executeSixGates()
     {
         const QString configId = currentItem.id;
-        ScriptActions& actions = ScriptActions::instance();
-        QString screenshotPath = AppPaths::instance().screenshotPath();
         const QString schemeName = getSystemConfigValue(configId, "schemeName", "").toString();
         const QString lineupName = getSystemConfigValue(configId, "lineupName", "").toString();
         Logger::log(QString("六道之门运行配置: 方案=%1 | 阵容=%2")
@@ -435,20 +613,11 @@ namespace scenarios {
 
         waitRandomWithEventProcessing(3000,200);
 
-        //选择柔风抱暖：三张卡片的「选择」按钮中，点击与标题水平位置最近的一项；
-        //随机点击并排除按钮边框（0.3/0.2/0.1/0.1），避免点到描边等无效区域
-        constexpr ClickExclude chooseExclude{0.1, 0.1, 0.1, 0.1};
-        if (actions.ocrRecognizesAndClickNearestX("选择", "柔风抱暖", 0.55, true,
-                                                  QRectF(0, 0, 100, 100), ocr::Enhance::Upscale,
-                                                  chooseExclude).isEmpty())
+        //选择技能：柔风抱暖
+        if (!selectSixGatesSkill("柔风抱暖"))
         {
-            Logger::log(QString("未找到并点击【选择】"));
             return false;
         }
-        //技能等级+1
-        skillLevel++;
-
-        waitRandomWithEventProcessing(2000,200);
 
         //开始识别场景
         for (int i = 0; i < ROUND_TOTAL; ++i)
@@ -457,27 +626,27 @@ namespace scenarios {
             // 心之岛只会单独出现，仍放在最低优先级兜底
             bool handled = false;
             // 优先级顺序：1.神秘 → 2.混沌 → 3.鏖战 → 4.宁息 → 5.心之岛
-            switch (detectSixGatesScene(screenshotPath))
+            switch (detectSixGatesScene())
             {
-            case SixGatesScene::Mystery:
-                handled = handleMysteryScene();
-                break;
-            case SixGatesScene::Chaos:
-                handled = handleChaosScene();
-                break;
-            case SixGatesScene::Fighting:
-                handled = handleFightingScene();
-                break;
-            case SixGatesScene::Rest:
-                handled = handleRestScene();
-                break;
-            case SixGatesScene::HeartIsland:
-                handled = handleHeartIslandScene();
-                break;
-            case SixGatesScene::None:
-            default:
-                Logger::log(QString("未识别到六道之门场景"));
-                return false;
+                case SixGatesScene::Mystery:
+                    handled = handleMysteryScene();
+                    break;
+                case SixGatesScene::Chaos:
+                    handled = handleChaosScene();
+                    break;
+                case SixGatesScene::Fighting:
+                    handled = handleFightingScene();
+                    break;
+                case SixGatesScene::Rest:
+                    handled = handleRestScene();
+                    break;
+                case SixGatesScene::HeartIsland:
+                    handled = handleHeartIslandScene();
+                    break;
+                case SixGatesScene::None:
+                default:
+                    Logger::log(QString("未识别到六道之门场景"));
+                    return false;
             }
             if (!handled)
             {
