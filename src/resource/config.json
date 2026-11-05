@@ -144,6 +144,73 @@
     ]
   },
   {
+    "id": "627CE2C8-01C9-4828-B4AE-4F5A360E7946",
+    "name": "系统方案-超鬼王",
+    "visible": true,
+    "type": "system",
+    "tip": "超鬼王活动自动执行方案，具体流程待补充。",
+    "systemConfig": [
+      {
+        "key": "schemeName",
+        "label": "方案名称",
+        "control": "input",
+        "value": "超鬼王",
+        "placeholder": "输入方案名称",
+        "tip": "当前超鬼王使用的方案分组名称，用于切换御魂。"
+      },
+      {
+        "key": "monomerLineupName",
+        "label": "单体阵容",
+        "control": "input",
+        "value": "单体通用阵容",
+        "placeholder": "输入单体通用阵容名称",
+        "tip": "当前超鬼王使用的单体通用阵容名称。"
+      },
+      {
+        "key": "populationLineupName",
+        "label": "群体阵容",
+        "control": "input",
+        "value": "群体通用阵容",
+        "placeholder": "输入群体通用阵容名称",
+        "tip": "当前超鬼王使用的群体通用阵容名称。"
+      },
+      {
+        "key": "greenLabel",
+        "label": "绿标位置",
+        "control": "number",
+        "value": 0,
+        "decimals": 0,
+        "min": 0,
+        "max": 5,
+        "step": 1,
+        "tip": "从左到右顺序，数字1-5号，不填或者0则不标记。"
+      },
+      {
+        "key": "markBoss",
+        "label": "标记BOSS",
+        "control": "switch",
+        "value": false,
+        "tip": "开启后自动标记BOSS。"
+      }
+    ],
+    "steps": [
+      {
+        "identifyErrorHandle": "next",
+        "imagePath": null,
+        "jumpStepsId": null,
+        "ocrText": null,
+        "offsetTime": null,
+        "randomClick": true,
+        "randomWait": null,
+        "score": 0.55,
+        "stepsId": "C1FE7B56-677B-4E53-AC54-E71AC271BAD4",
+        "taskName": "超鬼王",
+        "time": null,
+        "type": "SYSTEM_SUPER_GHOST_KING"
+      }
+    ]
+  },
+  {
     "id": "E5A7D999-1357-41C2-B684-066597E40GC1",
     "name": "系统方案-对弈竞猜采集",
     "visible": false,

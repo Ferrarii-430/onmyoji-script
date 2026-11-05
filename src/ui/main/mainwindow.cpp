@@ -22,6 +22,7 @@
 #include <QFormLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QScrollArea>
 #include <QSpinBox>
 #include <QVBoxLayout>
 #include "QMessageBox"
@@ -354,9 +355,31 @@ void mainwindow::showSystemConfigForm(const QString &configId)
         "  background-color: #f7f9fc;"
         "  border: 1px solid #d0d7e2;"
         "  border-radius: 8px;"
-        "}");
+        "}"
+        // 配置项行容器默认会被全局 QWidget 底色覆盖，单独置为透明，露出卡片背景
+        "#systemConfigField { background: transparent; }");
 
-    auto *form = new QFormLayout(m_systemConfigForm);
+    // 配置项超出容器高度时出现纵向滚动条，内容不足时不显示；
+    // 横向滚动条关闭，避免表单被横向拖动、配置项按可视宽度自适应
+    auto *scrollArea = new QScrollArea(m_systemConfigForm);
+    scrollArea->setObjectName("systemConfigScroll");
+    scrollArea->setWidgetResizable(true);
+    scrollArea->setFrameShape(QFrame::NoFrame);
+    scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    // 全局 QSS 给所有 QWidget 设了底色，会让 viewport 盖住卡片边框和背景，
+    // 这里单独把 viewport 命名为透明，保证卡片右侧/下侧边框始终可见
+    scrollArea->viewport()->setObjectName("systemConfigViewport");
+    scrollArea->viewport()->setAutoFillBackground(false);
+    scrollArea->setStyleSheet(
+        "#systemConfigScroll { background: transparent; }"
+        "#systemConfigViewport { background: transparent; }");
+
+    auto *formContainer = new QWidget(scrollArea);
+    formContainer->setObjectName("systemConfigContent");
+    formContainer->setStyleSheet("#systemConfigContent { background: transparent; }");
+
+    auto *form = new QFormLayout(formContainer);
     form->setContentsMargins(16, 16, 16, 16);
     form->setHorizontalSpacing(16);
     form->setVerticalSpacing(12);
@@ -389,6 +412,7 @@ void mainwindow::showSystemConfigForm(const QString &configId)
 
         // 每个配置项用一个垂直容器承载「控件 + 可选 tip 提示」，便于统一加入表单
         auto *fieldWidget = new QWidget(m_systemConfigForm);
+        fieldWidget->setObjectName("systemConfigField");
         auto *fieldLayout = new QVBoxLayout(fieldWidget);
         fieldLayout->setContentsMargins(0, 0, 0, 0);
         fieldLayout->setSpacing(4);
@@ -454,6 +478,14 @@ void mainwindow::showSystemConfigForm(const QString &configId)
 
         form->addRow(label, fieldWidget);
     }
+
+    scrollArea->setWidget(formContainer);
+
+    auto *rootLayout = new QVBoxLayout(m_systemConfigForm);
+    // 留出内边距，避免滚动区/内容贴边盖住卡片右侧与下侧边框
+    rootLayout->setContentsMargins(6, 6, 6, 6);
+    rootLayout->setSpacing(0);
+    rootLayout->addWidget(scrollArea);
 
     m_systemConfigForm->show();
     m_systemConfigForm->raise();
