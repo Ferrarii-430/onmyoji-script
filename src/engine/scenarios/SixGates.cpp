@@ -30,6 +30,7 @@ namespace scenarios {
     int skillLevel = 0; //技能等级
     int roundNum = 0; //当前回合数
     int ROUND_TOTAL = 25; //总回合数
+    bool isLock = false; //是否锁定
 
     // 六道之门内部共享实例与截图路径：本文件内所有处理方法统一复用
     static ScriptActions& actions = ScriptActions::instance();
@@ -41,6 +42,7 @@ namespace scenarios {
         sixGates_isRoundInitialized = false;
         skillLevel = 0;
         roundNum = 0;
+        isLock = false;
     }
 
     namespace
@@ -102,6 +104,96 @@ namespace scenarios {
         // 神秘场景处理（优先级 1，识别到 six-gates-mystery.png 时进入）
         bool handleMysteryScene()
         {
+            //1.背包仿造
+            if (actions.ocrContainsText("背包仿造", 0.60, QRectF(59.5, 0, 40.5, 100), ocr::Enhance::Upscale))
+            {
+                //直接退出
+                if (skillLevel >= 5)
+                {
+                    Logger::log(QString("技能已满级，退出仿造"));
+                    //点击返回
+                    if (!actions.yoloRecognizesAndClick(0.50, true, "common-exit-blue").isEmpty())
+                    {
+                        Logger::log(QString("点击【返回】失败"));
+                        return false;
+                    }
+
+                    waitRandomWithEventProcessing(1200, 200);
+
+                    //有确定就点一下，没有则不用管
+                    if (actions.yoloRecognizesAndClick(0.50, true, "common-exit-yellow").isEmpty())
+                    {
+                        Logger::log(QString("点击【确定】"));
+                    }
+
+                    waitRandomWithEventProcessing(1200, 200);
+                    return true;
+                }
+
+                //点击柔风抱暖进行仿造
+                if (actions.opencvRecognizesAndClick(screenshotPath + "six-gates-fighting-skill.png", 0.55, false, true).isEmpty())
+                {
+                    Logger::log(QString("点击【柔风抱暖】失败"));
+                    return false;
+                }
+
+                waitRandomWithEventProcessing(1200, 200);
+
+                //确定是否是柔风抱暖
+                if (!actions.ocrContainsText("柔风抱暖", 0.60, QRectF(0, 0, 100, 100), ocr::Enhance::Upscale))
+                {
+                    //找不到则取消选择 直接退出
+                    //点击返回
+                    if (!actions.yoloRecognizesAndClick(0.50, true, "common-exit-blue").isEmpty())
+                    {
+                        Logger::log(QString("点击【返回】失败"));
+                        return false;
+                    }
+
+                    waitRandomWithEventProcessing(1200, 200);
+
+                    //有确定就点一下，没有则不用管
+                    if (actions.yoloRecognizesAndClick(0.50, true, "common-exit-yellow").isEmpty())
+                    {
+                        Logger::log(QString("点击【确定】"));
+                    }
+
+                    waitRandomWithEventProcessing(1200, 200);
+                }
+
+                //点击仿造
+                if (actions.opencvRecognizesAndClick(screenshotPath + "six-gates-imitation.png", 0.55, false, true).isEmpty())
+                {
+                    Logger::log(QString("点击【仿造】失败"));
+                    return false;
+                }
+
+                waitRandomWithEventProcessing(1200, 200);
+
+                if (!actions.yoloRecognizesAndClick(0.50, true, "common-exit-yellow").isEmpty())
+                {
+                    Logger::log(QString("点击【确定】"));
+                }
+
+                waitRandomWithEventProcessing(2000, 200);
+
+                if (!actions.ocrContainsText("仿造成功", 0.55 ,QRectF(0, 0, 100, 100), ocr::Enhance::Upscale))
+                {
+                    Logger::log(QString("识别【仿造成功】失败"));
+                    return false;
+                }
+
+                waitRandomWithEventProcessing(1000, 200);
+
+                if (actions.clickInRoi(QRectF(81.3, 22.1, 16.3, 58.8), false).isEmpty())
+                {
+                    Logger::log(QString("roi点击失败"));
+                    return false;
+                }
+            }
+
+            //2.其他
+
             return true;
         }
 
@@ -181,7 +273,7 @@ namespace scenarios {
             }
 
             //有准备就点一下，没有则不用管
-            if (actions.yoloRecognizesAndClick(0.50, true, "battle-ready").isEmpty())
+            if (!actions.yoloRecognizesAndClick(0.50, true, "battle-ready").isEmpty())
             {
                 Logger::log(QString("点击【准备】"));
             }
@@ -214,6 +306,20 @@ namespace scenarios {
             }
 
             //开始选择技能
+            if (!selectSixGatesSkill("柔风抱暖"))
+            {
+                Logger::log(QString("技能选择异常"));
+                return false;
+            }
+
+            //识别是否有“获得奖励”
+            if (actions.ocrRecognizesAndClick("获得奖励", 0.55, false, QRectF(15.6, 10.4, 67.2, 72.4), ocr::Enhance::Upscale).isEmpty())
+            {
+                Logger::log(QString("点击【获得奖励】失败"));
+                return false;
+            }
+
+            waitRandomWithEventProcessing(1200, 200);
 
             return true;
         }
@@ -288,14 +394,52 @@ namespace scenarios {
         // 三张技能卡的「选择」按钮中，点击与技能标题水平位置最近的一项；
         // 随机点击并排除按钮边框（0.1/0.1/0.1/0.1），避免点到描边等无效区域
         constexpr ClickExclude chooseExclude{0.1, 0.1, 0.1, 0.1};
+        if (skillLevel >= 5)
+        {
+            if (actions.ocrRecognizesAndClickNearestX("万相之赐", skillName, 0.55, true,
+                                                  QRectF(0, 0, 100, 100), ocr::Enhance::Upscale,
+                                                  chooseExclude).isEmpty())
+            {
+                Logger::log(QString("无法识别到【万相之赐】按钮"));
+                return false;
+            }
+            Logger::log(QString("选择【万相之赐】"));
+            return true;
+        }
         if (actions.ocrRecognizesAndClickNearestX("选择", skillName, 0.55, true,
                                                   QRectF(0, 0, 100, 100), ocr::Enhance::Upscale,
                                                   chooseExclude).isEmpty())
         {
             Logger::log(QString("未找到并点击技能【%1】的【选择】").arg(skillName));
-            //TODO 点击刷新 逻辑还没写
+            //寻找刷新按钮
+            if (actions.opencvRecognizesAndClick(screenshotPath + "six-gates-refresh.png", 0.65, false, true).isEmpty())
+            {
+                Logger::log(QString("点击【刷新】失败"));
+                return false;
+            }
 
-            return false;
+            //点击确定
+            if (!actions.yoloRecognizesAndClick(0.80, false, "common-btn-yellow_confirm").isEmpty())
+            {
+                Logger::log(QString("点击【确定】"));
+                // return false;
+            }
+
+            //再次查看 柔风抱暖
+            if (actions.ocrRecognizesAndClickNearestX("选择", skillName, 0.55, true,
+                                                  QRectF(0, 0, 100, 100), ocr::Enhance::Upscale,
+                                                  chooseExclude).isEmpty())
+            {
+                Logger::log(QString("未找到并点击技能【%1】的【选择】").arg(skillName));
+                if (actions.ocrRecognizesAndClickNearestX("万相之赐", skillName, 0.55, true,
+                                                  QRectF(0, 0, 100, 100), ocr::Enhance::Upscale,
+                                                  chooseExclude).isEmpty())
+                {
+                    Logger::log(QString("无法识别到【万相之赐】按钮"));
+                    return false;
+                }
+                Logger::log(QString("选择【万相之赐】"));
+            }
         }
 
         skillLevel++;
@@ -616,12 +760,31 @@ namespace scenarios {
         //选择技能：柔风抱暖
         if (!selectSixGatesSkill("柔风抱暖"))
         {
+            Logger::log(QString("技能选择异常"));
             return false;
         }
 
         //开始识别场景
         for (int i = 0; i < ROUND_TOTAL; ++i)
         {
+            if (roundNum == 24 && skillLevel < 4)
+            {
+                if (actions.ocrRecognizesAndClick("唤息", 0.55, false, QRectF(78.9, 71.2, 21.1, 28.8), ocr::Enhance::Upscale | ocr::Enhance::AutoInvert).isEmpty())
+                {
+                    Logger::log(QString("无法识别到【唤息】按钮"));
+                    return false;
+                }
+
+                waitRandomWithEventProcessing(1200,200);
+
+                if (actions.yoloRecognizesAndClick(0.80, false, "common-btn-yellow_confirm").isEmpty())
+                {
+                    Logger::log(QString("无法识别到【确定】按钮"));
+                    return false;
+                }
+
+                waitRandomWithEventProcessing(1200,200);
+            }
             // 同一画面可能同时出现多种场景，按优先级进入第一个命中的场景；
             // 心之岛只会单独出现，仍放在最低优先级兜底
             bool handled = false;
@@ -652,9 +815,47 @@ namespace scenarios {
             {
                 return false;
             }
-
+            roundNum++;
             Logger::log(QString("当前回合数 (%1/%2)").arg(i+1).arg(ROUND_TOTAL));
         }
+
+        //进入boss战
+        Logger::log(QString("当前技能等级: %1, 准备进入boss战").arg(skillLevel));
+        if (skillLevel < 4)
+        {
+            Logger::log(QString("注意！当前技能等级过低"));
+        }
+        waitRandomWithEventProcessing(3000,500);
+
+        //点击挑战
+        if (actions.opencvRecognizesAndClick(screenshotPath + "six-gates-challenge.png", 0.60, false, true).isEmpty())
+        {
+            Logger::log(QString("点击【挑战】失败"));
+            return false;
+        }
+
+        waitWithEventProcessing(6000);
+
+        //有准备就点一下，没有则不用管
+        if (!actions.yoloRecognizesAndClick(0.50, true, "battle-ready").isEmpty())
+        {
+            Logger::log(QString("点击【准备】"));
+        }
+
+        //等待战斗结束 总共180秒
+        bool isEndOfBattle = false;
+        for (int i = 0; i < 60; ++i)
+        {
+            //TODO 待修改
+
+            waitWithEventProcessing(3000);
+        }
+        if (!isEndOfBattle)
+        {
+            Logger::log(QString("等待战斗结束超时"));
+        }
+
+        waitWithEventProcessing(3000);
 
         Logger::log(QString("六道之门方案已完成"));
         return true;
