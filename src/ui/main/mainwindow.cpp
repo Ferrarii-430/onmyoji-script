@@ -25,6 +25,7 @@
 #include <QScrollArea>
 #include <QSpinBox>
 #include <QVBoxLayout>
+#include <QWheelEvent>
 #include "QMessageBox"
 
 #include "src/core/AppPaths.h"
@@ -38,12 +39,70 @@
 #include "src/game/GameWindow.h"
 #include "src/game/capture/Dx11HookCapture.h"
 #include "src/platform/DPIHelper.h"
+#include "src/ui/bossConfigForm/BossConfigDialog.h"
 #include "src/ui/editTask/edittaskdialog.h"
 #include "src/ui/setting/settingdialog.h"
 #include "src/vision/ClassNameCache.h"
 #include "src/vision/ImageIo.h"
 #include "src/vision/OcrEngine.h"
 #include "src/vision/YOLODetector.h"
+
+namespace {
+
+// 鬼王列表配置是「系统方案-超鬼王」独有的功能，方案 id 直接写死在程序里：
+// 只有它显示「自定义配置」入口，其余系统方案一律不显示
+constexpr const char* kSuperGhostKingConfigId = "627CE2C8-01C9-4828-B4AE-4F5A360E7946";
+
+// 是否显示该方案的「自定义配置」按钮：先按 id 命中超鬼王，
+// 再看方案对象的 showBossConfig 字段是否有意关掉（缺省视为显示）
+bool canShowBossConfigButton(const QString &configId)
+{
+    if (configId.compare(QString::fromLatin1(kSuperGhostKingConfigId),
+                         Qt::CaseInsensitive) != 0) {
+        return false;
+    }
+    for (const QJsonValue &value : m_configArray) {
+        const QJsonObject obj = value.toObject();
+        if (obj.value("id").toString().compare(configId, Qt::CaseInsensitive) == 0) {
+            return obj.value("showBossConfig").toBool(true);
+        }
+    }
+    return true;
+}
+
+// 系统方案表单里的数字输入框：滚轮不再改数值。
+// QSpinBox 默认在获得焦点后响应滚轮，鼠标划过或滚动页面时很容易误改，
+// 这里直接吞掉滚轮事件（ignore 后由父级滚动区接管，页面照常滚动）
+class NoWheelSpinBox : public QSpinBox
+{
+public:
+    explicit NoWheelSpinBox(QWidget *parent = nullptr) : QSpinBox(parent) {}
+
+protected:
+    void wheelEvent(QWheelEvent *event) override { event->ignore(); }
+};
+
+class NoWheelDoubleSpinBox : public QDoubleSpinBox
+{
+public:
+    explicit NoWheelDoubleSpinBox(QWidget *parent = nullptr) : QDoubleSpinBox(parent) {}
+
+protected:
+    void wheelEvent(QWheelEvent *event) override { event->ignore(); }
+};
+
+// 下拉框同理：鼠标划过滚一下就换选项，且没有任何提示，这里一并吞掉滚轮。
+// 弹出列表打开时的滚动由列表自己处理，不受影响
+class NoWheelComboBox : public QComboBox
+{
+public:
+    explicit NoWheelComboBox(QWidget *parent = nullptr) : QComboBox(parent) {}
+
+protected:
+    void wheelEvent(QWheelEvent *event) override { event->ignore(); }
+};
+
+} // namespace
 
 mainwindow::mainwindow(QWidget *parent) :
     QWidget(parent), ui(new Ui::mainwindow) {
@@ -357,7 +416,8 @@ void mainwindow::showSystemConfigForm(const QString &configId)
         "  border-radius: 8px;"
         "}"
         // 配置项行容器默认会被全局 QWidget 底色覆盖，单独置为透明，露出卡片背景
-        "#systemConfigField { background: transparent; }");
+        "#systemConfigField { background: transparent; }"
+        "#systemConfigHeader { background: transparent; }");
 
     // 配置项超出容器高度时出现纵向滚动条，内容不足时不显示；
     // 横向滚动条关闭，避免表单被横向拖动、配置项按可视宽度自适应
@@ -385,10 +445,7 @@ void mainwindow::showSystemConfigForm(const QString &configId)
     form->setVerticalSpacing(12);
     form->setLabelAlignment(Qt::AlignRight | Qt::AlignVCenter);
 
-    // 区域标题
-    auto *title = new QLabel(QStringLiteral("方案配置"), m_systemConfigForm);
-    title->setStyleSheet("font-weight: bold; font-size: 12pt; color: #333; padding-bottom: 4px;");
-    form->addRow(title);
+    // 区域标题移到卡片顶部固定行（见下方 rootLayout），此处不再占表单一行
 
     // 方案级 tip：整个方案的功能使用说明，显示在标题下方
     const QString systemTip = getSystemTip(configId);
@@ -399,6 +456,33 @@ void mainwindow::showSystemConfigForm(const QString &configId)
             "color: #6b7280; font-size: 9pt; background-color: #eef2f7;"
             "border: 1px solid #d0d7e2; border-radius: 6px; padding: 8px;");
         form->addRow(tipLabel);
+    }
+
+    // 「阵容配置」入口：与 systemConfig 其他项一样是 label + 控件的一行。
+    // 只在超鬼王方案出现，且可由方案对象的 showBossConfig 关掉；
+    // 弹窗里配的是「鬼王名称 → 阵容/绿标/红标」列表，随 config.json 持久化
+    if (canShowBossConfigButton(configId)) {
+        auto *entryRow = new QWidget(m_systemConfigForm);
+        entryRow->setObjectName("systemConfigField");
+        auto *entryLayout = new QHBoxLayout(entryRow);
+        entryLayout->setContentsMargins(0, 0, 0, 0);
+        entryLayout->setSpacing(8);
+
+        auto *editBtn = new QPushButton(QStringLiteral("编辑"), entryRow);
+        editBtn->setCursor(Qt::PointingHandCursor);
+        editBtn->setToolTip(QStringLiteral("配置鬼王对应的阵容、绿标位置与红标 BOSS"));
+        entryLayout->addWidget(editBtn);
+        entryLayout->addStretch(1);
+
+        connect(editBtn, &QPushButton::clicked, this, [this, configId]() {
+            BossConfigDialog dialog(currentItem.taskName, getBossConfig(configId), this);
+            if (dialog.exec() != QDialog::Accepted) {
+                return;
+            }
+            updateBossConfig(AppPaths::instance().configPath(), configId, dialog.list());
+        });
+
+        form->addRow(QStringLiteral("阵容配置"), entryRow);
     }
 
     const QString configPath = AppPaths::instance().configPath();
@@ -420,7 +504,7 @@ void mainwindow::showSystemConfigForm(const QString &configId)
         if (control == "number") {
             if (field.value("decimals").toInt(0) <= 0) {
                 // 整数：QSpinBox
-                auto *spin = new QSpinBox(fieldWidget);
+                auto *spin = new NoWheelSpinBox(fieldWidget);
                 spin->setRange(field.value("min").toInt(0), field.value("max").toInt(100));
                 spin->setSingleStep(field.value("step").toInt(1));
                 spin->setValue(field.value("value").toInt());
@@ -429,7 +513,7 @@ void mainwindow::showSystemConfigForm(const QString &configId)
                 fieldLayout->addWidget(spin);
             } else {
                 // 小数：QDoubleSpinBox
-                auto *spin = new QDoubleSpinBox(fieldWidget);
+                auto *spin = new NoWheelDoubleSpinBox(fieldWidget);
                 spin->setDecimals(field.value("decimals").toInt(2));
                 spin->setRange(field.value("min").toDouble(0.0), field.value("max").toDouble(1.0));
                 spin->setSingleStep(field.value("step").toDouble(0.1));
@@ -447,7 +531,7 @@ void mainwindow::showSystemConfigForm(const QString &configId)
             fieldLayout->addWidget(check);
         } else if (control == "select") {
             // 下拉：QComboBox
-            auto *combo = new QComboBox(fieldWidget);
+            auto *combo = new NoWheelComboBox(fieldWidget);
             for (const QJsonValue &opt : field.value("options").toArray()) {
                 combo->addItem(opt.toString());
             }
@@ -481,11 +565,25 @@ void mainwindow::showSystemConfigForm(const QString &configId)
 
     scrollArea->setWidget(formContainer);
 
+    // 标题行固定贴在卡片顶部（不随表单内容滚动）；方案自己的入口按钮
+    // 放在下面的表单里，与 systemConfig 其他配置项保持同一种「label + 控件」形态
+    auto *header = new QWidget(m_systemConfigForm);
+    header->setObjectName("systemConfigHeader");
+    auto *headerLayout = new QHBoxLayout(header);
+    headerLayout->setContentsMargins(4, 2, 4, 2);
+    headerLayout->setSpacing(8);
+
+    auto *title = new QLabel(QStringLiteral("方案配置"), header);
+    title->setStyleSheet("font-weight: bold; font-size: 12pt; color: #333;");
+    headerLayout->addWidget(title);
+    headerLayout->addStretch(1);
+
     auto *rootLayout = new QVBoxLayout(m_systemConfigForm);
     // 留出内边距，避免滚动区/内容贴边盖住卡片右侧与下侧边框
     rootLayout->setContentsMargins(6, 6, 6, 6);
-    rootLayout->setSpacing(0);
-    rootLayout->addWidget(scrollArea);
+    rootLayout->setSpacing(6);
+    rootLayout->addWidget(header);
+    rootLayout->addWidget(scrollArea, 1);
 
     m_systemConfigForm->show();
     m_systemConfigForm->raise();

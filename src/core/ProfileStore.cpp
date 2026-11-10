@@ -369,6 +369,66 @@ void updateSystemConfigValue(const QString &filePath, const QString &configId,
 }
 
 // ------------------------------
+// 超鬼王专属：鬼王列表配置(bossConfig)
+// ------------------------------
+QJsonArray getBossConfig(const QString &configId)
+{
+    const QString target = cleanString(configId);
+    for (const QJsonValue &val : m_configArray) {
+        if (!val.isObject()) {
+            continue;
+        }
+        const QJsonObject obj = val.toObject();
+        if (cleanString(obj["id"].toString()).compare(target, Qt::CaseInsensitive) == 0) {
+            return obj.value("bossConfig").toArray();
+        }
+    }
+    return QJsonArray();
+}
+
+QJsonObject findBossConfig(const QString &configId, const QString &bossName)
+{
+    for (const QJsonValue &val : getBossConfig(configId)) {
+        const QJsonObject entry = val.toObject();
+        if (entry.value("bossName").toString() == bossName) {
+            return entry;
+        }
+    }
+    return QJsonObject();
+}
+
+void updateBossConfig(const QString &filePath, const QString &configId, const QJsonArray &list)
+{
+    QJsonArray rootArray = m_configArray;
+    const QString target = cleanString(configId);
+
+    bool updated = false;
+    for (int i = 0; i < rootArray.size(); ++i) {
+        QJsonObject obj = rootArray[i].toObject();
+        if (cleanString(obj["id"].toString()).compare(target, Qt::CaseInsensitive) != 0) {
+            continue;
+        }
+        // 整份数组覆盖写：顺序即界面顺序，空数组表示清空
+        obj["bossConfig"] = list;
+        rootArray[i] = obj;
+        updated = true;
+        break;
+    }
+
+    if (!updated) {
+        Logger::log("未找到 bossConfig 所属方案: " + configId);
+        return;
+    }
+
+    // 同步内存并写回文件
+    m_configArray = rootArray;
+    if (saveJsonAtomically(filePath, rootArray)) {
+        Logger::log(QString("已保存鬼王配置: %1（共 %2 条）")
+                        .arg(configId.left(8)).arg(list.size()));
+    }
+}
+
+// ------------------------------
 // 配置导出 / 导入（带版本校验）
 // ------------------------------
 QString exportConfigToFile(const QString &targetFilePath)

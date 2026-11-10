@@ -51,12 +51,27 @@ void updateSystemConfigValue(const QString &filePath, const QString &configId,
                              const QString &key, const QJsonValue &value);
 
 // ------------------------------
+// 超鬼王专属：鬼王列表配置(bossConfig)
+// 只属于「系统方案-超鬼王」，数组顺序即界面顺序，每项一条记录：
+//   { "bossName": "鬼王名称", "lineupName": "阵容名称",
+//     "greenMark": 0, "markBoss": false }
+// greenMark 为绿标位置 0-5（0 表示不标记），markBoss 为是否红标 BOSS。
+// 存在方案对象顶层，随 config.json 一起持久化，也会被配置导出/导入带上；
+// 方案对象上的 showBossConfig 控制主界面是否显示「自定义配置」入口。
+// ------------------------------
+QJsonArray getBossConfig(const QString &configId);
+void updateBossConfig(const QString &filePath, const QString &configId, const QJsonArray &list);
+// 按鬼王名称取一条记录，找不到返回空对象（供场景运行时查表）
+QJsonObject findBossConfig(const QString &configId, const QString &bossName);
+
+// ------------------------------
 // 配置导出 / 导入（带版本校验）
 // ------------------------------
 // 当前配置格式版本：config.json 本体保持裸数组格式不变，版本号仅写入导出文件。
 // 新增配置字段时递增此值；导入低版本文件时缺失字段由各读取处的默认值兜底
 // （如 TaskRunner 的 step["excludeLeft"].toDouble(0.0)），只降级不崩溃。
-constexpr int kConfigVersion = 1;
+// v2：系统方案新增顶层 bossConfig（超鬼王鬼王列表）。
+constexpr int kConfigVersion = 2;
 
 // 导出当前全部方案到 targetFilePath（带 app/appVersion/configVersion/exportedAt/programs 包装）。
 // 成功返回空字符串，失败返回错误信息（用于 UI 弹窗提示）

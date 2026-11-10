@@ -148,6 +148,156 @@
     "name": "系统方案-超鬼王",
     "visible": true,
     "type": "system",
+    "showBossConfig": true,
+    "bossConfig": [
+      {
+        "bossName": "梦山白藏主",
+        "greenMark": 0,
+        "lineupName": "",
+        "markBoss": false,
+        "strongPursuit": false
+      },
+      {
+        "bossName": "卑弥呼",
+        "greenMark": 0,
+        "lineupName": "",
+        "markBoss": false,
+        "strongPursuit": false
+      },
+      {
+        "bossName": "鬼金羊",
+        "greenMark": 0,
+        "lineupName": "",
+        "markBoss": false,
+        "strongPursuit": false
+      },
+      {
+        "bossName": "酒吞童子",
+        "greenMark": 0,
+        "lineupName": "",
+        "markBoss": false,
+        "strongPursuit": false
+      },
+      {
+        "bossName": "鬼童丸",
+        "greenMark": 0,
+        "lineupName": "",
+        "markBoss": false,
+        "strongPursuit": false
+      },
+      {
+        "bossName": "缘结神",
+        "greenMark": 0,
+        "lineupName": "",
+        "markBoss": false,
+        "strongPursuit": true
+      },
+      {
+        "bossName": "禅心云外镜",
+        "greenMark": 0,
+        "lineupName": "",
+        "markBoss": false,
+        "strongPursuit": false
+      },
+      {
+        "bossName": "八岐大蛇",
+        "greenMark": 0,
+        "lineupName": "",
+        "markBoss": false,
+        "strongPursuit": false
+      },
+      {
+        "bossName": "月读",
+        "greenMark": 0,
+        "lineupName": "",
+        "markBoss": false,
+        "strongPursuit": false
+      },
+      {
+        "bossName": "夜刀神",
+        "greenMark": 0,
+        "lineupName": "",
+        "markBoss": false,
+        "strongPursuit": false
+      },
+      {
+        "bossName": "纺愿缘结神",
+        "greenMark": 0,
+        "lineupName": "",
+        "markBoss": false,
+        "strongPursuit": false
+      },
+      {
+        "bossName": "修罗鬼童丸",
+        "greenMark": 0,
+        "lineupName": "",
+        "markBoss": false,
+        "strongPursuit": false
+      },
+      {
+        "bossName": "毗沙门天",
+        "greenMark": 0,
+        "lineupName": "",
+        "markBoss": false,
+        "strongPursuit": false
+      },
+      {
+        "bossName": "孔雀明王",
+        "greenMark": 0,
+        "lineupName": "",
+        "markBoss": false,
+        "strongPursuit": false
+      },
+      {
+        "bossName": "蚀月吸血姬",
+        "greenMark": 0,
+        "lineupName": "",
+        "markBoss": false,
+        "strongPursuit": false
+      },
+      {
+        "bossName": "祸津神",
+        "greenMark": 0,
+        "lineupName": "",
+        "markBoss": false,
+        "strongPursuit": false
+      },
+      {
+        "bossName": "寻香行",
+        "greenMark": 0,
+        "lineupName": "",
+        "markBoss": false,
+        "strongPursuit": false
+      },
+      {
+        "bossName": "市加美",
+        "greenMark": 0,
+        "lineupName": "",
+        "markBoss": false,
+        "strongPursuit": false
+      },
+      {
+        "bossName": "雪御前",
+        "greenMark": 0,
+        "lineupName": "",
+        "markBoss": false,
+        "strongPursuit": false
+      },
+      {
+        "bossName": "鬼王酒吞童子",
+        "greenMark": 0,
+        "lineupName": "",
+        "markBoss": false,
+        "strongPursuit": false
+      },
+      {
+        "bossName": "螃姬",
+        "greenMark": 0,
+        "lineupName": "",
+        "markBoss": false,
+        "strongPursuit": false
+      }
+    ],
     "tip": "超鬼王活动自动执行方案，具体流程待补充。",
     "systemConfig": [
       {
@@ -159,24 +309,16 @@
         "tip": "当前超鬼王使用的方案分组名称，用于切换御魂。"
       },
       {
-        "key": "monomerLineupName",
-        "label": "单体阵容",
-        "control": "input",
-        "value": "单体通用阵容",
-        "placeholder": "输入单体通用阵容名称",
-        "tip": "当前超鬼王使用的单体通用阵容名称。"
-      },
-      {
-        "key": "populationLineupName",
-        "label": "群体阵容",
+        "key": "defaultLineupName",
+        "label": "通用阵容",
         "control": "input",
         "value": "群体通用阵容",
-        "placeholder": "输入群体通用阵容名称",
-        "tip": "当前超鬼王使用的群体通用阵容名称。"
+        "placeholder": "输通用阵容名称",
+        "tip": "当前超鬼王未配置时使用的默认阵容名称。"
       },
       {
-        "key": "greenLabel",
-        "label": "绿标位置",
+        "key": "defaultGreenLabel",
+        "label": "默认绿标位置",
         "control": "number",
         "value": 0,
         "decimals": 0,
@@ -186,11 +328,25 @@
         "tip": "从左到右顺序，数字1-5号，不填或者0则不标记。"
       },
       {
-        "key": "markBoss",
-        "label": "标记BOSS",
+        "key": "defaultMarkBoss",
+        "label": "默认标记BOSS",
         "control": "switch",
         "value": false,
         "tip": "开启后自动标记BOSS。"
+      },
+      {
+        "key": "defaultStrongPursuit",
+        "label": "默认强力追击",
+        "control": "switch",
+        "value": false,
+        "tip": "开启后自动强力追击。"
+      },
+      {
+        "key": "autoDrinkTea",
+        "label": "自动喝茶",
+        "control": "switch",
+        "value": false,
+        "tip": "开启后自动喝茶，谨慎开启。"
       }
     ],
     "steps": [

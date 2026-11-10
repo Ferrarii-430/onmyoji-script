@@ -133,6 +133,8 @@ add_executable(qtTest WIN32
         src/ui/editTask/edittaskdialog.cpp
         src/ui/editTask/edittaskdialog.h
         src/ui/editTask/edittaskdialog.ui
+        src/ui/bossConfigForm/BossConfigDialog.cpp
+        src/ui/bossConfigForm/BossConfigDialog.h
         src/ui/typeOpenCVForm/typeopencvform.cpp
         src/ui/typeOpenCVForm/typeopencvform.h
         src/ui/typeOpenCVForm/typeopencvform.ui
