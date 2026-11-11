@@ -32,9 +32,15 @@ namespace scenarios {
     int ROUND_TOTAL = 25; //总回合数
     bool isLock = false; //是否锁定
 
-    // 六道之门内部共享实例与截图路径：本文件内所有处理方法统一复用
+    // 六道之门内部共享实例：本文件内所有处理方法统一复用
     static ScriptActions& actions = ScriptActions::instance();
-    static QString screenshotPath = AppPaths::instance().screenshotPath();
+
+    // 截图目录必须在 QCoreApplication 创建后再取：文件级静态初始化时 applicationDirPath()
+    // 还是空串，拼出来的路径无效，OpenCV 会报「无法加载图片」，所以用函数在调用时取值
+    static QString screenshotPath()
+    {
+        return AppPaths::instance().screenshotPath();
+    }
 
     // 重置跨轮次状态：任务结束/停止后由 TaskRunner 调用，下次启动任务重新走初始化流程
     void resetSixGatesStatus()
@@ -82,7 +88,7 @@ namespace scenarios {
             for (const SceneTemplate& templ : kSceneTemplates)
             {
                 const std::vector<OpenCvMatch> matches =
-                    actions.opencvFindAll(screenshotPath + templ.fileName, kSceneMatchThreshold, false);
+                    actions.opencvFindAll(screenshotPath() + templ.fileName, kSceneMatchThreshold, false);
                 if (matches.empty())
                 {
                     continue;
@@ -131,7 +137,7 @@ namespace scenarios {
                 }
 
                 //点击柔风抱暖进行仿造
-                if (actions.opencvRecognizesAndClick(screenshotPath + "six-gates-fighting-skill.png", 0.55, false, true).isEmpty())
+                if (actions.opencvRecognizesAndClick(screenshotPath() + "six-gates-fighting-skill.png", 0.55, false, true).isEmpty())
                 {
                     Logger::log(QString("点击【柔风抱暖】失败"));
                     return false;
@@ -162,7 +168,7 @@ namespace scenarios {
                 }
 
                 //点击仿造
-                if (actions.opencvRecognizesAndClick(screenshotPath + "six-gates-imitation.png", 0.55, false, true).isEmpty())
+                if (actions.opencvRecognizesAndClick(screenshotPath() + "six-gates-imitation.png", 0.55, false, true).isEmpty())
                 {
                     Logger::log(QString("点击【仿造】失败"));
                     return false;
@@ -216,7 +222,7 @@ namespace scenarios {
                     waitRandomWithEventProcessing(2000,200);
 
                     //点击开启
-                    if (actions.opencvRecognizesAndClick(screenshotPath + "turn-on.png", 0.75, false, true).isEmpty())
+                    if (actions.opencvRecognizesAndClick(screenshotPath() + "turn-on.png", 0.75, false, true).isEmpty())
                     {
                         Logger::log(QString("点击【开启】失败"));
                         return false;
@@ -249,7 +255,7 @@ namespace scenarios {
             for (int i = 0; i < 5; ++i)
             {
                 //点击技能
-                if (!actions.opencvRecognizesAndClick(screenshotPath + "six-gates-skill.png", 0.60, false, false).isEmpty())
+                if (!actions.opencvRecognizesAndClick(screenshotPath() + "six-gates-skill.png", 0.60, false, false).isEmpty())
                 {
                     Logger::log(QString("点击【技能】"));
                     hasSkill = true;
@@ -266,7 +272,7 @@ namespace scenarios {
             waitRandomWithEventProcessing(2000,200);
 
             //点击挑战
-            if (actions.opencvRecognizesAndClick(screenshotPath + "six-gates-challenge.png", 0.75, false, true).isEmpty())
+            if (actions.opencvRecognizesAndClick(screenshotPath() + "six-gates-challenge.png", 0.75, false, true).isEmpty())
             {
                 Logger::log(QString("点击【挑战】失败"));
                 return false;
@@ -343,7 +349,7 @@ namespace scenarios {
             waitRandomWithEventProcessing(2000,200);
 
             //点击挑战
-            if (actions.opencvRecognizesAndClick(screenshotPath + "six-gates-challenge.png", 0.75, false, true).isEmpty())
+            if (actions.opencvRecognizesAndClick(screenshotPath() + "six-gates-challenge.png", 0.75, false, true).isEmpty())
             {
                 Logger::log(QString("点击【挑战】失败"));
                 return false;
@@ -412,7 +418,7 @@ namespace scenarios {
         {
             Logger::log(QString("未找到并点击技能【%1】的【选择】").arg(skillName));
             //寻找刷新按钮
-            if (actions.opencvRecognizesAndClick(screenshotPath + "six-gates-refresh.png", 0.65, false, true).isEmpty())
+            if (actions.opencvRecognizesAndClick(screenshotPath() + "six-gates-refresh.png", 0.65, false, true).isEmpty())
             {
                 Logger::log(QString("点击【刷新】失败"));
                 return false;
@@ -466,7 +472,7 @@ namespace scenarios {
         }
 
         //判断是否选中椒图
-        auto detections = actions.opencvFindAll(screenshotPath + "jiaotu.png", 0.75, false);
+        auto detections = actions.opencvFindAll(screenshotPath() + "jiaotu.png", 0.75, false);
         if (detections.empty()) {
             Logger::log(QString("需要切换至椒图"));
             waitRandomWithEventProcessing(1200,200);
@@ -491,7 +497,7 @@ namespace scenarios {
         waitRandomWithEventProcessing(1200,200);
 
         //点击开启
-        if (actions.opencvRecognizesAndClick(screenshotPath + "turn-on.png", 0.75, false, true).isEmpty())
+        if (actions.opencvRecognizesAndClick(screenshotPath() + "turn-on.png", 0.75, false, true).isEmpty())
         {
             Logger::log(QString("点击【开启】失败"));
             return false;
@@ -657,7 +663,7 @@ namespace scenarios {
         }
 
         // 识别所有预设队伍切换按钮
-        detections = actions.opencvFindAll(screenshotPath + "switch-soul.png", 0.6, false);
+        detections = actions.opencvFindAll(screenshotPath() + "switch-soul.png", 0.6, false);
         if (detections.empty()) {
             Logger::log(QString("未找到预设队伍切换按钮"));
             return false;
@@ -705,7 +711,7 @@ namespace scenarios {
         waitRandomWithEventProcessing(2000,200);
 
         //点击确认
-        if (actions.opencvRecognizesAndClick(screenshotPath + "confirm.png", 0.75, false, true).isEmpty())
+        if (actions.opencvRecognizesAndClick(screenshotPath() + "confirm.png", 0.75, false, true).isEmpty())
         {
             Logger::log(QString("点击【确认】失败"));
             return false;
@@ -714,7 +720,7 @@ namespace scenarios {
         waitRandomWithEventProcessing(2000,200);
 
         //点击开启
-        if (actions.opencvRecognizesAndClick(screenshotPath + "turn-on.png", 0.75, false, true).isEmpty())
+        if (actions.opencvRecognizesAndClick(screenshotPath() + "turn-on.png", 0.75, false, true).isEmpty())
         {
             Logger::log(QString("点击【开启】失败"));
             return false;
@@ -828,7 +834,7 @@ namespace scenarios {
         waitRandomWithEventProcessing(3000,500);
 
         //点击挑战
-        if (actions.opencvRecognizesAndClick(screenshotPath + "six-gates-challenge.png", 0.60, false, true).isEmpty())
+        if (actions.opencvRecognizesAndClick(screenshotPath() + "six-gates-challenge.png", 0.60, false, true).isEmpty())
         {
             Logger::log(QString("点击【挑战】失败"));
             return false;

@@ -609,6 +609,11 @@ std::vector<OpenCvMatch> ScriptActions::opencvFindAll(const QString& templPath, 
     return results;
 }
 
+bool ScriptActions::opencvContains(const QString& templPath, const double threshold, const bool colorCheck)
+{
+    return !opencvFindAll(templPath, threshold, colorCheck).empty();
+}
+
 QJsonArray ScriptActions::ocrRecognizes(const QRectF& roiPercent, const ocr::Enhance enhance)
 {
     cv::Mat winImg = capture::captureGameWindow();

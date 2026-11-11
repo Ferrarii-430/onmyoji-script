@@ -105,7 +105,7 @@
   {
     "id": "D942C777-2449-41P2-A595-044486E39SG13",
     "name": "系统方案-六道之门",
-    "visible": true,
+    "visible": false,
     "type": "system",
     "tip": "自动循环执行六道之门，月之海-椒图4柔风速刷方案，需要在月之海界面启动。",
     "systemConfig": [
@@ -312,7 +312,7 @@
         "key": "defaultLineupName",
         "label": "通用阵容",
         "control": "input",
-        "value": "群体通用阵容",
+        "value": "群体通用",
         "placeholder": "输通用阵容名称",
         "tip": "当前超鬼王未配置时使用的默认阵容名称。"
       },

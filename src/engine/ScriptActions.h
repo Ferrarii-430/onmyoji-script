@@ -95,6 +95,11 @@ public:
     // 返回所有匹配结果（DX11 原始捕获坐标系），按分数降序排列，供调用方做下一步判断。
     std::vector<OpenCvMatch> opencvFindAll(const QString& templPath, double threshold, bool colorCheck = false);
 
+    // 判断截图中是否包含模板图片（纯检测，不点击）：
+    // 命中任一满足阈值的匹配返回 true，截图失败或模板加载失败返回 false。
+    // colorCheck 为是否做 HSV 颜色校验（用于区分同形状不同色的模板）
+    bool opencvContains(const QString& templPath, double threshold, bool colorCheck = false);
+
     // OCR 识别；roiPercent 为识别区域（左/上/宽/高，单位为图片尺寸的百分比 0~100）；
     // 宽或高 <= 0 时表示识别整张图
     // enhance 默认 Upscale：小裁剪图自动放大是本就存在的行为，保持不变；
