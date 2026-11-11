@@ -49,8 +49,8 @@ namespace scenarios {
     // 命中 bossConfig 用该行的阵容/绿标/红标；未命中则阵容留空、绿标与红标回落到方案级默认
     BossRuntimeParam resolveBossParam(const SuperGhostKingConfig &config, const QString &bossName);
 
-    // 获取当前体力值：识别逻辑待实现，暂时返回 0
-    int getStamina();
+    // 获取当前疲劳值
+    int getFatigue();
 
     // 系统方案-超鬼王：执行一轮超鬼王活动流程。
     // 返回 true 表示本轮正常完成（继续下一轮循环），false 表示中途失败/任务达成（终止任务循环）。

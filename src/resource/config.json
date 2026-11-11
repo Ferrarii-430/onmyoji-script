@@ -298,7 +298,7 @@
         "strongPursuit": false
       }
     ],
-    "tip": "超鬼王活动自动执行方案，具体流程待补充。",
+    "tip": "超鬼王活动自动执行方案，在召唤鬼王界面启动。",
     "systemConfig": [
       {
         "key": "schemeName",
@@ -310,10 +310,10 @@
       },
       {
         "key": "defaultLineupName",
-        "label": "通用阵容",
+        "label": "默认阵容",
         "control": "input",
         "value": "群体通用",
-        "placeholder": "输通用阵容名称",
+        "placeholder": "输入默认阵容名称",
         "tip": "当前超鬼王未配置时使用的默认阵容名称。"
       },
       {

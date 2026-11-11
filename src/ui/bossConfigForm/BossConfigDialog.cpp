@@ -110,7 +110,7 @@ BossConfigDialog::BossConfigDialog(const QString &schemeName, const QJsonArray &
     root->setSpacing(10);
 
     auto *hint = new QLabel(
-        QStringLiteral("每行一条鬼王配置：按识别到的鬼王名称取对应阵容与标记。"
+        QStringLiteral("每行一条鬼王配置：按识别到的鬼王名称取对应阵容与标记，没有则使用默认阵容名称。"
                        "绿标位置 0-5（0 表示不标记），红标 BOSS 为是否标记敌方 BOSS，"
                        "强力追击为是否开启强力追击。"), this);
     hint->setWordWrap(true);

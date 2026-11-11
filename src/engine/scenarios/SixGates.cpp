@@ -30,7 +30,7 @@ namespace scenarios {
     int skillLevel = 0; //技能等级
     int roundNum = 0; //当前回合数
     int ROUND_TOTAL = 25; //总回合数
-    bool isLock = false; //是否锁定
+    static bool isLock = false; //是否锁定，仅本文件内使用
 
     // 六道之门内部共享实例：本文件内所有处理方法统一复用
     static ScriptActions& actions = ScriptActions::instance();

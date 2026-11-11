@@ -33,6 +33,7 @@ namespace scenarios {
     QString currentLineup = "";
     // 当前强力追击状态：空值表示还没识别过，避免「已知关闭」与「未知」混淆
     std::optional<bool> currentStrongPursuitStatus;
+    static std::optional<bool> isLock; // 阵容锁定状态，仅本文件内使用
 
     namespace
     {
@@ -73,6 +74,28 @@ namespace scenarios {
                             ? QStringLiteral("超鬼王配置: (方案未配置任何参数)")
                             : QStringLiteral("超鬼王配置: ") + parts.join(QStringLiteral(" | ")));
         }
+
+        // 等待疲劳值回落到 100 以下再继续战斗。
+        // 未勾选自动喝茶时，疲劳值 >= 100 无法进入战斗，只能等它自然降低；
+        // 勾选自动喝茶时由游戏内喝茶弹窗处理，无需等待。
+        // 返回 false 表示等待期间任务已被停止，调用方应直接结束流程。
+        bool waitFatigueBelowBattleThreshold(bool autoDrinkTea)
+        {
+            if (autoDrinkTea)
+            {
+                return TaskRunner::instance().isRunning();
+            }
+
+            int fatigue = getFatigue();
+            while (fatigue >= 100 && TaskRunner::instance().isRunning())
+            {
+                Logger::log(QString("当前疲劳值【%1】，等待疲劳值降低中...").arg(fatigue));
+                // 带停止检查的等待：每个时间片都会检查 isRunning，点停止后可立即退出
+                waitWithEventProcessing(60000, [] { return TaskRunner::instance().isRunning(); });
+                fatigue = getFatigue();
+            }
+            return TaskRunner::instance().isRunning();
+        }
     } // namespace
 
     // 跨轮次状态示例：仅在单次任务运行的多次循环内保持的标记，
@@ -83,6 +106,7 @@ namespace scenarios {
     {
         currentLineup = "";
         currentStrongPursuitStatus.reset();
+        isLock.reset();
     }
 
     SuperGhostKingConfig loadSuperGhostKingConfig()
@@ -193,8 +217,7 @@ namespace scenarios {
                             .arg(bossName.trimmed(),
                                  param.lineupName.isEmpty() ? QStringLiteral("(未填)") : param.lineupName)
                             .arg(param.greenMark)
-                            .arg(param.markBoss ? QStringLiteral("是") : QStringLiteral("否"))
-                            .arg(param.strongPursuit ? QStringLiteral("是") : QStringLiteral("否")));
+                            .arg(param.markBoss ? QStringLiteral("是") : QStringLiteral("否"), param.strongPursuit ? QStringLiteral("是") : QStringLiteral("否")));
             return param;
         }
 
@@ -211,8 +234,7 @@ namespace scenarios {
                         .arg(entry->bossName,
                              param.lineupName.isEmpty() ? QStringLiteral("(未填)") : param.lineupName)
                         .arg(param.greenMark)
-                        .arg(param.markBoss ? QStringLiteral("是") : QStringLiteral("否"))
-                        .arg(param.strongPursuit ? QStringLiteral("是") : QStringLiteral("否")));
+                        .arg(param.markBoss ? QStringLiteral("是") : QStringLiteral("否"), param.strongPursuit ? QStringLiteral("是") : QStringLiteral("否")));
         return param;
     }
 
@@ -228,14 +250,20 @@ namespace scenarios {
 
         Logger::log(QString("开始执行超鬼王"));
 
-        // TODO 超鬼王执行流程待实现（识别界面、进入挑战、结算循环）。
         // 识别到鬼王名称后按下面方式取该鬼王的阵容/绿标/标记：
         //   const BossRuntimeParam param = resolveBossParam(config, ocrBossName);
         //   if (!param.lineupName.isEmpty()) { 切换阵容(param.lineupName); }
         //   标记(param.greenMark, param.markBoss);
 
+        //判断疲劳值是否满足进入战斗（需小于100）
+        if (!waitFatigueBelowBattleThreshold(config.autoDrinkTea))
+        {
+            Logger::log(QString("等待疲劳值降低超时"));
+            return false;
+        }
+
         //识别召唤鬼王
-        if (actions.opencvRecognizesAndClick(screenshotPath + "super-call.png", 0.65, true, true).isEmpty())
+        if (actions.opencvRecognizesAndClick(screenshotPath + "super-call.png", 0.65, true, true, ClickExclude{0.2, 0.2, 0.2, 0.2}).isEmpty())
         {
             Logger::log(QString("点击【召唤鬼王】失败"));
             return false;
@@ -244,8 +272,8 @@ namespace scenarios {
         waitRandomWithEventProcessing(2500, 300);
 
         //获取鬼王名称
-        QJsonArray ocrData = actions.ocrRecognizes(QRectF(38.4, 16.1, 6.5, 31.1), ocr::Enhance::Upscale | ocr::Enhance::AutoInvert);
-        qDebug() << "[debug] ocrData:" << ocrData;
+        QJsonArray ocrData = actions.ocrRecognizes(QRectF(38.4, 16.1, 6.5, 31.1));
+        // qDebug() << "[debug] ocrData:" << ocrData;
         if (ocrData.empty())
         {
             Logger::log(QString("无法识别鬼王名称"));
@@ -256,6 +284,7 @@ namespace scenarios {
         for (const QJsonValue& val : ocrData) {
             const QJsonObject item = val.toObject();
             const QString bossName = item["text"].toString();
+            qDebug() << "[debug] bossName:" << bossName;
 
             // 每条识别结果先回到默认配置，避免上一条命中的鬼王配置串到这一条
             param.lineupName = config.defaultLineupName;
@@ -277,8 +306,7 @@ namespace scenarios {
                             .arg(bossName,
                                  param.lineupName.isEmpty() ? QStringLiteral("(未填)") : param.lineupName)
                             .arg(param.greenMark)
-                            .arg(param.markBoss ? QStringLiteral("是") : QStringLiteral("否"))
-                            .arg(param.strongPursuit ? QStringLiteral("是") : QStringLiteral("否")));
+                            .arg(param.markBoss ? QStringLiteral("是") : QStringLiteral("否"), param.strongPursuit ? QStringLiteral("是") : QStringLiteral("否")));
         }
 
         waitRandomWithEventProcessing(1000, 200);
@@ -299,8 +327,8 @@ namespace scenarios {
             utils::OcrTextTracker groupTopTracker;
             for (int i = 0; i < 10; ++i)
             {
-                QJsonArray groupData = actions.ocrRecognizes(QRectF(37.7, 35.0, 11.1, 51.8), ocr::Enhance::Upscale);
-
+                QJsonArray groupData = actions.ocrRecognizes(QRectF(37.7, 35.0, 11.1, 51.8));
+                // qDebug() << "[debug] groupData:" << groupData;
                 //文本内容与上次一致（忽略 box/score 波动），说明滑动未改变列表内容，已到顶部，结束循环
                 if (groupTopTracker.unchangedSinceLast(groupData)) {
                     Logger::log(QString("分组列表别结果与上次一致，已滑动到顶部"));
@@ -368,10 +396,36 @@ namespace scenarios {
             //先回到列表顶部，避免目标预设在上方时漏检
             Logger::log(QString("开始滑动到预设列表顶部"));
             utils::OcrTextTracker presetTopTracker;
+            //确定有多少个预设可选择，防止识别到错误的数据
+            auto switchNumberArray = actions.opencvFindAll(screenshotPath + "super-switch-soul.png", 0.6, false);
+            // qDebug() << "[debug] switchNumberArray:" << switchNumberArray.size();
+            constexpr QRectF presetsRoiArray[5] = {
+                {48.5, 32.3, 30.8, 13.4}, //0或者1个
+                {48.5, 32.3, 5.1, 26.0}, //2个
+                {48.5, 32.3, 5.1, 39.8}, //3个
+                {48.5, 32.3, 30.8, 45.0}};//大于3个
+            QRectF presetsRoi = {};
+            switch (switchNumberArray.size())
+            {
+                case 0:
+                case 1:
+                    presetsRoi = presetsRoiArray[0];
+                    break;
+
+                case 2:
+                    presetsRoi = presetsRoiArray[1];
+                    break;
+                case 3:
+                    presetsRoi = presetsRoiArray[2];
+                    break;
+                default:
+                    presetsRoi = presetsRoiArray[3];
+            }
+
             for (int i = 0; i < 10; ++i)
             {
-                QJsonArray presetData = actions.ocrRecognizes(QRectF(48.5, 34.4, 30.8, 44.4), ocr::Enhance::Upscale);
-                qDebug() << "[debug] presetData:" << presetData;
+                QJsonArray presetData = actions.ocrRecognizes(presetsRoi, ocr::Enhance::Upscale);
+                // qDebug() << "[debug] presetData:" << presetData;
 
                 //文本内容与上次一致（忽略 box/score 波动），说明滑动未改变列表内容，已到顶部，结束循环
                 if (presetTopTracker.unchangedSinceLast(presetData)) {
@@ -396,7 +450,7 @@ namespace scenarios {
             Logger::log(QString("开始寻找目标预设列表"));
             for (int i = 0; i < 10; ++i)
             {
-                QJsonArray presetData = actions.ocrRecognizes(QRectF(48.5, 34.4, 30.8, 44.4), ocr::Enhance::Upscale);
+                QJsonArray presetData = actions.ocrRecognizes(presetsRoi, ocr::Enhance::Upscale);
 
                 //文本内容与上次一致（忽略 box/score 波动），说明滑动未改变列表内容，已到底部，结束循环
                 if (presetSearchTracker.unchangedSinceLast(presetData)) {
@@ -510,17 +564,18 @@ namespace scenarios {
         // 只有还没识别过当前状态时才需要看界面，识别一次后跨轮次复用
         if (!currentStrongPursuitStatus.has_value())
         {
-            currentStrongPursuitStatus = !actions.opencvFindAll(screenshotPath + "super-check.png", 0.8, true).empty();
+            currentStrongPursuitStatus = actions.opencvContains(screenshotPath + "super-check.png", 0.75, true);
+            Logger::log(QString("当前【强力追击】状态：%1").arg(currentStrongPursuitStatus.value() ? QStringLiteral("是") : QStringLiteral("否")));
         }
 
         //判断是否需要开启强力追击
         if (param.strongPursuit)
         {
             //开启
-            if (!currentStrongPursuitStatus)
+            if (!currentStrongPursuitStatus.value())
             {
                 //只有关闭状态下需要开启
-                if (actions.ocrRecognizesAndClick("2.5倍伤害", 0.65, false, QRectF(81.0, 68.3, 19.0, 13.3), ocr::Enhance::Upscale).isEmpty())
+                if (actions.ocrRecognizesAndClick("2.5倍伤害", 0.65, true, QRectF(81.0, 68.3, 19.0, 13.3), ocr::Enhance::Upscale).isEmpty())
                 {
                     Logger::log(QString("开启【强力追击】失败"));
                 }
@@ -529,10 +584,10 @@ namespace scenarios {
         } else
         {
             //关闭
-            if (currentStrongPursuitStatus)
+            if (currentStrongPursuitStatus.value())
             {
                 //只有开启状态下需要关闭
-                if (actions.opencvRecognizesAndClick(screenshotPath + "super-check.png", 0.65, true, false).isEmpty())
+                if (actions.opencvRecognizesAndClick(screenshotPath + "super-check.png", 0.65, false, true).isEmpty())
                 {
                     Logger::log(QString("关闭【强力追击】失败"));
                     return false;
@@ -543,20 +598,47 @@ namespace scenarios {
 
         waitRandomWithEventProcessing(2000,200);
 
-        bool isKill = false;
-        //不设置战斗次数上限
-        for (int num = 0; num < 999; ++num)
+        //勾选锁定
+        if (!isLock.has_value())
         {
-            //TODO 此处缺少逻辑，判断体力是否足够
+            if (!actions.opencvRecognizesAndClick(screenshotPath + "super-lock.png", 0.75, false, true).isEmpty())
+            {
+                Logger::log(QString("已锁定阵容"));
+                isLock = true;
+            } else
+            {
+                Logger::log(QString("锁定阵容失败"));
+            }
+        }
+
+        bool isKill = false;
+        //战斗次数上限10次
+        for (int num = 0; num < 10; ++num)
+        {
+            //判断疲劳值是否满足进入战斗（需小于100）
+            if (!waitFatigueBelowBattleThreshold(config.autoDrinkTea))
+            {
+                Logger::log(QString("等待疲劳值降低超时"));
+                return false;
+            }
 
             //点击战斗
-            if (actions.opencvRecognizesAndClick(screenshotPath + "anniversary-challenge.png", 0.65, true, false).isEmpty())
+            if (actions.opencvRecognizesAndClick(screenshotPath + "anniversary-challenge.png", 0.65, true, false, ClickExclude{0.2, 0.2, 0.2, 0.2}).isEmpty())
             {
                 Logger::log(QString("点击【战斗】失败"));
                 return false;
             }
 
+            //这里可能会触发喝茶
+            //TODO 自动喝茶的逻辑还没写
+
             waitRandomWithEventProcessing(3500,300);
+
+            //有准备就点一下，没有则不用管
+            if (actions.yoloRecognizesAndClick(0.50, true, "battle-ready").isEmpty())
+            {
+                Logger::log(QString("点击【准备】"));
+            }
 
             //判断是否进入战斗
             bool isEngageInBattle = false;
@@ -564,7 +646,7 @@ namespace scenarios {
             {
                 //先等1秒
                 waitRandomWithEventProcessing(1000,200);
-                if (!actions.yoloRecognizesAndClick(0.50, true, "battle-ready").isEmpty())
+                if (actions.yoloContainsLabels(0.45, {"common-exit-battle"}, false))
                 {
                     Logger::log(QString("已进入【超鬼王】战斗场景"));
                     isEngageInBattle = true;
@@ -582,14 +664,62 @@ namespace scenarios {
 
             waitRandomWithEventProcessing(2000,200);
 
+            //是否红标boss
+            if (param.markBoss)
+            {
+                waitRandomWithEventProcessing(1000,200);
+                if (!actions.clickInRoi(QRectF(81, 15, 18, 70), true).isEmpty())
+                {
+                    Logger::log(QString("已红标BOSS"));
+                }
+            }
+
+            //是否需要绿标队友
+            if (param.greenMark > 0)
+            {
+                waitRandomWithEventProcessing(2000,200);
+                QString savePathGreenMark;
+                const QRectF roiArray[5] = {
+                    {14.9, 66.4, 5.1, 8.4},
+                    {30.7, 59.7, 5.1, 8.4},
+                    {45.0, 55.3, 5.1, 8.4},
+                    {56.1, 56.3, 5.1, 8.4},
+                    {71.6, 64.3, 5.1, 8.4}};
+                switch (param.greenMark)
+                {
+                    case 1:
+                        savePathGreenMark = actions.clickInRoi(roiArray[0], false);
+                        break;
+                    case 2:
+                        savePathGreenMark = actions.clickInRoi(roiArray[1], false);
+                        break;
+                    case 3:
+                        savePathGreenMark = actions.clickInRoi(roiArray[2], false);
+                        break;
+                    case 4:
+                        savePathGreenMark = actions.clickInRoi(roiArray[3], false);
+                        break;
+                    case 5:
+                        savePathGreenMark = actions.clickInRoi(roiArray[4], false);
+                        break;
+                    default:
+                        Logger::log(QString("绿标数据异常"));
+                        return false;
+                }
+                if (!savePathGreenMark.isEmpty())
+                {
+                    Logger::log(QString("已绿标【%1】号位").arg(param.greenMark));
+                }
+            }
+
             // 循环等待战斗结束 3分钟
             bool isBattleOfEnd = false;
             for (int i = 0; i < 36 && TaskRunner::instance().isRunning(); ++i)
             {
                 Logger::log(QString("等待战斗结束...(%1/36)").arg(i+1));
                 waitWithEventProcessing(5000);
-                //是否有【造成伤害】文字
-                if (actions.ocrContainsText("本次伤害", 0.7, QRectF(40.2, 39.0, 19.0, 11.6)))
+                //是否有【本次伤害】文字
+                if (actions.ocrContainsText("本次伤害", 0.55, QRectF(40.2, 39.0, 19.0, 11.6)))
                 {
                     Logger::log(QString("战斗已经结束"));
                     isBattleOfEnd = true;
@@ -681,6 +811,11 @@ namespace scenarios {
                 break;
             }
             Logger::log(QString("鬼王未击杀，继续战斗"));
+
+            if (num == 9)
+            {
+                Logger::log(QString("超出单次鬼王战斗上限"));
+            }
         }
 
         waitRandomWithEventProcessing(2000, 200);
@@ -689,10 +824,22 @@ namespace scenarios {
         return true;
     }
 
-    // 获取当前体力值：识别逻辑待实现，暂时返回 0
-    int getStamina()
+    // 获取当前疲劳值
+    int getFatigue()
     {
-        return 0;
+        QJsonArray fatigueData = actions.ocrRecognizes(QRectF(80.1, 0, 19.9, 9.4));
+        if (fatigueData.isEmpty())
+        {
+            qWarning() << "疲劳检测异常：" << fatigueData;
+            Logger::log(QString("疲劳检测异常"));
+            return 0;
+        }
+        //正常来说只会有一个文字。at() 是 const 版本，越界返回 Undefined 而非触发
+        // Q_ASSERT_X 直接 abort（已通过上面的 isEmpty() 校验，这里双重保险）
+        const QJsonObject item = fatigueData.at(0).toObject();
+        const QString text = item["text"].toString();
+        const QString fatigueText = text.split("/").value(0);
+        return fatigueText.toInt();
     }
 
     // 注册为系统方案：TaskRunner 按注册表调度（注册方式见 ScenarioRegistry.h）
