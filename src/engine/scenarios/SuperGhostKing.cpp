@@ -543,140 +543,156 @@ namespace scenarios {
 
         waitRandomWithEventProcessing(2000,200);
 
-        //点击战斗
-        if (actions.opencvRecognizesAndClick(screenshotPath + "anniversary-challenge.png", 0.65, true, false).isEmpty())
+        bool isKill = false;
+        //不设置战斗次数上限
+        for (int num = 0; num < 999; ++num)
         {
-            Logger::log(QString("点击【战斗】失败"));
-            return false;
-        }
+            //TODO 此处缺少逻辑，判断体力是否足够
 
-        waitRandomWithEventProcessing(3500,300);
-
-        //判断是否进入战斗
-        bool isEngageInBattle = false;
-        for (int i = 0; i < 5 && TaskRunner::instance().isRunning(); ++i)
-        {
-            //先等1秒
-            waitRandomWithEventProcessing(1000,200);
-            if (!actions.yoloRecognizesAndClick(0.50, true, "battle-ready").isEmpty())
+            //点击战斗
+            if (actions.opencvRecognizesAndClick(screenshotPath + "anniversary-challenge.png", 0.65, true, false).isEmpty())
             {
-                Logger::log(QString("已进入【超鬼王】战斗场景"));
-                isEngageInBattle = true;
-                break;
-            }
-        }
-        if (!isEngageInBattle)
-        {
-            if (!actions.hasCollaboration())
-            {
-                Logger::log(QString("等待进入战斗场景超时"));
+                Logger::log(QString("点击【战斗】失败"));
                 return false;
             }
-        }
 
-        waitRandomWithEventProcessing(2000,200);
+            waitRandomWithEventProcessing(3500,300);
 
-        // 循环等待战斗结束 3分钟
-        bool isBattleOfEnd = false;
-        for (int i = 0; i < 36 && TaskRunner::instance().isRunning(); ++i)
-        {
-            Logger::log(QString("等待战斗结束...(%1/36)").arg(i+1));
-            waitWithEventProcessing(5000);
-            //是否有【造成伤害】文字
-            if (actions.ocrContainsText("本次伤害", 0.7, QRectF(40.2, 39.0, 19.0, 11.6)))
+            //判断是否进入战斗
+            bool isEngageInBattle = false;
+            for (int i = 0; i < 5 && TaskRunner::instance().isRunning(); ++i)
             {
-                Logger::log(QString("战斗已经结束"));
-                isBattleOfEnd = true;
-                break;
+                //先等1秒
+                waitRandomWithEventProcessing(1000,200);
+                if (!actions.yoloRecognizesAndClick(0.50, true, "battle-ready").isEmpty())
+                {
+                    Logger::log(QString("已进入【超鬼王】战斗场景"));
+                    isEngageInBattle = true;
+                    break;
+                }
             }
-        }
-        if (!isBattleOfEnd)
-        {
-            if (!actions.hasCollaboration())
+            if (!isEngageInBattle)
             {
-                Logger::log(QString("等待战斗结束超时"));
-                return false;
+                if (!actions.hasCollaboration())
+                {
+                    Logger::log(QString("等待进入战斗场景超时"));
+                    return false;
+                }
+            }
+
+            waitRandomWithEventProcessing(2000,200);
+
+            // 循环等待战斗结束 3分钟
+            bool isBattleOfEnd = false;
+            for (int i = 0; i < 36 && TaskRunner::instance().isRunning(); ++i)
+            {
+                Logger::log(QString("等待战斗结束...(%1/36)").arg(i+1));
+                waitWithEventProcessing(5000);
+                //是否有【造成伤害】文字
+                if (actions.ocrContainsText("本次伤害", 0.7, QRectF(40.2, 39.0, 19.0, 11.6)))
+                {
+                    Logger::log(QString("战斗已经结束"));
+                    isBattleOfEnd = true;
+                    break;
+                }
+            }
+            if (!isBattleOfEnd)
+            {
+                if (!actions.hasCollaboration())
+                {
+                    Logger::log(QString("等待战斗结束超时"));
+                    return false;
+                }else
+                {
+                    //此时无需重试 直接判定为战斗完成
+                }
+            }
+
+            waitRandomWithEventProcessing(2000,200);
+
+            //随机点击退出页面
+            QString savePathReceiveRewards;
+
+            // 随机生成 0 或 1
+            if (QRandomGenerator::global()->bounded(2) == 0)
+            {
+                savePathReceiveRewards = actions.clickInRoi(QRectF(81, 15, 18, 70), true);
             }else
             {
-                //此时无需重试 直接判定为战斗完成
+                savePathReceiveRewards = actions.clickInRoi(QRectF(7, 10, 16, 79), true);
             }
-        }
 
-        waitRandomWithEventProcessing(2000,200);
-
-        //随机点击退出页面
-        QString savePathReceiveRewards;
-
-        // 随机生成 0 或 1
-        if (QRandomGenerator::global()->bounded(2) == 0)
-        {
-            savePathReceiveRewards = actions.clickInRoi(QRectF(81, 15, 18, 70), true);
-        }else
-        {
-            savePathReceiveRewards = actions.clickInRoi(QRectF(7, 10, 16, 79), true);
-        }
-
-        //点击退出伤害页面
-        if (!savePathReceiveRewards.isEmpty())
-        {
-            Logger::log(QString("退出【伤害页面】成功"));
-        }else
-        {
-            //这里不需要重试
-            Logger::log(QString("退出【伤害页面】失败"));
-            return false;
-        }
-
-        waitRandomWithEventProcessing(3000,200);
-
-        //判断是否击杀鬼王
-        bool isKill = false;
-        for (int i = 0; i < 5; ++i)
-        {
-            waitWithEventProcessing(1000);
-            if (actions.ocrContainsText("结算中", 0.65, QRectF(40.2, 39.0, 19.0, 11.6), ocr::Enhance::AutoInvert))
+            //点击退出伤害页面
+            if (!savePathReceiveRewards.isEmpty())
             {
-                Logger::log(QString("鬼王已击杀，正在结算中"));
-                //进入循环等待结算模式
-                for (int j = 0; j < 10; ++j)
+                Logger::log(QString("退出【伤害页面】成功"));
+            }else
+            {
+                //这里不需要重试
+                Logger::log(QString("退出【伤害页面】失败"));
+                return false;
+            }
+
+            waitRandomWithEventProcessing(3000,200);
+
+            //判断是否击杀鬼王
+            for (int i = 0; i < 5; ++i)
+            {
+                waitWithEventProcessing(1000);
+                if (actions.ocrContainsText("结算中", 0.65, QRectF(40.2, 39.0, 19.0, 11.6), ocr::Enhance::AutoInvert))
                 {
-                    waitWithEventProcessing(1000);
-                    if (actions.opencvContains(screenshotPath + "super-call.png", 0.65, true))
+                    Logger::log(QString("鬼王已击杀，正在结算中"));
+                    //进入循环等待结算模式
+                    for (int j = 0; j < 10; ++j)
                     {
-                        Logger::log(QString("结算完成"));
-                        break;
+                        waitWithEventProcessing(1000);
+                        if (actions.opencvContains(screenshotPath + "super-call.png", 0.65, true))
+                        {
+                            Logger::log(QString("结算完成"));
+                            break;
+                        }
                     }
+                    isKill = true;
+                    break;
                 }
-                isKill = true;
-                break;
+
+                waitWithEventProcessing(200);
+
+                //判断是否有【召唤鬼王】按钮
+                if (actions.opencvContains(screenshotPath + "super-call.png", 0.65, true))
+                {
+                    isKill = true;
+                    Logger::log(QString("鬼王已击杀"));
+                    break;
+                }
+
+                waitWithEventProcessing(200);
+
+                //判断是否有【战斗】按钮
+                if (actions.opencvContains(screenshotPath + "anniversary-challenge.png", 0.65, true))
+                {
+                    isKill = false;
+                    break;
+                }
             }
 
-            waitWithEventProcessing(200);
-
-            //判断是否有【召唤鬼王】按钮
-            if (actions.opencvContains(screenshotPath + "super-call.png", 0.65, true))
+            if (isKill)
             {
-                isKill = true;
-                Logger::log(QString("鬼王已击杀"));
                 break;
             }
-
-            waitWithEventProcessing(200);
-
-            //判断是否有【战斗】按钮
-            if (actions.opencvContains(screenshotPath + "anniversary-challenge.png", 0.65, true))
-            {
-                isKill = false;
-                break;
-            }
-        }
-        if (!isKill)
-        {
             Logger::log(QString("鬼王未击杀，继续战斗"));
         }
 
+        waitRandomWithEventProcessing(2000, 200);
+
         Logger::log(QString("超鬼王方案已完成"));
         return true;
+    }
+
+    // 获取当前体力值：识别逻辑待实现，暂时返回 0
+    int getStamina()
+    {
+        return 0;
     }
 
     // 注册为系统方案：TaskRunner 按注册表调度（注册方式见 ScenarioRegistry.h）
