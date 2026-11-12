@@ -29,9 +29,12 @@ namespace scenarios {
     // 本文件内所有处理方法统一复用的脚本动作实例（与 SuperGhostKing.cpp 一致的线程局部写法）
     [[maybe_unused]] static thread_local ScriptActions& actions = ScriptActions::instance();
 
-    thread_local QString currentLineup = "";
+    // 组队协战与单人超鬼王是两条独立流程，状态各自一份。
+    // 必须加 static（内部链接）：否则与 SuperGhostKing.cpp 的同名 thread_local
+    // 会在链接期重复定义（thread_local 不影响符号唯一性）。
+    static thread_local QString currentLineup = "";
     // 当前强力追击状态：空值表示还没识别过，避免「已知关闭」与「未知」混淆
-    thread_local std::optional<bool> currentStrongPursuitStatus;
+    static thread_local std::optional<bool> currentStrongPursuitStatus;
     static thread_local std::optional<bool> isLock; // 阵容锁定状态，仅本文件内使用
 
     QString coopRoleToText(CoopRole role)

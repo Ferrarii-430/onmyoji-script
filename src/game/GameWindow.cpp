@@ -148,10 +148,24 @@ void GameWindow::ensureMinWidthForCapture(int minWidth)
         return;
     }
 
-    // 快速路径：本 minWidth 上次已确认达标，且此后截图尺寸仍达标 → 跳过逐帧
-    // GetWindowPlacement/IsIconic 等系统调用。窗口被手动拉小时截图尺寸会跟着
+    // 画幅判定：ROI / OCR 全部以百分比保存，只有画幅稳定为 16:9，同一份配置在不同
+    // 分辨率、不同机器上才指向同一块游戏画面内容。容差 2%，吸收 1136x640 这类舍入。
+    const double targetAspect = 16.0 / 9.0;
+    const double aspectTolerance = 0.02;
+    auto aspectIsTarget = [targetAspect, aspectTolerance](int w, int h) -> bool {
+        if (w <= 0 || h <= 0) {
+            return false;
+        }
+        const double aspect = static_cast<double>(w) / h;
+        return std::abs(aspect - targetAspect) / targetAspect <= aspectTolerance;
+    };
+
+    // 快速路径：本 minWidth 上次已确认达标，且此后截图尺寸仍达标、画幅正确 → 跳过
+    // 逐帧 GetWindowPlacement/IsIconic 等系统调用。窗口被手动拉小时截图尺寸会跟着
     // 变小（setLastCaptureSize），下次仍会走完整检查，不会漏判。
-    if (minWidth == lastEnsuredMinWidth_ && lastCaptureSize_.width >= minWidth) {
+    if (minWidth == lastEnsuredMinWidth_
+        && lastCaptureSize_.width >= minWidth
+        && aspectIsTarget(lastCaptureSize_.width, lastCaptureSize_.height)) {
         return;
     }
 
@@ -186,15 +200,17 @@ void GameWindow::ensureMinWidthForCapture(int minWidth)
     }
 
     // 首次截图：获取客户区尺寸作为判断依据
+    int currentHeight = lastCaptureSize_.height;
     if (currentWidth == 0) {
         RECT clientRect{};
         if (GetClientRect(hwnd_, &clientRect)) {
             currentWidth = clientRect.right;
+            currentHeight = clientRect.bottom;
         }
     }
 
-    // 尺寸足够，无需调整
-    if (currentWidth >= minWidth) {
+    // 尺寸足够且画幅正确，无需调整
+    if (currentWidth >= minWidth && aspectIsTarget(currentWidth, currentHeight)) {
         if (sizeProbed) {
             ShowWindow(hwnd_, SW_MINIMIZE);
             core::waitWithEventProcessing(50);
@@ -206,8 +222,20 @@ void GameWindow::ensureMinWidthForCapture(int minWidth)
         return;
     }
 
-    Logger::log(QString("窗口宽度调整: 当前宽度 %1 < %2，开始调整窗口尺寸")
-                .arg(currentWidth).arg(minWidth));
+    if (currentWidth >= minWidth) {
+        // 宽度够了但画幅不对：旧版本按固定边框算窗口尺寸，在不同 DPI 的机器上会
+        // 设出非 16:9 的客户区（如 736x444），ROI 于是整体偏移。这里校正回来。
+        Logger::log(QString("窗口宽度调整: 宽度 %1 已达标，但画幅 %1x%2（比例 %3）不是 16:9，"
+                            "开始校正窗口尺寸")
+                        .arg(currentWidth)
+                        .arg(currentHeight)
+                        .arg(currentHeight > 0
+                                 ? QString::number(static_cast<double>(currentWidth) / currentHeight, 'f', 4)
+                                 : QStringLiteral("n/a")));
+    } else {
+        Logger::log(QString("窗口宽度调整: 当前宽度 %1 < %2，开始调整窗口尺寸")
+                    .arg(currentWidth).arg(minWidth));
+    }
     Logger::log(QString("窗口宽度调整: placement 位置 (%1, %2), 尺寸 %3x%4, isHidden=%5")
                 .arg(placementRect.left).arg(placementRect.top)
                 .arg(placementW).arg(placementH).arg(isHiddenPlacement));
@@ -226,18 +254,44 @@ void GameWindow::ensureMinWidthForCapture(int minWidth)
         Logger::log(QString("窗口宽度调整: 窗口原为最大化前台显示，已恢复普通状态，原地调整大小"));
     }
 
-    // 阴阳师(Unity) 不接受外部直接指定的窗口尺寸，会按窗口高度自行推导 16:9 客户区：
-    //   客户高 = 窗口高 - 自定义边框(实测约 78px)，客户宽 = 客户高 * 16 / 9
-    // （实测: 窗口 998x622 -> 渲染 966x544；窗口 632x416 -> 渲染 600x338）
-    // 因此只设置"宽度"不会生效，必须通过设置高度间接控制渲染分辨率。
-    // 这里按最小渲染宽度反推固定目标尺寸（16 的倍数并留 16px 余量防止边框误差），
-    // 每次都设置为同一个值，保证调整后渲染分辨率稳定一致。
-    constexpr int kFrameW = 32; // 实测窗口外框与客户区的宽度差
-    constexpr int kFrameH = 78; // 实测窗口外框与客户区的高度差
     const int clientW = ((minWidth + 31) / 16) * 16; // ≥ minWidth 且为 16 倍数
     const int clientH = clientW * 9 / 16;
-    const int winW = clientW + kFrameW;
-    const int winH = clientH + kFrameH;
+
+    // 外框与客户区的差值随 DPI、Windows 主题变化，绝不能跨机器硬编码。
+    // 历史实测（200% 缩放）：窗口 998x622 -> 客户区 966x544，窗口 632x416 -> 客户区 600x338，
+    // 两组的差值都是 32x78，于是当时把 32/78 写死了。但 100% 缩放下的实测差值只有 16x39，
+    // 结果在 1K 机器上把窗口设成 752x483，实际客户区 736x444（比例 1.6577，不是 16:9）——
+    // 同一 ROI 百分比框到的内容整体上移，而框高折算下来只差 1 个百分点，
+    // 所以表现为"框的大小正常、位置偏上"。这里改为实时测量。
+    int frameW = 0;
+    int frameH = 0;
+    {
+        RECT wr{}, cr{};
+        const bool measured = GetWindowRect(hwnd_, &wr)
+                              && GetClientRect(hwnd_, &cr)
+                              && cr.right > 0 && cr.bottom > 0;
+        if (measured) {
+            frameW = (wr.right - wr.left) - cr.right;
+            frameH = (wr.bottom - wr.top) - cr.bottom;
+        }
+        const double dpiScale = DPIHelper::GetWindowDPIScaling(hwnd_);
+        if (!measured || frameW <= 0 || frameH <= 0 || frameW > 200 || frameH > 300) {
+            // 客户区暂时不可读（如刚从最小化恢复）：按 DPI 折算 100% 下的实测值兜底
+            frameW = std::max(1, static_cast<int>(std::lround(16.0 * dpiScale)));
+            frameH = std::max(1, static_cast<int>(std::lround(39.0 * dpiScale)));
+            Logger::log(QString("窗口宽度调整: 边框实测失败，按 DPI %1 折算为 %2x%3")
+                            .arg(QString::number(dpiScale, 'f', 2))
+                            .arg(frameW)
+                            .arg(frameH));
+        } else {
+            Logger::log(QString("窗口宽度调整: 实测边框 宽+%1 高+%2（DPI %3）")
+                            .arg(frameW)
+                            .arg(frameH)
+                            .arg(QString::number(dpiScale, 'f', 2)));
+        }
+    }
+    const int winW = clientW + frameW;
+    const int winH = clientH + frameH;
 
     // 无感调整：先移到屏幕外避免用户看到闪烁；最大化前台场景跳过（原地调整保持可见）
     if (!wasMaximizedForeground) {
@@ -270,11 +324,48 @@ void GameWindow::ensureMinWidthForCapture(int minWidth)
     SendMessage(hwnd_, WM_SIZE, SIZE_RESTORED,
                 MAKELPARAM(newSize.right, newSize.bottom));
     SendMessage(hwnd_, WM_EXITSIZEMOVE, 0, 0);
-    Logger::log(QString("窗口宽度调整: 已发送尺寸调整消息 (客户区 %1x%2, 窗口 %3x%4)")
+    Logger::log(QString("窗口宽度调整: 已发送尺寸调整消息 (目标客户区 %1x%2, 窗口 %3x%4)")
                 .arg(clientW).arg(clientH).arg(winW).arg(winH));
 
     // 等待 Unity 监听 WM_EXITSIZEMOVE 后调用 Screen.SetResolution 重建 swap chain
     core::waitWithEventProcessing(500);
+
+    // 校验实际客户区画幅。边框测量在某些主题/缩放下仍可能有几像素误差，
+    // 若结果不是 16:9 就用本次实测边框再校正一次（只做一次，避免来回抖动）。
+    {
+        RECT actualClient{};
+        if (GetClientRect(hwnd_, &actualClient)
+            && actualClient.right > 0 && actualClient.bottom > 0) {
+            const int aw = actualClient.right;
+            const int ah = actualClient.bottom;
+            if (aspectIsTarget(aw, ah)) {
+                Logger::log(QString("窗口宽度调整: 实际客户区 %1x%2（比例 %3），画幅正确")
+                                .arg(aw)
+                                .arg(ah)
+                                .arg(QString::number(static_cast<double>(aw) / ah, 'f', 4)));
+            } else {
+                RECT wr{};
+                if (GetWindowRect(hwnd_, &wr)) {
+                    const int measuredFrameW = (wr.right - wr.left) - aw;
+                    const int measuredFrameH = (wr.bottom - wr.top) - ah;
+                    if (measuredFrameW > 0 && measuredFrameH > 0) {
+                        Logger::log(QString("窗口宽度调整: 实际客户区 %1x%2（比例 %3）不是 16:9，"
+                                            "按实测边框 %4x%5 再校正一次")
+                                        .arg(aw)
+                                        .arg(ah)
+                                        .arg(QString::number(static_cast<double>(aw) / ah, 'f', 4))
+                                        .arg(measuredFrameW)
+                                        .arg(measuredFrameH));
+                        SetWindowPos(hwnd_, nullptr, 0, 0,
+                                     clientW + measuredFrameW,
+                                     clientH + measuredFrameH,
+                                     SWP_NOMOVE | SWP_NOACTIVATE | SWP_NOZORDER);
+                        core::waitWithEventProcessing(300);
+                    }
+                }
+            }
+        }
+    }
 
     // 恢复原位置。若 placement 在系统隐藏区，改用屏幕中心。
     int restoreX = placementRect.left;
@@ -369,6 +460,9 @@ void GameWindow::ensureMinWidthForCapture(int minWidth)
 
     // 清空上次截图尺寸，强制下次截图重新获取（避免用到调整前的旧值）
     lastCaptureSize_ = cv::Size();
+    // 本次已完成调整；快速路径还带画幅校验，若游戏没接受尺寸、截图仍非 16:9，
+    // 下次调用不会因这里记录了 minWidth 而漏检。
+    lastEnsuredMinWidth_ = minWidth;
 
     Logger::log(QString("窗口宽度调整完成"));
 }

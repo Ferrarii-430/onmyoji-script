@@ -238,18 +238,22 @@ void OcrForm::onCaptureImageClicked()
         constexpr double kRefAspect = 16.0 / 9.0;
         const bool aspectOff = captureAspect > 0.0
                                && std::abs(captureAspect - kRefAspect) / kRefAspect > 0.02;
+        const double clientScale = winImg.cols > 0
+                                       ? static_cast<double>(clientW) / winImg.cols
+                                       : 0.0;
 
-        Logger::log(QString("[截图诊断] 截图 %1x%2（比例 %3）| 客户区 %4x%5（比例 %6）| 窗口 %7x%8 | DPI %9% | "
-                            "ROI(%10,%11,%12,%13)% -> 像素(%14,%15,%16,%17) | %18")
+        Logger::log(QString("[截图诊断] 截图 %1x%2（比例 %3）| 客户区 %4x%5（比例 %6，÷截图 %7）| 窗口 %8x%9 | DPI %10x | "
+                            "ROI(%11,%12,%13,%14)% -> 像素(%15,%16,%17,%18) | %19")
                         .arg(winImg.cols)
                         .arg(winImg.rows)
                         .arg(QString::number(captureAspect, 'f', 4))
                         .arg(clientW)
                         .arg(clientH)
                         .arg(QString::number(clientAspect, 'f', 4))
+                        .arg(QString::number(clientScale, 'f', 2))
                         .arg(windowW)
                         .arg(windowH)
-                        .arg(QString::number(DPIHelper::GetWindowDPIScaling(hwnd), 'f', 0))
+                        .arg(QString::number(DPIHelper::GetWindowDPIScaling(hwnd), 'f', 2))
                         .arg(roiX)
                         .arg(roiY)
                         .arg(roiW)

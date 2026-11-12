@@ -143,17 +143,22 @@ cv::Mat captureGameWindow()
             constexpr double kReferenceAspect = 16.0 / 9.0;
             const bool aspectOff = captureAspect > 0.0
                                    && std::abs(captureAspect - kReferenceAspect) / kReferenceAspect > 0.02;
+            // 客户区通常是截图的整数倍：200% 缩放下游戏按逻辑像素渲染，DWM 再放大显示
+            const double clientScale = winImg.cols > 0
+                                           ? static_cast<double>(clientW) / winImg.cols
+                                           : 0.0;
 
-            Logger::log(QString("[截图诊断] 截图 %1x%2（比例 %3）| 客户区 %4x%5（比例 %6）| 窗口 %7x%8 | DPI %9% | %10")
+            Logger::log(QString("[截图诊断] 截图 %1x%2（比例 %3）| 客户区 %4x%5（比例 %6，÷截图 %7）| 窗口 %8x%9 | DPI %10x | %11")
                             .arg(winImg.cols)
                             .arg(winImg.rows)
                             .arg(QString::number(captureAspect, 'f', 4))
                             .arg(clientW)
                             .arg(clientH)
                             .arg(QString::number(clientAspect, 'f', 4))
+                            .arg(QString::number(clientScale, 'f', 2))
                             .arg(windowW)
                             .arg(windowH)
-                            .arg(QString::number(DPIHelper::GetWindowDPIScaling(hwnd), 'f', 0))
+                            .arg(QString::number(DPIHelper::GetWindowDPIScaling(hwnd), 'f', 2))
                             .arg(aspectOff ? QStringLiteral("⚠ 非 16:9（同一 ROI 百分比在其他画幅下会框到不同位置）")
                                            : QStringLiteral("16:9")));
         }
