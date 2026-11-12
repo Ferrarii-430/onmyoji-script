@@ -57,6 +57,10 @@ QJsonValue getSystemConfigValue(const QString &configId, const QString &key,
 // 更新某方案某 key 的配置值并写回文件(只改 value，不动控件描述)
 void updateSystemConfigValue(const QString &filePath, const QString &configId,
                              const QString &key, const QJsonValue &value);
+// 批量更新某方案的一组配置值并写回文件(只改 value)，用于「存为默认值」。
+// values 里没有的 key 保持原值；成功返回 true
+bool updateSystemConfigValues(const QString &filePath, const QString &configId,
+                              const QJsonObject &values);
 
 // ------------------------------
 // 超鬼王专属：鬼王列表配置(bossConfig)

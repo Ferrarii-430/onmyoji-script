@@ -388,6 +388,114 @@ void sessionwidget::activateBinding()
     }
 }
 
+void sessionwidget::setSystemConfigOverrides(const QJsonObject& overrides)
+{
+    m_systemConfigOverrides = overrides;
+
+    // 恢复持久化值时，当前选中的系统方案表单还是按默认值建的，需要重建一次
+    if (m_selectedItem.id.isEmpty()) {
+        return;
+    }
+    for (const QJsonValue& val : m_configArray) {
+        const QJsonObject obj = val.toObject();
+        if (obj.value("id").toString() != m_selectedItem.id) {
+            continue;
+        }
+        if (obj.value("type").toString() == QStringLiteral("system")) {
+            showSystemConfigForm(m_selectedItem.id);
+        }
+        break;
+    }
+}
+
+QJsonValue sessionwidget::effectiveSystemConfigValue(const QString& configId, const QString& key,
+                                                     const QJsonValue& fallback) const
+{
+    const QJsonObject perConfig = m_systemConfigOverrides.value(configId).toObject();
+    return perConfig.contains(key) ? perConfig.value(key) : fallback;
+}
+
+void sessionwidget::saveSystemConfigOverride(const QString& configId, const QString& key,
+                                             const QJsonValue& value)
+{
+    QJsonObject perConfig = m_systemConfigOverrides.value(configId).toObject();
+    perConfig[key] = value;
+    m_systemConfigOverrides[configId] = perConfig;
+    emit systemConfigOverridesChanged();
+}
+
+void sessionwidget::saveSystemConfigAsDefault(const QString& configId)
+{
+    // 用当前生效值（本页覆盖优先）生成要写回的默认值
+    const QJsonArray systemConfig = getSystemConfig(configId);
+    QJsonObject values;
+    for (const QJsonValue& val : systemConfig) {
+        const QJsonObject field = val.toObject();
+        const QString key = field.value("key").toString();
+        if (key.isEmpty()) {
+            continue;
+        }
+        values[key] = effectiveSystemConfigValue(configId, key, field.value("value"));
+    }
+    if (values.isEmpty()) {
+        return;
+    }
+
+    if (!updateSystemConfigValues(AppPaths::instance().configPath(), configId, values)) {
+        Logger::log(QStringLiteral("保存方案默认值失败"));
+        return;
+    }
+
+    // 默认值已经等于本页的值，清掉覆盖让本页回到「跟随默认」，
+    // 避免以后默认值再变时本页还钉在旧值上
+    m_systemConfigOverrides.remove(configId);
+    emit systemConfigOverridesChanged();
+    Logger::log(QStringLiteral("已将当前参数保存为方案默认值"));
+}
+
+void sessionwidget::resetSystemConfigToDefault(const QString& configId)
+{
+    if (!m_systemConfigOverrides.contains(configId)) {
+        return;
+    }
+
+    m_systemConfigOverrides.remove(configId);
+    emit systemConfigOverridesChanged();
+    // 重建表单，控件值回到 config.json 里的默认值
+    showSystemConfigForm(configId);
+    Logger::log(QStringLiteral("已恢复方案默认值"));
+}
+
+void sessionwidget::applySystemConfigOverrides(QJsonArray& configs, const QString& configId) const
+{
+    const QJsonObject perConfig = m_systemConfigOverrides.value(configId).toObject();
+    if (perConfig.isEmpty()) {
+        return; // 没有个性化配置，直接用方案默认值
+    }
+
+    for (int i = 0; i < configs.size(); ++i) {
+        QJsonObject obj = configs[i].toObject();
+        if (obj.value("id").toString() != configId) {
+            continue;
+        }
+
+        // 只改这份「本次运行」的副本：任务线程启动时整体拷走，
+        // 其他标签页读的仍是各自的副本，config.json 完全不动
+        QJsonArray systemConfig = obj.value("systemConfig").toArray();
+        for (int j = 0; j < systemConfig.size(); ++j) {
+            QJsonObject field = systemConfig[j].toObject();
+            const QString key = field.value("key").toString();
+            if (perConfig.contains(key)) {
+                field["value"] = perConfig.value(key);
+                systemConfig[j] = field;
+            }
+        }
+        obj["systemConfig"] = systemConfig;
+        configs[i] = obj;
+        return;
+    }
+}
+
 bool sessionwidget::isTaskRunning() const
 {
     return m_runner != nullptr && m_runner->isRunning();
@@ -517,7 +625,9 @@ void sessionwidget::onItemClicked(QListWidgetItem *item) {
     }
 }
 
-// 按系统方案的 systemConfig 描述动态生成可编辑表单，控件变更即写回 config.json
+// 按系统方案的 systemConfig 描述动态生成可编辑表单。
+// 控件变更只记在本标签页的覆盖值里（随 windows.json 持久化），不写 config.json：
+// 同一方案被多个标签页共用时，各实例的运行参数互不覆盖
 void sessionwidget::showSystemConfigForm(const QString &configId)
 {
     // 每次销毁并重建容器：避免复用旧 QFormLayout 清理时的 takeAt 告警
@@ -612,14 +722,15 @@ void sessionwidget::showSystemConfigForm(const QString &configId)
         form->addRow(QStringLiteral("阵容配置"), entryRow);
     }
 
-    const QString configPath = AppPaths::instance().configPath();
-
     for (const QJsonValue &val : systemConfig) {
         const QJsonObject field = val.toObject();
         const QString key = field["key"].toString();
         const QString label = field["label"].toString();
         const QString control = field["control"].toString();
         const QString itemTip = field.value("tip").toString();
+        // 显示本标签页的值：有覆盖用覆盖，没有则用方案默认值(config.json)
+        const QJsonValue currentValue =
+            effectiveSystemConfigValue(configId, key, field.value("value"));
 
         // 每个配置项用一个垂直容器承载「控件 + 可选 tip 提示」，便于统一加入表单
         auto *fieldWidget = new QWidget(m_systemConfigForm);
@@ -634,9 +745,9 @@ void sessionwidget::showSystemConfigForm(const QString &configId)
                 auto *spin = new NoWheelSpinBox(fieldWidget);
                 spin->setRange(field.value("min").toInt(0), field.value("max").toInt(100));
                 spin->setSingleStep(field.value("step").toInt(1));
-                spin->setValue(field.value("value").toInt());
+                spin->setValue(currentValue.toInt());
                 connect(spin, qOverload<int>(&QSpinBox::valueChanged), this,
-                        [=](int v) { updateSystemConfigValue(configPath, configId, key, v); });
+                        [=](int v) { saveSystemConfigOverride(configId, key, v); });
                 fieldLayout->addWidget(spin);
             } else {
                 // 小数：QDoubleSpinBox
@@ -644,38 +755,85 @@ void sessionwidget::showSystemConfigForm(const QString &configId)
                 spin->setDecimals(field.value("decimals").toInt(2));
                 spin->setRange(field.value("min").toDouble(0.0), field.value("max").toDouble(1.0));
                 spin->setSingleStep(field.value("step").toDouble(0.1));
-                spin->setValue(field.value("value").toDouble());
+                spin->setValue(currentValue.toDouble());
                 connect(spin, qOverload<double>(&QDoubleSpinBox::valueChanged), this,
-                        [=](double v) { updateSystemConfigValue(configPath, configId, key, v); });
+                        [=](double v) { saveSystemConfigOverride(configId, key, v); });
                 fieldLayout->addWidget(spin);
             }
         } else if (control == "switch") {
             // 开关：QCheckBox
             auto *check = new QCheckBox(fieldWidget);
-            check->setChecked(field.value("value").toBool());
+            check->setChecked(currentValue.toBool());
             connect(check, &QCheckBox::toggled, this,
-                    [=](bool v) { updateSystemConfigValue(configPath, configId, key, v); });
+                    [=](bool v) { saveSystemConfigOverride(configId, key, v); });
             fieldLayout->addWidget(check);
+        } else if (control == "multiSelect") {
+            // 多选：一组 QCheckBox，值存为数组（如 [1,2,3]）
+            auto *boxWidget = new QWidget(fieldWidget);
+            auto *boxLayout = new QHBoxLayout(boxWidget);
+            boxLayout->setContentsMargins(0, 0, 0, 0);
+            boxLayout->setSpacing(8);
+
+            const QJsonArray options = field.value("options").toArray();
+            const QJsonArray selected = currentValue.toArray();
+            QList<QCheckBox*> boxes;
+            QList<QJsonValue> optionValues;
+            for (const QJsonValue &opt : options) {
+                auto *check = new QCheckBox(
+                    opt.isDouble() ? QStringLiteral("%1星").arg(opt.toInt()) : opt.toString(),
+                    boxWidget);
+                bool checked = false;
+                for (const QJsonValue &sel : selected) {
+                    if (sel == opt) {
+                        checked = true;
+                        break;
+                    }
+                }
+                check->setChecked(checked);
+                boxLayout->addWidget(check);
+                boxes.append(check);
+                optionValues.append(opt);
+            }
+            boxLayout->addStretch(1);
+
+            // 收集当前勾选项；表单重建后旧控件销毁，旧 lambda 不会再生效
+            const auto collectChecked = [boxes, optionValues]() {
+                QJsonArray values;
+                for (int i = 0; i < boxes.size(); ++i) {
+                    if (boxes.at(i)->isChecked()) {
+                        values.append(optionValues.at(i));
+                    }
+                }
+                return values;
+            };
+            for (QCheckBox *check : boxes) {
+                connect(check, &QCheckBox::toggled, this,
+                        [this, configId, key, collectChecked](bool) {
+                            saveSystemConfigOverride(configId, key,
+                                                     QJsonValue(collectChecked()));
+                        });
+            }
+            fieldLayout->addWidget(boxWidget);
         } else if (control == "select") {
             // 下拉：QComboBox
             auto *combo = new NoWheelComboBox(fieldWidget);
             for (const QJsonValue &opt : field.value("options").toArray()) {
                 combo->addItem(opt.toString());
             }
-            combo->setCurrentText(field.value("value").toString());
+            combo->setCurrentText(currentValue.toString());
             connect(combo, &QComboBox::currentTextChanged, this,
-                    [=](const QString &v) { updateSystemConfigValue(configPath, configId, key, v); });
+                    [=](const QString &v) { saveSystemConfigOverride(configId, key, v); });
             fieldLayout->addWidget(combo);
         } else if (control == "input") {
             // 文本输入：QLineEdit
             auto *edit = new QLineEdit(fieldWidget);
-            edit->setText(field.value("value").toString());
+            edit->setText(currentValue.toString());
             edit->setPlaceholderText(field.value("placeholder").toString());
             if (field.contains("maxLength")) {
                 edit->setMaxLength(field.value("maxLength").toInt());
             }
             connect(edit, &QLineEdit::textChanged, this,
-                    [=](const QString &v) { updateSystemConfigValue(configPath, configId, key, v); });
+                    [=](const QString &v) { saveSystemConfigOverride(configId, key, v); });
             fieldLayout->addWidget(edit);
         }
 
@@ -704,6 +862,23 @@ void sessionwidget::showSystemConfigForm(const QString &configId)
     title->setStyleSheet("font-weight: bold; font-size: 12pt; color: #333;");
     headerLayout->addWidget(title);
     headerLayout->addStretch(1);
+
+    // 「存为默认值」：系统方案参数平时只改本标签页的覆盖值，
+    // 想把当前这套参数变成新标签页的起点时，点这里写回 config.json
+    auto *resetBtn = new QPushButton(QStringLiteral("恢复默认"), header);
+    resetBtn->setCursor(Qt::PointingHandCursor);
+    resetBtn->setToolTip(QStringLiteral("丢弃本标签页的参数修改，回到方案默认值"));
+    connect(resetBtn, &QPushButton::clicked, this,
+            [this, configId]() { resetSystemConfigToDefault(configId); });
+    headerLayout->addWidget(resetBtn);
+
+    auto *saveDefaultBtn = new QPushButton(QStringLiteral("存为默认值"), header);
+    saveDefaultBtn->setCursor(Qt::PointingHandCursor);
+    saveDefaultBtn->setToolTip(
+        QStringLiteral("把本标签页当前参数写回方案默认值(config.json)，新建标签页将使用这套值"));
+    connect(saveDefaultBtn, &QPushButton::clicked, this,
+            [this, configId]() { saveSystemConfigAsDefault(configId); });
+    headerLayout->addWidget(saveDefaultBtn);
 
     auto *rootLayout = new QVBoxLayout(m_systemConfigForm);
     // 留出内边距，避免滚动区/内容贴边盖住卡片右侧与下侧边框
@@ -889,10 +1064,15 @@ void sessionwidget::startTaskButtonClick()
 
     int cycleCount = ui->taskCycleNumber->text().toInt();
 
+    // 系统方案参数是本标签页自己的设置：写进本次运行的配置副本，不动 config.json。
+    // 多个标签页同时跑同一方案时，各自读到各自的值。
+    QJsonArray runtimeConfigs = m_configArray;
+    applySystemConfigOverrides(runtimeConfigs, m_selectedItem.id);
+
     // 异步启动：任务在独立线程执行，界面立刻恢复响应。
     // 方案选择与配置数组一并传入——任务线程写入自己的副本，
     // 之后别的标签页怎么切换方案都不影响本次运行。
-    m_runner->start(steps, cycleCount, buildContext(), m_selectedItem, m_configArray);
+    m_runner->start(steps, cycleCount, buildContext(), m_selectedItem, runtimeConfigs);
 }
 
 //关闭当前选中的任务

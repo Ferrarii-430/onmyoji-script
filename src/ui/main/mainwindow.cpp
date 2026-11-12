@@ -163,6 +163,8 @@ void mainwindow::restoreSessions()
 
         sessionwidget* session = createSession();
         session->bindInstance(item.pid, hwnd, item.displayName);
+        // 恢复本标签页的系统方案参数（存在 windows.json，与绑定记录同一份）
+        session->setSystemConfigOverrides(item.systemConfigOverrides);
         ++restored;
     }
 
@@ -215,6 +217,15 @@ sessionwidget* mainwindow::createSession()
         }
         persistSessions();
         refreshSharedBindings();
+    });
+
+    // 标签页级系统方案参数变化（组队模式、协同身份等）：随绑定记录一起持久化，
+    // 避免多个标签页共用同一方案时互相覆盖
+    connect(session, &sessionwidget::systemConfigOverridesChanged, this, [this]() {
+        if (m_restoring) {
+            return;
+        }
+        persistSessions();
     });
 
     connect(session, &sessionwidget::taskFinished, this, [this, session]() {
@@ -320,6 +331,7 @@ void mainwindow::persistSessions()
             platform::getProcessImageName(session->boundPid()).c_str());
         binding.windowTitle = binding.displayName;
         binding.boundAt = QDateTime::currentSecsSinceEpoch();
+        binding.systemConfigOverrides = session->systemConfigOverrides();
         items.push_back(binding);
     }
 

@@ -145,7 +145,7 @@
   },
   {
     "id": "627CE2C8-01C9-4828-B4AE-4F5A360E7946",
-    "name": "系统方案-超鬼王",
+    "name": "系统方案-超鬼王(日清)",
     "visible": true,
     "type": "system",
     "showBossConfig": true,
@@ -346,7 +346,7 @@
         "label": "自动喝茶",
         "control": "switch",
         "value": false,
-        "tip": "开启后自动喝茶，谨慎开启。"
+        "tip": "开启后自动喝茶，谨慎开启(目前功能无效)。"
       }
     ],
     "steps": [
@@ -521,7 +521,7 @@
         "strongPursuit": false
       }
     ],
-    "tip": "超鬼王大小号协同模式，在召唤鬼王界面启动。大号(击杀方)负责击杀鬼王，小号(提供方)负责提供协同。",
+    "tip": "超鬼王大小号协同模式，在召唤鬼王界面启动。大号(击杀方)负责击杀鬼王，小号(提供方)负责提供协同。方案参数按标签页保存，多个实例可分别设置。",
     "systemConfig": [
       {
         "key": "coopRole",
@@ -532,7 +532,7 @@
           "小号(提供方)"
         ],
         "value": "大号(击杀方)",
-        "tip": "大号(击杀方)：进入战斗击杀鬼王；小号(提供方)：提供协同。"
+        "tip": "大号(击杀方)：进入战斗击杀鬼王；小号(提供方)：提供鬼王邀请大号。"
       },
       {
         "key": "mainAccountName",
@@ -540,7 +540,26 @@
         "control": "input",
         "value": "",
         "placeholder": "输入大号角色名称",
-        "tip": "小号据此识别要协同的大号，留空则不校验名称。"
+        "tip": "(提供方配置)小号据此识别要协同的大号，必填！否则无法邀请。"
+      },
+      {
+        "key": "inviteStarLevels",
+        "label": "邀请星级",
+        "control": "multiSelect",
+        "options": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "value": [
+          4,
+          5,
+          6
+        ],
+        "tip": "(提供方配置)只邀请勾选星级的鬼王，未勾选的不邀请；全不选则不邀请任何鬼王；必填。"
       },
       {
         "key": "schemeName",
@@ -548,7 +567,7 @@
         "control": "input",
         "value": "超鬼王",
         "placeholder": "输入方案名称",
-        "tip": "当前超鬼王使用的方案分组名称，用于切换御魂。"
+        "tip": "(击杀方配置)当前超鬼王使用的方案分组名称，用于切换御魂。"
       },
       {
         "key": "defaultLineupName",
@@ -556,7 +575,7 @@
         "control": "input",
         "value": "群体通用",
         "placeholder": "输入默认阵容名称",
-        "tip": "当前超鬼王未配置时使用的默认阵容名称。"
+        "tip": "(击杀方配置)当前超鬼王未配置时使用的默认阵容名称。"
       },
       {
         "key": "defaultGreenLabel",
@@ -567,28 +586,28 @@
         "min": 0,
         "max": 5,
         "step": 1,
-        "tip": "从左到右顺序，数字1-5号，不填或者0则不标记。"
+        "tip": "(击杀方配置)从左到右顺序，数字1-5号，不填或者0则不标记。"
       },
       {
         "key": "defaultMarkBoss",
         "label": "默认标记BOSS",
         "control": "switch",
         "value": false,
-        "tip": "开启后自动标记BOSS。"
+        "tip": "(击杀方配置)开启后自动标记BOSS。"
       },
       {
         "key": "defaultStrongPursuit",
         "label": "默认强力追击",
         "control": "switch",
         "value": false,
-        "tip": "开启后自动强力追击。"
+        "tip": "(击杀方配置)开启后自动强力追击。"
       },
       {
         "key": "autoDrinkTea",
         "label": "自动喝茶",
         "control": "switch",
         "value": false,
-        "tip": "开启后自动喝茶，谨慎开启。"
+        "tip": "(击杀方配置)开启后自动喝茶，谨慎开启(目前功能无效)。"
       }
     ],
     "steps": [

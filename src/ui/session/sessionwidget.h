@@ -14,6 +14,7 @@
 #include <QListWidget>
 #include <QWidget>
 #include <QJsonArray>
+#include <QJsonObject>
 #include <QStringList>
 #include <functional>
 #include <opencv2/core/mat.hpp>
@@ -49,6 +50,13 @@ public:
 
     // 记录绑定并刷新界面
     void bindInstance(DWORD pid, HWND hwnd, const QString& displayName = QString());
+
+    // 本标签页的系统方案配置覆盖值：{ "方案 id": { "配置 key": 值 } }。
+    // 系统方案参数按游戏实例独立（组队模式、协同身份等都算），
+    // config.json 只保留方案默认值，避免多个标签页共用同一方案时互相覆盖。
+    QJsonObject systemConfigOverrides() const { return m_systemConfigOverrides; }
+    // 恢复持久化的覆盖值（不触发变更信号，避免恢复阶段反复写文件）
+    void setSystemConfigOverrides(const QJsonObject& overrides);
 
     // 与本页绑定同一 PID 的其他标签页（空表示独占），供 shell 拼接提示文案
     QStringList sharedPeers() const { return m_sharedPeers; }
@@ -87,6 +95,8 @@ public slots:
 signals:
     // 绑定信息变化（供 shell 持久化）
     void bindingChanged();
+    // 本标签页的系统方案配置变化（供 shell 持久化）
+    void systemConfigOverridesChanged();
     // 标签页标题需要更新
     void titleChanged();
     // 任务开始/结束
@@ -146,6 +156,23 @@ private:
     bool autoBindFirstInstance();
 
     void showSystemConfigForm(const QString &configId);
+
+    // 读取本标签页的配置值：优先取覆盖值，没有则用方案默认值（config.json）
+    QJsonValue effectiveSystemConfigValue(const QString& configId, const QString& key,
+                                          const QJsonValue& fallback) const;
+    // 记录本标签页的配置值并通知 shell 持久化（不写 config.json）
+    void saveSystemConfigOverride(const QString& configId, const QString& key,
+                                  const QJsonValue& value);
+    // 把本标签页当前的配置值写回方案默认值(config.json)，并清掉本页覆盖
+    void saveSystemConfigAsDefault(const QString& configId);
+    // 丢弃本标签页的配置覆盖，回到方案默认值
+    void resetSystemConfigToDefault(const QString& configId);
+    // 把本标签页的覆盖值写进「本次运行」的配置副本（不改 config.json，
+    // 因此多个标签页同时跑同一方案也不会互相覆盖）
+    void applySystemConfigOverrides(QJsonArray& configs, const QString& configId) const;
+
+    // 本标签页的系统方案配置覆盖值（方案 id -> { key: value }）
+    QJsonObject m_systemConfigOverrides;
     void setTaskRunningState(bool running);
     void showCycleProgress(int completed, int total);
 

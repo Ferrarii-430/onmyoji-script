@@ -17,6 +17,11 @@ struct WindowBinding {
     QString windowTitle;    // 绑定时的窗口标题
     qint64 boundAt = 0;     // 绑定时间戳（Unix 秒）
 
+    // 本标签页的系统方案配置覆盖值：{ "方案 id": { "配置 key": 值 } }。
+    // 系统方案参数是「每个游戏实例」的运行参数（组队模式、协同身份等），
+    // config.json 只保留方案默认值，避免多个标签页共用同一方案时互相覆盖。
+    QJsonObject systemConfigOverrides;
+
     bool isValid() const { return pid != 0; }
 
     // tab / 列表标题：优先用户命名，其次窗口标题，最后回退「实例 N」

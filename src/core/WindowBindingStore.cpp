@@ -43,6 +43,7 @@ QJsonObject WindowBinding::toJson() const
     obj[QStringLiteral("imageName")] = imageName;
     obj[QStringLiteral("windowTitle")] = windowTitle;
     obj[QStringLiteral("boundAt")] = boundAt;
+    obj[QStringLiteral("systemConfigOverrides")] = systemConfigOverrides;
     return obj;
 }
 
@@ -57,6 +58,7 @@ WindowBinding WindowBinding::fromJson(const QJsonObject& obj)
     item.imageName = obj.value(QStringLiteral("imageName")).toString();
     item.windowTitle = obj.value(QStringLiteral("windowTitle")).toString();
     item.boundAt = obj.value(QStringLiteral("boundAt")).toVariant().toLongLong();
+    item.systemConfigOverrides = obj.value(QStringLiteral("systemConfigOverrides")).toObject();
     return item;
 }
 

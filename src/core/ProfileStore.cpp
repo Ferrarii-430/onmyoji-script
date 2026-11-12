@@ -373,6 +373,44 @@ void updateSystemConfigValue(const QString &filePath, const QString &configId,
     }
 }
 
+// 批量更新某方案的一组配置值并写回文件(只改 value)，用于「存为默认值」
+bool updateSystemConfigValues(const QString &filePath, const QString &configId,
+                              const QJsonObject &values)
+{
+    QJsonArray rootArray = m_configArray;
+    const QString target = cleanString(configId);
+
+    for (int i = 0; i < rootArray.size(); ++i) {
+        QJsonObject obj = rootArray[i].toObject();
+        if (cleanString(obj["id"].toString()).compare(target, Qt::CaseInsensitive) != 0) {
+            continue;
+        }
+
+        QJsonArray systemConfig = obj.value("systemConfig").toArray();
+        for (int j = 0; j < systemConfig.size(); ++j) {
+            QJsonObject field = systemConfig[j].toObject();
+            const QString key = field["key"].toString();
+            if (values.contains(key)) {
+                field["value"] = values.value(key);
+                systemConfig[j] = field;
+            }
+        }
+        obj["systemConfig"] = systemConfig;
+        rootArray[i] = obj;
+
+        // 同步内存并写回文件
+        m_configArray = rootArray;
+        if (saveJsonAtomically(filePath, rootArray)) {
+            Logger::log(QString("已更新系统方案默认值: %1 项").arg(values.size()));
+            return true;
+        }
+        return false;
+    }
+
+    Logger::log("未找到系统方案: " + configId);
+    return false;
+}
+
 // ------------------------------
 // 超鬼王专属：鬼王列表配置(bossConfig)
 // ------------------------------
