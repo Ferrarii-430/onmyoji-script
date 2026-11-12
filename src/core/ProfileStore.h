@@ -13,8 +13,16 @@ struct ItemInfo {
     QString id;
 };
 
-inline QJsonArray m_configArray;
-inline ItemInfo currentItem;
+// 按线程隔离：多标签页并发运行时，每个会话各自选中不同的方案。
+// 若共用一份全局变量，B 标签页切换方案会把 A 正在执行的任务的配置改掉，
+// 表现为「跑着跑着换成了别人的方案参数」。
+// 任务线程由 TaskRunner 在启动时写入自己的副本（见 TaskRunner::start）。
+//
+// 用 extern 声明 + 单点定义，而不是 inline 变量：
+// MinGW 下 inline thread_local 的 TLS 初始化函数会在每个引用它的编译单元
+// 各生成一份，链接期直接报 multiple definition。
+extern thread_local QJsonArray m_configArray;
+extern thread_local ItemInfo currentItem;
 QString getPathByRecognitionImg(const std::string &configId, const std::string &fileName);
 void addConfigToJsonFile(const QString &filePath, const QString &name);
 bool removeConfigById(const QString &filePath, const QString &idToRemove);

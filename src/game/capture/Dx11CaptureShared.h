@@ -9,16 +9,21 @@
 
 #include <cstdint>
 
-// 命名 file mapping 的名称（同一会话内跨进程可见）
-#define DX11_SHARED_NAME L"OnmyojiDx11CaptureShared"
-
-// 跨进程截图请求事件名称（auto-reset）。script 进程通过 OpenEvent/SetEvent
-// 直接触发 DLL 截图，无需每次都启动 remote_capture_call.exe。
-#define DX11_CAPTURE_REQUEST_EVENT_NAME L"OnmyojiDx11CaptureRequest"
-
-// 跨进程“新帧就绪”事件名称（auto-reset）。DLL 写完共享内存后 SetEvent，
-// script 进程 WaitForSingleObject 等待该事件，替代按 2ms 间隔轮询序号。
-#define DX11_CAPTURE_READY_EVENT_NAME L"OnmyojiDx11CaptureFrameReady"
+// ============================================================================
+// 命名对象前缀。
+//
+// 实际名称 = 前缀 + "_" + 十进制 PID，例如 OnmyojiDx11CaptureShared_12345。
+// 多开时多个游戏进程各自注入一份 DLL，若共用固定名会互相覆写像素数据，
+// 表现为「A 窗口的截图里出现 B 窗口的画面」。因此两侧都必须按 PID 隔离：
+//   - DLL 侧（dx11_hook/src/main.cpp）用 GetCurrentProcessId()
+//   - 脚本侧用绑定的目标 PID（见 src/game/GameContext.h）
+// 两边规则必须完全一致，否则会「注入成功但永远截不到图」。
+// ============================================================================
+#define DX11_SHARED_NAME_PREFIX            L"OnmyojiDx11CaptureShared"
+#define DX11_CAPTURE_REQUEST_EVENT_PREFIX  L"OnmyojiDx11CaptureRequest"
+#define DX11_CAPTURE_READY_EVENT_PREFIX    L"OnmyojiDx11CaptureFrameReady"
+#define DX11_CLICK_SHARED_PREFIX           L"OnmyojiDx11ClickShared"
+#define DX11_CLICK_REQUEST_EVENT_PREFIX    L"OnmyojiDx11ClickRequest"
 
 static const uint32_t DX11_SHARED_MAGIC = 0x31315844; // 'DX11'
 static const uint32_t DX11_SHARED_VERSION = 1;
@@ -45,9 +50,8 @@ struct Dx11CaptureShared {
 // Dx11ClickCommand 完全一致。DLL 已注入游戏进程，向 swap chain 输出窗口
 // PostMessage 鼠标消息实现后台点击/滑动。script 进程把命令写入共享内存并
 // SetEvent 请求事件，轮询 doneSeq 确认 DLL 已投递完成。
+// 命名对象同样按 PID 隔离，前缀见上方 DX11_CLICK_*_PREFIX。
 // ============================================================================
-#define DX11_CLICK_SHARED_NAME L"OnmyojiDx11ClickShared"
-#define DX11_CLICK_REQUEST_EVENT_NAME L"OnmyojiDx11ClickRequest"
 
 static const uint32_t DX11_CLICK_MAGIC = 0x314B4C43; // 'CLK1'
 static const uint32_t DX11_CLICK_VERSION = 2;

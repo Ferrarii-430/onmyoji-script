@@ -6,6 +6,7 @@
 #include <QRectF>
 #include <QString>
 #include <QStringList>
+#include <functional>
 #include <opencv2/core/mat.hpp>
 #include <vector>
 
@@ -75,10 +76,23 @@ class ScriptActions : public QObject
     Q_OBJECT
 
 public:
+    // 每个线程一份实例。
+    // 多会话并发后，任务执行在各自的 worker 线程，实例里的状态
+    // （协作弹窗守卫开关、最近一次结果图）必须按线程隔离，
+    // 否则 A 会话开的守卫会作用到 B 会话的识别流程上。
+    // 所有既有调用点（ScriptActions::instance()）无需修改即可作用于当前线程。
     static ScriptActions& instance();
 
     ScriptActions(const ScriptActions&) = delete;
     ScriptActions& operator=(const ScriptActions&) = delete;
+
+    // 结果图回显回调：识别出结果后由本类主动调用。
+    // 任务跑在 worker 线程、UI 在主线线程，Qt 信号无法在「UI 线程 connect 的对象」
+    // 与「worker 线程的实例」之间建立连接，因此改由 TaskRunner 注入回调，
+    // 在回调里 emit 自己的信号完成跨线程投递。
+    // path 为磁盘路径或 memoryResultKey()；img 仅在内存回显模式下非空。
+    using ShowImageCallback = std::function<void(const QString& path, const cv::Mat& img)>;
+    void setShowImageCallback(ShowImageCallback callback);
 
     // OpenCV 模板匹配识别并点击，成功返回结果图路径，失败返回空
     // colorCheck 为是否做 HSV 颜色校验（用于区分同形状不同色的模板）
@@ -195,6 +209,10 @@ public:
     // 取最近一次缓存的结果图（无缓存返回空 Mat）；返回深拷贝，调用方可安全使用
     cv::Mat memoryResultImage() const;
 
+    // 释放内存回显缓存。任务结束时调用：线程局部实例常驻到线程退出，
+    // 不主动释放会让一张整屏大小的结果图跟着线程一直占着内存
+    void releaseMemoryResult();
+
 signals:
     void requestShowImage(const QString& imagePath);
 
@@ -244,6 +262,9 @@ private:
 
     // 协作弹窗守卫开关：默认关闭，开启后扫描点击方法识别失败时自动扫协作弹窗并重试一次
     bool m_collaborationGuardEnabled = false;
+
+    // 结果图回显回调；为空时退回到 requestShowImage 信号（UI 线程内的单线程场景）
+    ShowImageCallback m_showImageCallback;
 
     // persistScreenshot 关闭时缓存最近一次的结果图，供 UI 内存回显
     cv::Mat m_memoryResultImage;

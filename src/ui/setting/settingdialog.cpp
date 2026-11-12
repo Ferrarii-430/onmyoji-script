@@ -236,7 +236,7 @@ void SettingDialog::onCancelClicked()
 void SettingDialog::onConfigExportClicked()
 {
     // 任务运行中方案配置可能被脚本写入，禁止导出避免导出中间状态
-    if (TaskRunner::instance().isRunning()) {
+    if (TaskRunner::isAnyRunning()) {
         QMessageBox::information(this, QStringLiteral("导出配置"),
                                  QStringLiteral("任务运行中，请先停止任务再导出配置"));
         return;
@@ -264,7 +264,7 @@ void SettingDialog::onConfigExportClicked()
 
 void SettingDialog::onConfigImportClicked()
 {
-    if (TaskRunner::instance().isRunning()) {
+    if (TaskRunner::isAnyRunning()) {
         QMessageBox::information(this, QStringLiteral("导入配置"),
                                  QStringLiteral("任务运行中，请先停止任务再导入配置"));
         return;

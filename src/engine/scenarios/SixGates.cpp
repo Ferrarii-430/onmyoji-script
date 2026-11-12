@@ -26,14 +26,14 @@ namespace scenarios {
 
     // 跨轮次状态示例：仅在单次任务运行的多次循环内保持的标记，
     // 需要更多跨轮次状态时在此追加，并同步在 resetSixGatesStatus 中重置
-    bool sixGates_isRoundInitialized = false;
-    int skillLevel = 0; //技能等级
-    int roundNum = 0; //当前回合数
-    int ROUND_TOTAL = 25; //总回合数
-    static bool isLock = false; //是否锁定，仅本文件内使用
+    thread_local bool sixGates_isRoundInitialized = false;
+    thread_local int skillLevel = 0; //技能等级
+    thread_local int roundNum = 0; //当前回合数
+    thread_local int ROUND_TOTAL = 25; //总回合数
+    static thread_local bool isLock = false; //是否锁定，仅本文件内使用
 
     // 六道之门内部共享实例：本文件内所有处理方法统一复用
-    static ScriptActions& actions = ScriptActions::instance();
+    static thread_local ScriptActions& actions = ScriptActions::instance();
 
     // 截图目录必须在 QCoreApplication 创建后再取：文件级静态初始化时 applicationDirPath()
     // 还是空串，拼出来的路径无效，OpenCV 会报「无法加载图片」，所以用函数在调用时取值

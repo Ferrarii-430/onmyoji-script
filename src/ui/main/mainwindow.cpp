@@ -1,982 +1,512 @@
-//
-// Created by CZY on 2025/9/25.
-//
-
-// You may need to build the project (run Qt uic code generator) to get "ui_mainwindow.h" resolved
-
 #include "mainwindow.h"
-#include "src/core/Logger.h"
-#include <opencv2/opencv.hpp>
-#include "ui_mainwindow.h"
+
 #include <QCloseEvent>
-#include <QFile>
+#include <QDateTime>
+#include <QHash>
 #include <QHBoxLayout>
-#include <QHeaderView>
-#include <QJsonArray>
-#include <QTimer>
-#include <QDebug>
-#include <QInputDialog>
-#include <QCheckBox>
-#include <QComboBox>
-#include <QDoubleSpinBox>
-#include <QFormLayout>
 #include <QLabel>
-#include <QLineEdit>
-#include <QScrollArea>
-#include <QSpinBox>
+#include <QMessageBox>
+#include <QTabWidget>
+#include <QTimer>
+#include <QToolButton>
 #include <QVBoxLayout>
-#include <QWheelEvent>
-#include "QMessageBox"
+#include <opencv2/core/version.hpp>
 
 #include "src/core/AppPaths.h"
 #include "src/core/AppVersion.h"
-#include "src/core/ConfigTypeEnum.h"
-#include "src/core/ProfileStore.h"
+#include "src/core/Logger.h"
 #include "src/core/SettingManager.h"
 #include "src/core/UpdateChecker.h"
-#include "src/engine/ScriptActions.h"
-#include "src/engine/TaskRunner.h"
+#include "src/core/WindowBindingStore.h"
 #include "src/game/GameWindow.h"
 #include "src/game/capture/Dx11HookCapture.h"
-#include "src/platform/DPIHelper.h"
-#include "src/ui/bossConfigForm/BossConfigDialog.h"
-#include "src/ui/editTask/edittaskdialog.h"
-#include "src/ui/setting/settingdialog.h"
+#include "src/platform/ProcessUtils.h"
+#include "src/ui/session/sessionwidget.h"
 #include "src/vision/ClassNameCache.h"
-#include "src/vision/ImageIo.h"
 #include "src/vision/OcrEngine.h"
 #include "src/vision/YOLODetector.h"
 
 namespace {
 
-// 鬼王列表配置是「系统方案-超鬼王」独有的功能，方案 id 直接写死在程序里：
-// 只有它显示「自定义配置」入口，其余系统方案一律不显示
-constexpr const char* kSuperGhostKingConfigId = "627CE2C8-01C9-4828-B4AE-4F5A360E7946";
-
-// 是否显示该方案的「自定义配置」按钮：先按 id 命中超鬼王，
-// 再看方案对象的 showBossConfig 字段是否有意关掉（缺省视为显示）
-bool canShowBossConfigButton(const QString &configId)
-{
-    if (configId.compare(QString::fromLatin1(kSuperGhostKingConfigId),
-                         Qt::CaseInsensitive) != 0) {
-        return false;
-    }
-    for (const QJsonValue &value : m_configArray) {
-        const QJsonObject obj = value.toObject();
-        if (obj.value("id").toString().compare(configId, Qt::CaseInsensitive) == 0) {
-            return obj.value("showBossConfig").toBool(true);
-        }
-    }
-    return true;
-}
-
-// 系统方案表单里的数字输入框：滚轮不再改数值。
-// QSpinBox 默认在获得焦点后响应滚轮，鼠标划过或滚动页面时很容易误改，
-// 这里直接吞掉滚轮事件（ignore 后由父级滚动区接管，页面照常滚动）
-class NoWheelSpinBox : public QSpinBox
-{
-public:
-    explicit NoWheelSpinBox(QWidget *parent = nullptr) : QSpinBox(parent) {}
-
-protected:
-    void wheelEvent(QWheelEvent *event) override { event->ignore(); }
-};
-
-class NoWheelDoubleSpinBox : public QDoubleSpinBox
-{
-public:
-    explicit NoWheelDoubleSpinBox(QWidget *parent = nullptr) : QDoubleSpinBox(parent) {}
-
-protected:
-    void wheelEvent(QWheelEvent *event) override { event->ignore(); }
-};
-
-// 下拉框同理：鼠标划过滚一下就换选项，且没有任何提示，这里一并吞掉滚轮。
-// 弹出列表打开时的滚动由列表自己处理，不受影响
-class NoWheelComboBox : public QComboBox
-{
-public:
-    explicit NoWheelComboBox(QWidget *parent = nullptr) : QComboBox(parent) {}
-
-protected:
-    void wheelEvent(QWheelEvent *event) override { event->ignore(); }
-};
+// 单个会话面板的固定尺寸（沿用原主界面的绝对定位尺寸，
+// 界面本身没有布局管理器，拉伸会导致控件错位）
+constexpr int kSessionWidth = 979;
+constexpr int kSessionHeight = 550;
 
 } // namespace
 
-mainwindow::mainwindow(QWidget *parent) :
-    QWidget(parent), ui(new Ui::mainwindow) {
-    ui->setupUi(this);
+mainwindow::mainwindow(QWidget *parent)
+    : QWidget(parent) {
     setWindowTitle(QStringLiteral("onmyoji-script v") + APP_VERSION);
 
-    // 配合全局 QSS 的 alternate-background-color 显示斑马纹
-    ui->listWidget->setAlternatingRowColors(true);
-    ui->tableWidget->setAlternatingRowColors(true);
-    ui->tableWidget->setSelectionBehavior(QAbstractItemView::SelectRows);
-    ui->tableWidget->setShowGrid(false);
-    ui->tableWidget->verticalHeader()->setVisible(false);
-    ui->openCVIdentifyLabel->setStyleSheet(
-        "border: 1px dashed #c0c4d0; border-radius: 6px; background-color: #ffffff;");
-    ui->settingButton->raise(); // 确保不被同层其他控件盖住
+    setupUi();
 
-    // 把 Logger 输出重定向到界面日志框
-    Logger::setSink([this](const QString& msg) { appendLogToUI(msg); });
-
-    // 日志框上限：超出自动丢弃最旧内容，防止长时间挂机内存无限增长
-    ui->plainTextEdit->setMaximumBlockCount(2000);
-
-    // 绑定选中信号
-    connect(ui->listWidget, &QListWidget::itemClicked,
-            this, &mainwindow::onItemClicked);
-
-    //绑定开启任务按钮
-    connect(ui->startTaskButton, &QToolButton::clicked,
-            this, &mainwindow::startTaskButtonClick);
-
-    //绑定关闭任务按钮
-    connect(ui->stopTaskButton, &QToolButton::clicked,
-            this, &mainwindow::stopTaskButtonClick);
-
-    //绑定添加方案按钮
-    connect(ui->programmeAddBtn, &QToolButton::clicked,
-            this, &mainwindow::onProgrammeAddBtnClicked);
-
-    //绑定删除方案按钮
-    connect(ui->programmeRemoveBtn, &QToolButton::clicked,
-            this, &mainwindow::onProgrammeRemoveBtnClicked);
-
-    //绑定添加方案内容按钮
-    connect(ui->programmeContentAddBtn, &QToolButton::clicked,
-            this, &mainwindow::onProgrammeContentAddBtnClicked);
-
-    //绑定打开设置按钮
-    connect(ui->settingButton, &QToolButton::clicked,
-            this, &mainwindow::onSettingBtnClicked);
-
-    //绑定方案内容上移按钮
-    connect(ui->programmeContentUpButton, &QToolButton::clicked,
-            this, &mainwindow::onProgrammeUpBtnClicked);
-
-    //绑定方案内容下移按钮
-    connect(ui->programmeContentDownButton, &QToolButton::clicked,
-            this, &mainwindow::onProgrammeDownBtnClicked);
-
-    //监听编辑方案名称
-    connect(ui->listWidget, &QListWidget::itemChanged, this, [this](QListWidgetItem *item) {
-        // 这里可以保存修改到配置文件等
-        updateProgrammeContent(AppPaths::instance().configPath(), currentItem.id, item->text());
-        loadListWidgetData();
+    // 日志分发：worker 线程产生日志时带有会话标识（Logger::setThreadTag），
+    // 据此投递到对应标签页；UI 线程的日志没有标识，落到当前标签页。
+    // 必须用队列投递回到 UI 线程——sink 会在任意工作线程被调用。
+    Logger::setSink([this](const QString& tag, const QString& msg) {
+        QMetaObject::invokeMethod(this, [this, tag, msg]() {
+            sessionwidget* target = tag.isEmpty() ? nullptr : findSessionByTag(tag);
+            if (!target) {
+                target = currentSession();
+            }
+            if (target) {
+                target->appendLogToUI(msg);
+            }
+        }, Qt::QueuedConnection);
     });
 
-    //读取setting的配置
-    if (SETTING_CONFIG.loadConfig())
-    {
-        Logger::log(QString("Setting配置加载成功！"));
-    }
+    m_restoring = true;
+    restoreSessions();
+    m_restoring = false;
 
-    //读取classes.txt的配置
-    QString classesPath = AppPaths::instance().classesNamePath();
-    if (ClassNameCache::initialize(classesPath))
-    {
-        Logger::log(QString("classes.txt配置加载成功！"));
-    }
+    initGlobalServices();
 
-    //读取方案的配置
-    loadListWidgetData();
+    setFixedSize(kSessionWidth + 2, kSessionHeight + 80);
+}
 
-    Logger::log(QString("Config配置加载成功！"));
+mainwindow::~mainwindow() {
+    // Logger 是全局单例，比本对象活得久；不清理会在下一条日志里访问悬空指针
+    Logger::setSink(nullptr);
+}
 
-    // 检查OpenCV版本和编译选项
-    Logger::log(QString("OpenCV 版本 %1").arg(CV_VERSION));
+void mainwindow::setupUi()
+{
+    auto* rootLayout = new QVBoxLayout(this);
+    rootLayout->setContentsMargins(0, 0, 0, 0);
+    rootLayout->setSpacing(0);
 
-    Logger::log(QString("OCR 引擎: PP-OCRv6（OcrLite 推理）"));
+    m_tabs = new QTabWidget(this);
+    m_tabs->setTabsClosable(true);
+    m_tabs->setMovable(true);
+    m_tabs->setDocumentMode(true);
+    rootLayout->addWidget(m_tabs, 1);
 
-    QString onnxPath = AppPaths::instance().onmyojiYoloOnnxPath();
-    bool initSuccess = YOLODetector::getInstance().initialize(onnxPath.toStdWString());
-    if (initSuccess)
-    {
-        Logger::log(QString("onmyoji-yolo-v5 加载成功！"));
-    }
+    // 底部工具条：新建标签页。
+    // 不用 QTabWidget 的 cornerWidget —— documentMode 下它可能不显示，
+    // 那样就没有任何入口能开第二个实例了。
+    auto* bottomBar = new QHBoxLayout();
+    bottomBar->setContentsMargins(8, 4, 8, 6);
+    bottomBar->setSpacing(8);
 
-    // OCR 引擎模型常驻：启动时预加载，避免首次 OCR 识别卡顿
-    if (vision::initInProcessOcr())
-    {
-        Logger::log(QString("PP-OCRv6 进程内引擎加载成功！"));
-    }
-
-    ui->taskCycleNumber->setValue(1);
-
-    connect(&ScriptActions::instance(), &ScriptActions::requestShowImage,
-            this, &mainwindow::showOpenCVIdentifyImage);
-
-    // 任务执行器信号绑定
-    TaskRunner& runner = TaskRunner::instance();
-    connect(&runner, &TaskRunner::showImage, this, &mainwindow::showOpenCVIdentifyImage);
-    connect(&runner, &TaskRunner::started, this, [this]() {
-        setTaskRunningState(true);
+    auto* addButton = new QToolButton(this);
+    addButton->setText(QStringLiteral("+ 新建标签页"));
+    addButton->setToolTip(QStringLiteral("新建一个标签页，绑定另一个游戏实例"));
+    connect(addButton, &QToolButton::clicked, this, [this]() {
+        sessionwidget* session = createSession();
+        m_tabs->setCurrentWidget(session);
     });
-    connect(&runner, &TaskRunner::finished, this, [this]() {
-        setTaskRunningState(false);
-        // 关窗曾被运行中任务拦截：任务已真正结束，此刻再执行退出
-        if (m_pendingClose) {
-            m_pendingClose = false;
-            close();
+    bottomBar->addWidget(addButton);
+
+    auto* hintLabel = new QLabel(
+        QStringLiteral("每个标签页绑定一个游戏窗口，可同时运行、互不影响"), this);
+    hintLabel->setStyleSheet(QStringLiteral("color: #888;"));
+    bottomBar->addWidget(hintLabel);
+    bottomBar->addStretch(1);
+
+    rootLayout->addLayout(bottomBar);
+
+    connect(m_tabs, &QTabWidget::tabCloseRequested, this, &mainwindow::closeSession);
+
+    // 切换标签页时同步 UI 线程的预览上下文（编辑器测试步骤作用于该实例）。
+    // 任务执行线程持有自己固定的上下文，不受切换影响，因此运行中也可以自由切换。
+    connect(m_tabs, &QTabWidget::currentChanged, this, [this](int index) {
+        auto* session = qobject_cast<sessionwidget*>(m_tabs->widget(index));
+        if (session) {
+            session->activateBinding();
         }
     });
-    connect(&runner, &TaskRunner::cycleProgress, this, &mainwindow::showCycleProgress);
+}
 
-    //设置DPI感知
-    DPIHelper::SetProcessDPIAwareness();
+void mainwindow::initGlobalServices()
+{
+    if (SETTING_CONFIG.loadConfig()) {
+        Logger::log(QStringLiteral("Setting配置加载成功！"));
+    }
 
-    // 启动后延迟 3 秒静默检查更新：等待 UI 完全绘制完成，避免阻塞首屏；
-    // 仅在发现新版本时弹窗，其它情况只写日志（不打扰用户）。
+    if (ClassNameCache::initialize(AppPaths::instance().classesNamePath())) {
+        Logger::log(QStringLiteral("classes.txt配置加载成功！"));
+    }
+
+    Logger::log(QStringLiteral("OpenCV 版本 %1").arg(CV_VERSION));
+
+    // 模型加载是进程级一次性工作，多个标签页共享同一份推理引擎
+    if (YOLODetector::getInstance().initialize(
+            AppPaths::instance().onmyojiYoloOnnxPath().toStdWString())) {
+        Logger::log(QStringLiteral("onmyoji-yolo-v5 加载成功！"));
+    }
+
+    if (vision::initInProcessOcr()) {
+        Logger::log(QStringLiteral("PP-OCRv6 进程内引擎加载成功！"));
+    }
+
+    // 延迟检查更新，避免阻塞首屏；仅在发现新版本时弹窗
     QTimer::singleShot(3000, this, []() {
         UpdateChecker::instance().checkAsync(false);
     });
 }
 
-mainwindow::~mainwindow() {
-    // 清空全局日志回调：Logger 是全局单例，比本对象活得久，
-    // 不清理的话析构后下一条日志会通过悬空的 this 调用 appendLogToUI 而崩溃
-    Logger::setSink(nullptr);
-    delete ui;
-}
-
-// 退出前卸载游戏进程内的 hook DLL：DLL 已支持安全排空后自卸载（游戏不闪退、
-// 文件解锁）。未注入时（事件不存在）直接返回，不启动注入器进程。
-void mainwindow::unloadHookOnExit()
+void mainwindow::restoreSessions()
 {
-    if (!capture::isDllInjected()) {
+    WINDOW_BINDINGS.load();
+
+    int restored = 0;
+    for (const WindowBinding& item : WINDOW_BINDINGS.all()) {
+        if (item.pid == 0 || !platform::isProcessAlive(item.pid)) {
+            continue;
+        }
+
+        HWND hwnd = platform::findWindowByPid(item.pid);
+        if (!hwnd) {
+            continue;
+        }
+
+        sessionwidget* session = createSession();
+        session->bindInstance(item.pid, hwnd, item.displayName);
+        ++restored;
+    }
+
+    if (restored == 0) {
+        createSession();
+    }
+
+    if (m_tabs->count() > 0) {
+        m_tabs->setCurrentIndex(0);
+        if (auto* session = currentSession()) {
+            session->activateBinding();
+        }
+    }
+
+    if (restored > 0) {
+        Logger::log(QStringLiteral("已恢复 %1 个游戏实例标签页").arg(restored));
+    }
+
+    // 恢复出来的绑定可能包含重复（历史配置或用户手动改过 windows.json），
+    // 这里统一算一次，重复时在标题与日志上给出提示
+    refreshSharedBindings();
+}
+
+sessionwidget* mainwindow::createSession()
+{
+    auto* session = new sessionwidget(this);
+    session->setFixedSize(kSessionWidth, kSessionHeight);
+
+    const int index = m_tabs->addTab(session, session->tabTitle());
+    m_tabs->setTabToolTip(index, QStringLiteral("右键可关闭；每个标签页绑定一个游戏实例"));
+
+    connect(session, &sessionwidget::titleChanged, this, [this, session]() {
+        refreshTabTitle(session);
+    });
+
+    // 绑定前查重：绑定同一个 PID 时给出提醒（不拦截）
+    session->setPeerLookup([this, session](DWORD pid) {
+        return peerDisplayNamesFor(static_cast<quint32>(pid), session);
+    });
+
+    connect(session, &sessionwidget::bindingChanged, this, [this]() {
+        if (m_restoring) {
+            return;
+        }
+        persistSessions();
+        refreshSharedBindings();
+    });
+
+    connect(session, &sessionwidget::taskFinished, this, [this, session]() {
+        // 关闭标签页时若任务在跑，等它真正结束再删
+        if (session->property("closeAfterStop").toBool()) {
+            m_tabs->removeTab(m_tabs->indexOf(session));
+            session->deleteLater();
+            if (m_tabs->count() == 0) {
+                createSession();
+            }
+            // 少了一个标签页，共用关系可能已解除
+            persistSessions();
+            refreshSharedBindings();
+            return;
+        }
+
+        if (m_pendingClose) {
+            // 可能还有别的标签页在收尾，等全部停下再关窗口
+            if (anyTaskRunning()) {
+                return;
+            }
+            m_pendingClose = false;
+            // 延后一拍再关，避免在信号处理栈里递归触发 closeEvent
+            QTimer::singleShot(0, this, [this]() { close(); });
+        }
+    });
+
+    return session;
+}
+
+sessionwidget* mainwindow::currentSession() const
+{
+    return qobject_cast<sessionwidget*>(m_tabs->currentWidget());
+}
+
+sessionwidget* mainwindow::findSessionByTag(const QString& tag) const
+{
+    if (tag.isEmpty()) {
+        return nullptr;
+    }
+    for (int i = 0; i < m_tabs->count(); ++i) {
+        auto* session = qobject_cast<sessionwidget*>(m_tabs->widget(i));
+        if (session && session->logTag() == tag) {
+            return session;
+        }
+    }
+    return nullptr;
+}
+
+bool mainwindow::anyTaskRunning() const
+{
+    for (int i = 0; i < m_tabs->count(); ++i) {
+        auto* session = qobject_cast<sessionwidget*>(m_tabs->widget(i));
+        if (session && session->isTaskRunning()) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void mainwindow::refreshTabTitle(sessionwidget* session)
+{
+    const int index = m_tabs->indexOf(session);
+    if (index < 0) {
         return;
     }
 
-    GameWindow& gameWindow = GameWindow::instance();
-    if (!gameWindow.handle() && !gameWindow.locate()) {
-        Logger::log(QStringLiteral("未找到游戏窗口，跳过 hook DLL 卸载"));
+    m_tabs->setTabText(index, session->tabTitle());
+
+    // 共用实例的完整说明放 tooltip：标题栏放不下，但鼠标一悬停就能看清是谁
+    if (session->sharedPeers().isEmpty()) {
+        m_tabs->setTabToolTip(index, QStringLiteral("右键可关闭；每个标签页绑定一个游戏实例"));
         return;
     }
+    m_tabs->setTabToolTip(
+        index,
+        QStringLiteral("与其他标签页共用同一个游戏实例：\n    %1\n\n"
+                       "同时运行任务会互相干扰。")
+            .arg(session->sharedPeers().join(QStringLiteral("\n    "))));
+}
 
-    Logger::log(QStringLiteral("正在从游戏进程卸载 hook DLL..."));
-    if (capture::dllStopHook(gameWindow.processId())) {
-        Logger::log(QStringLiteral("hook DLL 已卸载"));
-    } else {
-        Logger::log(QStringLiteral("hook DLL 卸载未确认（不影响退出）"));
+void mainwindow::activateSession(sessionwidget* session)
+{
+    if (session) {
+        session->activateBinding();
     }
 }
 
-// 拦截运行中关窗：任务同步跑在 UI 线程，直接接受关闭会让正在执行的
-// run() 继续操作已销毁/隐藏的界面而崩溃。确认退出时先协作式停止，
-// 等 finished 信号（run() 返回）到来后再真正关闭窗口。
+void mainwindow::persistSessions()
+{
+    QVector<WindowBinding> items;
+
+    for (int i = 0; i < m_tabs->count(); ++i) {
+        auto* session = qobject_cast<sessionwidget*>(m_tabs->widget(i));
+        if (!session || session->boundPid() == 0) {
+            continue;
+        }
+
+        WindowBinding binding;
+        binding.pid = session->boundPid();
+        binding.displayName = session->displayName();
+        binding.imageName = QString::fromWCharArray(
+            platform::getProcessImageName(session->boundPid()).c_str());
+        binding.windowTitle = binding.displayName;
+        binding.boundAt = QDateTime::currentSecsSinceEpoch();
+        items.push_back(binding);
+    }
+
+    WINDOW_BINDINGS.clear();
+    for (const WindowBinding& item : items) {
+        WINDOW_BINDINGS.add(item);
+    }
+
+    if (!WINDOW_BINDINGS.save()) {
+        Logger::log(QStringLiteral("窗口绑定记录保存失败：%1")
+                        .arg(WindowBindingStore::filePath()));
+    }
+}
+
+void mainwindow::refreshSharedBindings()
+{
+    // pid -> 绑定该实例的所有标签页
+    QHash<quint32, QVector<sessionwidget *>> owners;
+    for (int i = 0; i < m_tabs->count(); ++i) {
+        auto* session = qobject_cast<sessionwidget*>(m_tabs->widget(i));
+        if (session && session->boundPid() != 0) {
+            owners[static_cast<quint32>(session->boundPid())].append(session);
+        }
+    }
+
+    QStringList conflicts;
+
+    for (auto it = owners.cbegin(); it != owners.cend(); ++it) {
+        const QVector<sessionwidget *>& group = it.value();
+        const bool shared = group.size() > 1;
+
+        // 把「还有谁在用同一个实例」下发给每个标签页：
+        // 标题加 ⚠共用 角标，状态栏常驻提示
+        for (sessionwidget* session : group) {
+            QStringList peers;
+            if (shared) {
+                for (sessionwidget* other : group) {
+                    if (other == session) {
+                        continue;
+                    }
+                    peers << QStringLiteral("标签页 %1「%2」")
+                                 .arg(m_tabs->indexOf(other) + 1)
+                                 .arg(other->displayName());
+                }
+            }
+            session->setSharedPeers(peers);
+        }
+
+        if (shared) {
+            QStringList tabs;
+            for (sessionwidget* session : group) {
+                tabs << QStringLiteral("标签页 %1").arg(m_tabs->indexOf(session) + 1);
+            }
+            conflicts << QStringLiteral("PID %1（%2）")
+                             .arg(it.key())
+                             .arg(tabs.join(QStringLiteral("、")));
+        }
+    }
+
+    // 组合没变就不重复记日志（绑定/解绑一次会走到这里多次）
+    const QString signature = conflicts.join(QStringLiteral(" | "));
+    if (signature == m_lastSharedLog) {
+        return;
+    }
+    m_lastSharedLog = signature;
+
+    if (signature.isEmpty()) {
+        Logger::log(QStringLiteral("已没有标签页共用同一个游戏实例"));
+        return;
+    }
+
+    Logger::log(QStringLiteral("⚠ 多个标签页绑定了同一个游戏实例：%1 —— 允许共用，"
+                               "但同时运行任务会互相干扰，请确认这是本意")
+                    .arg(signature));
+}
+
+QStringList mainwindow::peerDisplayNamesFor(quint32 pid, sessionwidget* self) const
+{
+    QStringList peers;
+    if (pid == 0) {
+        return peers;
+    }
+
+    for (int i = 0; i < m_tabs->count(); ++i) {
+        auto* session = qobject_cast<sessionwidget*>(m_tabs->widget(i));
+        if (!session || session == self) {
+            continue;
+        }
+        if (static_cast<quint32>(session->boundPid()) != pid) {
+            continue;
+        }
+        peers << QStringLiteral("标签页 %1「%2」").arg(i + 1).arg(session->displayName());
+    }
+    return peers;
+}
+
+void mainwindow::closeSessionDeferred(sessionwidget* session)
+{
+    session->setProperty("closeAfterStop", true);
+    session->stopTask();
+}
+
+void mainwindow::closeSession(int index)
+{
+    auto* session = qobject_cast<sessionwidget*>(m_tabs->widget(index));
+    if (!session) {
+        return;
+    }
+
+    if (session->isTaskRunning()) {
+        const auto reply = QMessageBox::question(
+            this, QStringLiteral("关闭标签页"),
+            QStringLiteral("该标签页的任务正在运行，是否停止并关闭？"),
+            QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+        if (reply != QMessageBox::Yes) {
+            return;
+        }
+
+        // run() 在 UI 线程阻塞，不能直接删；置标记等 taskFinished 再处理
+        closeSessionDeferred(session);
+        return;
+    }
+
+    m_tabs->removeTab(index);
+    session->deleteLater();
+
+    if (m_tabs->count() == 0) {
+        createSession();
+    }
+
+    persistSessions();
+    refreshSharedBindings();
+}
+
+void mainwindow::unloadAllHooks()
+{
+    for (int i = 0; i < m_tabs->count(); ++i) {
+        auto* session = qobject_cast<sessionwidget*>(m_tabs->widget(i));
+        if (!session) {
+            continue;
+        }
+
+        const DWORD pid = session->boundPid();
+        if (pid == 0 || !platform::isProcessAlive(pid)) {
+            continue;
+        }
+        if (!capture::isDllInjected(pid)) {
+            continue;
+        }
+
+        Logger::log(QStringLiteral("正在从游戏进程卸载 hook DLL（PID %1）...").arg(pid));
+        if (capture::dllStopHook(QString::number(pid))) {
+            Logger::log(QStringLiteral("hook DLL 已卸载（PID %1）").arg(pid));
+        } else {
+            Logger::log(QStringLiteral("hook DLL 卸载未确认（PID %1，不影响退出）").arg(pid));
+        }
+    }
+}
+
 void mainwindow::closeEvent(QCloseEvent *event)
 {
-    if (!TaskRunner::instance().isRunning()) {
-        unloadHookOnExit();
+    if (!anyTaskRunning()) {
+        unloadAllHooks();
         Logger::setSink(nullptr);
         event->accept();
         return;
     }
 
+    if (m_pendingClose) {
+        // 已在等待任务结束，拒绝这次重复的关闭请求
+        event->ignore();
+        return;
+    }
+
     const auto reply = QMessageBox::question(
         this, QStringLiteral("退出确认"),
-        QStringLiteral("任务正在运行，是否停止任务并退出？"),
+        QStringLiteral("有标签页正在运行任务，是否停止全部任务并退出？"),
         QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
     if (reply != QMessageBox::Yes) {
         event->ignore();
         return;
     }
 
-    Logger::log(QStringLiteral("停止任务并退出..."));
+    Logger::log(QStringLiteral("停止所有任务并退出..."));
     m_pendingClose = true;
-    TaskRunner::instance().stop();
-    if (!TaskRunner::instance().isRunning()) {
-        // 弹窗期间任务已恰好结束（finished 已错过），直接退出
-        m_pendingClose = false;
-        unloadHookOnExit();
-        Logger::setSink(nullptr);
-        event->accept();
-        return;
+
+    // 每个会话各自停止；全部 finished 后由 createSession 里的
+    // taskFinished 回调重新触发关闭流程
+    for (int i = 0; i < m_tabs->count(); ++i) {
+        auto* session = qobject_cast<sessionwidget*>(m_tabs->widget(i));
+        if (session && session->isTaskRunning()) {
+            session->stopTask();
+        }
     }
     event->ignore();
-}
-
-void mainwindow::loadListWidgetData()
-{
-    refreshConfig();
-
-    ui->listWidget->clear();
-
-    QJsonArray arr = m_configArray;
-
-    // 显隐字段过滤：visible 为 false 的方案不在列表中显示；
-    // 缺省视为 true，兼容无该字段的旧配置
-    QJsonArray visibleArr;
-    for (int i = 0; i < arr.size(); i++) {
-        if (arr[i].toObject()["visible"].toBool(true)) {
-            visibleArr.append(arr[i]);
-        }
-    }
-
-    for (int i = 0; i < visibleArr.size(); i++) {
-        QJsonObject obj = visibleArr[i].toObject();
-
-        QString name = obj["name"].toString();
-        QString id   = obj["id"].toString();   // 假设 JSON 里有 id 字段
-
-        // 创建列表项
-        QListWidgetItem *item = new QListWidgetItem(name);
-
-        // 绑定额外数据（Qt::UserRole 是给用户自定义数据用的）
-        item->setData(Qt::UserRole, id);
-        item->setFlags(item->flags() | Qt::ItemIsEditable); // 添加可编辑标志
-
-        ui->listWidget->addItem(item);
-    }
-
-    if (visibleArr.size() > 0)
-    {
-        QJsonObject step = visibleArr[0].toObject();
-        QString id = step["id"].toString();
-        QString name = step["name"].toString();
-        commonSetCurrentItem(id,name);
-        ui->currentTaskName->setText(name);
-        showStepsInTable(visibleArr[0].toObject()["steps"].toArray()); //默认显示第一个可见配置的方案内容
-    }
-    else
-    {
-        // 所有方案均隐藏：清空选中状态与方案内容表格
-        commonSetCurrentItem(QString(), QString());
-        ui->currentTaskName->setText(QStringLiteral("（无方案）"));
-        ui->tableWidget->clear();
-        ui->tableWidget->setRowCount(0);
-        ui->tableWidget->setColumnCount(0);
-    }
-}
-
-// 点击了方案列表
-void mainwindow::onItemClicked(QListWidgetItem *item) {
-    if (!item) return;
-    // 获取显示文本
-    QString name = item->text();
-    QString id   = item->data(Qt::UserRole).toString();
-    // Logger::log(QString( "onItemClicked->选中项 name:" + name + ", id:" + id));
-    commonSetCurrentItem(id,name);
-    ui->currentTaskName->setText(name);
-
-    QJsonObject obj = QJsonObject(); //默认为空
-    //读取对应的方案步骤数据到表格
-    for (const QJsonValue &val : m_configArray) {
-        if (!val.isObject()) {
-            continue;
-        }
-        obj = val.toObject();
-        if (obj["id"].toString() == id) {
-            break;
-        }
-    }
-
-    QJsonArray steps = obj["steps"].toArray();
-    if (obj["type"] == "system")
-    {
-        ui->tableWidget->clear(); // 清空表格
-        ui->tableWidget->setRowCount(0);
-        ui->tableWidget->setColumnCount(0);
-        ui->programmeContentAddBtn->setDisabled(true);
-        // 按该系统方案的 systemConfig 生成可编辑表单(无自定义配置则退回原提示)
-        showSystemConfigForm(id);
-    }else
-    {
-        ui->programmeContentAddBtn->setDisabled(false);
-        showStepsInTable(steps);
-    }
-}
-
-// 按系统方案的 systemConfig 描述动态生成可编辑表单，控件变更即写回 config.json
-void mainwindow::showSystemConfigForm(const QString &configId)
-{
-    // 每次销毁并重建容器：避免复用旧 QFormLayout 清理时的 takeAt 告警
-    if (m_systemConfigForm) {
-        m_systemConfigForm->deleteLater();
-        m_systemConfigForm = nullptr;
-    }
-
-    // systemConfig 为空(如十周年999)时同样生成表单：显示标题与方案级 tip，只是没有配置项。
-    // 不再用 systemConfigTips 静态提示兜底——它被 raise 后的 tableWidget 盖住，永远不可见。
-    const QJsonArray systemConfig = getSystemConfig(configId);
-    ui->systemConfigTips->hide();
-
-    // 表单容器，位置对齐任务表格区域
-    m_systemConfigForm = new QWidget(ui->tableWidget->parentWidget());
-    m_systemConfigForm->setGeometry(ui->tableWidget->geometry());
-    // 边框 + 背景色，营造独立配置区域的分隔感（用 #objectName 限定，避免影响内部控件）
-    m_systemConfigForm->setObjectName("systemConfigForm");
-    m_systemConfigForm->setStyleSheet(
-        "#systemConfigForm {"
-        "  background-color: #f7f9fc;"
-        "  border: 1px solid #d0d7e2;"
-        "  border-radius: 8px;"
-        "}"
-        // 配置项行容器默认会被全局 QWidget 底色覆盖，单独置为透明，露出卡片背景
-        "#systemConfigField { background: transparent; }"
-        "#systemConfigHeader { background: transparent; }");
-
-    // 配置项超出容器高度时出现纵向滚动条，内容不足时不显示；
-    // 横向滚动条关闭，避免表单被横向拖动、配置项按可视宽度自适应
-    auto *scrollArea = new QScrollArea(m_systemConfigForm);
-    scrollArea->setObjectName("systemConfigScroll");
-    scrollArea->setWidgetResizable(true);
-    scrollArea->setFrameShape(QFrame::NoFrame);
-    scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
-    scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    // 全局 QSS 给所有 QWidget 设了底色，会让 viewport 盖住卡片边框和背景，
-    // 这里单独把 viewport 命名为透明，保证卡片右侧/下侧边框始终可见
-    scrollArea->viewport()->setObjectName("systemConfigViewport");
-    scrollArea->viewport()->setAutoFillBackground(false);
-    scrollArea->setStyleSheet(
-        "#systemConfigScroll { background: transparent; }"
-        "#systemConfigViewport { background: transparent; }");
-
-    auto *formContainer = new QWidget(scrollArea);
-    formContainer->setObjectName("systemConfigContent");
-    formContainer->setStyleSheet("#systemConfigContent { background: transparent; }");
-
-    auto *form = new QFormLayout(formContainer);
-    form->setContentsMargins(16, 16, 16, 16);
-    form->setHorizontalSpacing(16);
-    form->setVerticalSpacing(12);
-    form->setLabelAlignment(Qt::AlignRight | Qt::AlignVCenter);
-
-    // 区域标题移到卡片顶部固定行（见下方 rootLayout），此处不再占表单一行
-
-    // 方案级 tip：整个方案的功能使用说明，显示在标题下方
-    const QString systemTip = getSystemTip(configId);
-    if (!systemTip.isEmpty()) {
-        auto *tipLabel = new QLabel(systemTip, m_systemConfigForm);
-        tipLabel->setWordWrap(true);
-        tipLabel->setStyleSheet(
-            "color: #6b7280; font-size: 9pt; background-color: #eef2f7;"
-            "border: 1px solid #d0d7e2; border-radius: 6px; padding: 8px;");
-        form->addRow(tipLabel);
-    }
-
-    // 「阵容配置」入口：与 systemConfig 其他项一样是 label + 控件的一行。
-    // 只在超鬼王方案出现，且可由方案对象的 showBossConfig 关掉；
-    // 弹窗里配的是「鬼王名称 → 阵容/绿标/红标」列表，随 config.json 持久化
-    if (canShowBossConfigButton(configId)) {
-        auto *entryRow = new QWidget(m_systemConfigForm);
-        entryRow->setObjectName("systemConfigField");
-        auto *entryLayout = new QHBoxLayout(entryRow);
-        entryLayout->setContentsMargins(0, 0, 0, 0);
-        entryLayout->setSpacing(8);
-
-        auto *editBtn = new QPushButton(QStringLiteral("编辑"), entryRow);
-        editBtn->setCursor(Qt::PointingHandCursor);
-        editBtn->setToolTip(QStringLiteral("配置鬼王对应的阵容、绿标位置与红标 BOSS"));
-        entryLayout->addWidget(editBtn);
-        entryLayout->addStretch(1);
-
-        connect(editBtn, &QPushButton::clicked, this, [this, configId]() {
-            BossConfigDialog dialog(currentItem.taskName, getBossConfig(configId), this);
-            if (dialog.exec() != QDialog::Accepted) {
-                return;
-            }
-            updateBossConfig(AppPaths::instance().configPath(), configId, dialog.list());
-        });
-
-        form->addRow(QStringLiteral("阵容配置"), entryRow);
-    }
-
-    const QString configPath = AppPaths::instance().configPath();
-
-    for (const QJsonValue &val : systemConfig) {
-        const QJsonObject field = val.toObject();
-        const QString key = field["key"].toString();
-        const QString label = field["label"].toString();
-        const QString control = field["control"].toString();
-        const QString itemTip = field.value("tip").toString();
-
-        // 每个配置项用一个垂直容器承载「控件 + 可选 tip 提示」，便于统一加入表单
-        auto *fieldWidget = new QWidget(m_systemConfigForm);
-        fieldWidget->setObjectName("systemConfigField");
-        auto *fieldLayout = new QVBoxLayout(fieldWidget);
-        fieldLayout->setContentsMargins(0, 0, 0, 0);
-        fieldLayout->setSpacing(4);
-
-        if (control == "number") {
-            if (field.value("decimals").toInt(0) <= 0) {
-                // 整数：QSpinBox
-                auto *spin = new NoWheelSpinBox(fieldWidget);
-                spin->setRange(field.value("min").toInt(0), field.value("max").toInt(100));
-                spin->setSingleStep(field.value("step").toInt(1));
-                spin->setValue(field.value("value").toInt());
-                connect(spin, qOverload<int>(&QSpinBox::valueChanged), this,
-                        [=](int v) { updateSystemConfigValue(configPath, configId, key, v); });
-                fieldLayout->addWidget(spin);
-            } else {
-                // 小数：QDoubleSpinBox
-                auto *spin = new NoWheelDoubleSpinBox(fieldWidget);
-                spin->setDecimals(field.value("decimals").toInt(2));
-                spin->setRange(field.value("min").toDouble(0.0), field.value("max").toDouble(1.0));
-                spin->setSingleStep(field.value("step").toDouble(0.1));
-                spin->setValue(field.value("value").toDouble());
-                connect(spin, qOverload<double>(&QDoubleSpinBox::valueChanged), this,
-                        [=](double v) { updateSystemConfigValue(configPath, configId, key, v); });
-                fieldLayout->addWidget(spin);
-            }
-        } else if (control == "switch") {
-            // 开关：QCheckBox
-            auto *check = new QCheckBox(fieldWidget);
-            check->setChecked(field.value("value").toBool());
-            connect(check, &QCheckBox::toggled, this,
-                    [=](bool v) { updateSystemConfigValue(configPath, configId, key, v); });
-            fieldLayout->addWidget(check);
-        } else if (control == "select") {
-            // 下拉：QComboBox
-            auto *combo = new NoWheelComboBox(fieldWidget);
-            for (const QJsonValue &opt : field.value("options").toArray()) {
-                combo->addItem(opt.toString());
-            }
-            combo->setCurrentText(field.value("value").toString());
-            connect(combo, &QComboBox::currentTextChanged, this,
-                    [=](const QString &v) { updateSystemConfigValue(configPath, configId, key, v); });
-            fieldLayout->addWidget(combo);
-        } else if (control == "input") {
-            // 文本输入：QLineEdit
-            auto *edit = new QLineEdit(fieldWidget);
-            edit->setText(field.value("value").toString());
-            edit->setPlaceholderText(field.value("placeholder").toString());
-            if (field.contains("maxLength")) {
-                edit->setMaxLength(field.value("maxLength").toInt());
-            }
-            connect(edit, &QLineEdit::textChanged, this,
-                    [=](const QString &v) { updateSystemConfigValue(configPath, configId, key, v); });
-            fieldLayout->addWidget(edit);
-        }
-
-        // 配置项级 tip：单个选项的解释说明，显示在控件下方
-        if (!itemTip.isEmpty()) {
-            auto *itemTipLabel = new QLabel(itemTip, fieldWidget);
-            itemTipLabel->setWordWrap(true);
-            itemTipLabel->setStyleSheet("color: #9ca3af; font-size: 8pt;");
-            fieldLayout->addWidget(itemTipLabel);
-        }
-
-        form->addRow(label, fieldWidget);
-    }
-
-    scrollArea->setWidget(formContainer);
-
-    // 标题行固定贴在卡片顶部（不随表单内容滚动）；方案自己的入口按钮
-    // 放在下面的表单里，与 systemConfig 其他配置项保持同一种「label + 控件」形态
-    auto *header = new QWidget(m_systemConfigForm);
-    header->setObjectName("systemConfigHeader");
-    auto *headerLayout = new QHBoxLayout(header);
-    headerLayout->setContentsMargins(4, 2, 4, 2);
-    headerLayout->setSpacing(8);
-
-    auto *title = new QLabel(QStringLiteral("方案配置"), header);
-    title->setStyleSheet("font-weight: bold; font-size: 12pt; color: #333;");
-    headerLayout->addWidget(title);
-    headerLayout->addStretch(1);
-
-    auto *rootLayout = new QVBoxLayout(m_systemConfigForm);
-    // 留出内边距，避免滚动区/内容贴边盖住卡片右侧与下侧边框
-    rootLayout->setContentsMargins(6, 6, 6, 6);
-    rootLayout->setSpacing(6);
-    rootLayout->addWidget(header);
-    rootLayout->addWidget(scrollArea, 1);
-
-    m_systemConfigForm->show();
-    m_systemConfigForm->raise();
-}
-
-//加载数据到任务表格
-void mainwindow::showStepsInTable(const QJsonArray &steps) {
-    ui->systemConfigTips->hide();
-    if (m_systemConfigForm) {
-        m_systemConfigForm->hide();
-    }
-    ui->tableWidget->raise();
-    ui->tableWidget->clear(); // 清空表格
-    ui->tableWidget->setRowCount(steps.size());
-    ui->tableWidget->setColumnCount(5); // 新增序号列
-    QStringList headers = {"序号", "任务名称", "类型", "操作",""};
-    ui->tableWidget->setHorizontalHeaderLabels(headers);
-
-    // 单元格按钮外包一层容器留出边距，避免按钮铺满整格粘在一起
-    auto wrapCellWidget = [](QWidget* inner) {
-        auto* container = new QWidget();
-        auto* layout = new QHBoxLayout(container);
-        layout->setContentsMargins(8, 4, 8, 4);
-        layout->addWidget(inner);
-        return container;
-    };
-
-    for (int i = 0; i < steps.size(); ++i) {
-        QJsonObject step = steps[i].toObject();
-
-        // 序号
-        ui->tableWidget->setItem(i, 0, new QTableWidgetItem(QString::number(i + 1))); // 从1开始
-
-        // 任务名称
-        QString taskName = step["taskName"].toString();
-        ui->tableWidget->setItem(i, 1, new QTableWidgetItem(taskName));
-
-        // 类型
-        QString type = step["type"].toString();
-        ui->tableWidget->setItem(i, 2, new QTableWidgetItem(type));
-
-        // 编辑按钮
-        QPushButton *editBtn = new QPushButton("编辑");
-        ui->tableWidget->setCellWidget(i, 3, wrapCellWidget(editBtn));
-        connect(editBtn, &QPushButton::clicked, this, [this, step]() {
-            // 弹窗修改，或进入编辑模式
-            EditTaskDialog* dlg = new EditTaskDialog(EditMode::Edit,step,currentItem.id,nullptr);
-            dlg->show();
-            connect(dlg, &EditTaskDialog::accepted,[dlg, this]() {
-                QJsonObject data = dlg->resultData();
-                if (data.isEmpty()) {
-                    return;
-                }
-
-                // 保存回 JSON 文件 & 刷新表格
-                if (data["type"].toString() == "OPENCV") {
-                    saveBase64ImageToFile(data);
-                }
-                updateConfigInJsonFile(AppPaths::instance().configPath(), currentItem.id, data);
-                QTimer::singleShot(0, dlg, &QObject::deleteLater); // 延迟一拍
-                showCurrentSelectStepsInTable();
-            });
-            connect(dlg, &EditTaskDialog::imagePathRequested, this, &mainwindow::showOpenCVIdentifyImage);
-        });
-
-        // 删除按钮
-        QPushButton *delBtn = new QPushButton("删除");
-        ui->tableWidget->setCellWidget(i, 4, wrapCellWidget(delBtn));
-        connect(delBtn, &QPushButton::clicked, this, [this, step]() {
-            // 添加确认弹窗
-            QMessageBox::StandardButton reply;
-            reply = QMessageBox::question(this, "确认删除",
-                                        "确定要删除这个步骤吗？",
-                                        QMessageBox::Yes | QMessageBox::No);
-
-            if (reply == QMessageBox::Yes) {
-                // qDebug() << "点击了删除: 行=" << i << " id=" << step["stepsId"].toString();
-                removeConfigById(AppPaths::instance().configPath(), currentItem.id, step["stepsId"].toString());
-                showCurrentSelectStepsInTable();
-            }
-        });
-
-    }
-
-    ui->tableWidget->resizeColumnsToContents();
-    ui->tableWidget->resizeRowsToContents();
-}
-
-void mainwindow::showCurrentSelectStepsInTable()
-{
-    refreshConfig();
-    if (currentItem.id.isEmpty())
-    {
-        Logger::log(QString("当前选择方案ID为空"));
-        return;
-    }
-
-
-    bool hasConfigId = false;
-    for (int i = 0; i < m_configArray.size(); ++i)
-    {
-        QJsonObject obj = m_configArray[i].toObject();
-        if (obj["id"].toString() == currentItem.id)
-        {
-            showStepsInTable(obj["steps"].toArray());
-            hasConfigId = true;
-            break;
-        }
-    }
-
-    if (!hasConfigId)
-    {
-        Logger::log("没有ConfigId: " + currentItem.id);
-    }
-}
-
-//开启当前选中的任务
-void mainwindow::startTaskButtonClick()
-{
-    if (currentItem.id.isEmpty())
-    {
-        Logger::log(QString("没有选中脚本方案"));
-        return;
-    }
-
-    QJsonObject obj = QJsonObject(); //默认为空
-    //读取对应的方案步骤数据
-    for (const QJsonValue &val : m_configArray) {
-        if (!val.isObject()) {
-            continue;
-        }
-        obj = val.toObject();
-        if (obj["id"].toString() == currentItem.id) {
-            break;
-        }
-    }
-    QJsonArray steps = obj["steps"].toArray();
-
-    int cycleCount = ui->taskCycleNumber->text().toInt();
-    TaskRunner::instance().run(steps, cycleCount);
-}
-
-//关闭当前选中的任务
-void mainwindow::stopTaskButtonClick()
-{
-    // 停止是「协作式」的：TaskRunner 只在当前步骤执行完后才退出循环，
-    // 因此按钮先反馈等待状态，避免用户重复点击或误以为没生效。
-    ui->stopTaskButton->setText(QStringLiteral("正在停止..."));
-    ui->stopTaskButton->setEnabled(false);
-    TaskRunner::instance().stop();
-}
-
-// 任务运行状态切换：控制按钮可用性与循环次数控件的显示形态
-void mainwindow::setTaskRunningState(bool running)
-{
-    ui->startTaskButton->setEnabled(!running);
-    ui->stopTaskButton->setEnabled(running);
-    ui->stopTaskButton->setText(QStringLiteral("停止"));
-
-    if (running) {
-        // 运行中：隐藏可编辑的循环次数输入框，用进度标签占位
-        ui->label_5->setText(QStringLiteral("运行中"));
-        ui->taskCycleNumber->hide();
-        if (!m_cycleProgressLabel) {
-            m_cycleProgressLabel = new QLabel(this);
-            // 比输入框略宽：无限循环时需显示「(∞) 已执行 N 次」，右侧为空白区域不遮挡其他控件
-            const QRect spinRect = ui->taskCycleNumber->geometry();
-            m_cycleProgressLabel->setGeometry(spinRect.x(), spinRect.y(), 160, spinRect.height());
-            // m_cycleProgressLabel->setStyleSheet(
-            //     "border: 1px solid #c0c4d0; border-radius: 4px;"
-            //     "background-color: #f7f9fc; padding-left: 4px;");
-            m_cycleProgressLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
-            m_cycleProgressLabel->show();
-            m_cycleProgressLabel->raise();
-        }
-    } else {
-        // 停止/结束后：恢复默认的循环次数输入框
-        ui->label_5->setText(QStringLiteral("循环次数"));
-        if (m_cycleProgressLabel) {
-            m_cycleProgressLabel->hide();
-            m_cycleProgressLabel->deleteLater();
-            m_cycleProgressLabel = nullptr;
-        }
-        ui->taskCycleNumber->show();
-    }
-}
-
-// 显示循环进度：(已执行/总次数)；total <= 0 表示无限循环
-void mainwindow::showCycleProgress(int completed, int total)
-{
-    if (!m_cycleProgressLabel) {
-        return;
-    }
-    if (total <= 0) {
-        m_cycleProgressLabel->setText(QString("(∞) 已执行 %1 次").arg(completed));
-    } else {
-        m_cycleProgressLabel->setText(QString("(%1/%2)").arg(completed).arg(total));
-    }
-}
-
-void mainwindow::appendLogToUI(const QString &msg)
-{
-    if (!ui || !ui->plainTextEdit) return;
-
-    // appendPlainText 本身会自动滚动到底并移动光标，无需再手动操作
-    ui->plainTextEdit->appendPlainText(msg);
-}
-
-// 按钮点击槽函数
-void mainwindow::onProgrammeAddBtnClicked()
-{
-    bool ok;
-    QString configName = QInputDialog::getText(
-        this,
-        tr("添加方案"),
-        tr("请输入方案名称:"),
-        QLineEdit::Normal,
-        "",
-        &ok
-    );
-
-    if (ok && !configName.isEmpty()) {
-        addConfigToJsonFile(AppPaths::instance().configPath(), configName);
-        // 输入了有效内容
-        Logger::log("已添加新的配置: " + configName);
-        loadListWidgetData();
-    } else {
-        // 用户取消或输入为空
-        Logger::log(QString("用户未输入或无效的配置名称"));
-    }
-}
-
-// 按钮点击槽函数
-void mainwindow::onProgrammeRemoveBtnClicked()
-{
-    if (currentItem.id.isEmpty())
-    {
-        Logger::log(QString("未选中配置"));
-        return;
-    }
-    // 弹出确认对话框
-    QMessageBox::StandardButton reply;
-    reply = QMessageBox::question(
-        this,
-        tr("确认删除"),
-        tr("确定要删除配置 “%1” 吗？").arg(currentItem.taskName),
-        QMessageBox::Yes | QMessageBox::No
-    );
-
-    if (reply == QMessageBox::Yes)
-    {
-        if (removeConfigById(AppPaths::instance().configPath(), currentItem.id))
-        {
-            Logger::log("已删除配置: " + currentItem.taskName);
-            loadListWidgetData();  // 刷新配置
-            commonSetCurrentItem("","");
-            ui->currentTaskName->setText("");
-            if (m_configArray.size() > 0)
-            {
-                const QString id = m_configArray[0].toObject()["id"].toString();
-                const QString name = m_configArray[0].toObject()["name"].toString();
-                commonSetCurrentItem(id,name);
-                ui->currentTaskName->setText(name);
-            }
-        }
-        else
-        {
-            Logger::log("删除配置失败: " + currentItem.taskName);
-        }
-    }
-    else
-    {
-        Logger::log(QString("已取消删除"));
-    }
-}
-
-void mainwindow::onSettingBtnClicked()
-{
-    SettingDialog dialog(this);
-    // 设置内导入方案配置成功后，刷新主窗口的方案列表与表单
-    connect(&dialog, &SettingDialog::configImported, this, [this]() {
-        commonSetCurrentItem(QString(), QString());
-        if (m_systemConfigForm) {
-            m_systemConfigForm->deleteLater();
-            m_systemConfigForm = nullptr;
-        }
-        loadListWidgetData();
-        if (m_configArray.isEmpty()) {
-            ui->tableWidget->clear();
-            ui->tableWidget->setRowCount(0);
-            ui->tableWidget->setColumnCount(0);
-            ui->currentTaskName->setText(QStringLiteral("（无方案）"));
-        }
-    });
-    if (dialog.exec() == QDialog::Accepted) {
-        // 设置已保存和应用
-        Logger::log(QString("Setting配置已修改"));
-    }
-}
-
-
-void mainwindow::onProgrammeContentAddBtnClicked()
-{
-    QJsonObject empty;
-    EditTaskDialog* dlg = new EditTaskDialog(EditMode::Add,empty,currentItem.id,nullptr); // 非模态
-    dlg->show();
-    connect(dlg, &EditTaskDialog::accepted, [dlg, this]() {
-        QJsonObject data = dlg->resultData();
-        // 保存 JSON
-        if (data.isEmpty()) {
-            return;
-        }
-
-        if (data["type"].toString() == "OPENCV") {
-            saveBase64ImageToFile(data);
-        }
-        addConfigToJsonFile(AppPaths::instance().configPath(),currentItem.id,data);
-        QTimer::singleShot(0, dlg, &QObject::deleteLater);  // 延迟一拍
-        showCurrentSelectStepsInTable();
-    });
-    connect(dlg, &EditTaskDialog::imagePathRequested, this, &mainwindow::showOpenCVIdentifyImage);
-}
-
-void mainwindow::onProgrammeUpBtnClicked()
-{
-    int currentRow = ui->tableWidget->currentRow();
-    if (currentRow >= 0) {
-        moveProgramme(AppPaths::instance().configPath(), currentItem.id, currentRow, true);
-        showCurrentSelectStepsInTable();
-        ui->tableWidget->selectRow(currentRow-1);
-    } else {
-        Logger::log(QString("没有选择方案内容的任何行"));
-    }
-}
-
-void mainwindow::onProgrammeDownBtnClicked()
-{
-    int currentRow = ui->tableWidget->currentRow();
-    if (currentRow >= 0) {
-        moveProgramme(AppPaths::instance().configPath(), currentItem.id, currentRow, false);
-        showCurrentSelectStepsInTable();
-        ui->tableWidget->selectRow(currentRow+1);
-    } else {
-        Logger::log(QString("没有选择方案内容的任何行"));
-    }
-}
-
-void mainwindow::showOpenCVIdentifyImage(const QString& savePath) const
-{
-    if (savePath.isEmpty()) {
-        qWarning() << "[WARN] showOpenCVIdentifyImage: 路径为空";
-        ui->openCVIdentifyLabel->clear();
-        ui->openCVIdentifyLabel->setText("无图像");
-        return;
-    }
-
-    // 内存回显模式：persistScreenshot 关闭时 ScriptActions 不落盘，
-    // 收到内存 key 直接取缓存图像，避免磁盘读写；否则按路径读文件
-    cv::Mat img;
-    if (savePath == ScriptActions::memoryResultKey()) {
-        img = ScriptActions::instance().memoryResultImage();
-    } else {
-        img = vision::imreadQt(savePath);
-    }
-    if (img.empty()) {
-        qWarning() << "[ERROR] 无法加载图片:" << savePath;
-        ui->openCVIdentifyLabel->clear();
-        ui->openCVIdentifyLabel->setText("加载失败");
-        return;
-    }
-
-    // 转换为 Qt 可识别格式（BGR → RGB）
-    cv::cvtColor(img, img, cv::COLOR_BGR2RGB);
-
-    // 封装成 QImage（不拷贝数据）
-    QImage qimg(
-        img.data,
-        img.cols,
-        img.rows,
-        static_cast<int>(img.step),
-        QImage::Format_RGB888
-    );
-
-    // 缩放显示：保持比例完整显示在 QLabel 内
-    QSize labelSize = ui->openCVIdentifyLabel->size();
-    QPixmap pixmap = QPixmap::fromImage(qimg).scaled(
-        labelSize,
-        Qt::KeepAspectRatio,
-        Qt::SmoothTransformation
-    );
-
-    // 设置显示
-    ui->openCVIdentifyLabel->setPixmap(pixmap);
-    ui->openCVIdentifyLabel->setAlignment(Qt::AlignCenter);
-    ui->openCVIdentifyLabel->setScaledContents(false);  // 不拉伸变形
 }

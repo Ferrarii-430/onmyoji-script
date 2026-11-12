@@ -5,6 +5,8 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QMutex>
+#include <QMutexLocker>
 #include <iostream>
 #include <utility>
 
@@ -17,6 +19,13 @@ constexpr qint64 kMaxLogFileSize = 5 * 1024 * 1024; // 5 MB
 // 历史备份数量，生成 app_log.1.txt ~ app_log.N.txt
 constexpr int kBackupCount = 2;
 
+// 保护 sink 与日志文件：多会话并发运行时各 worker 线程都会写日志。
+// 注意不能在持锁期间调用 sink —— sink 内部可能再次触发日志写入（递归锁死）。
+QMutex g_logMutex;
+
+// 当前线程所属会话标识，由各 worker 线程启动时通过 setThreadTag 设置
+thread_local QString t_threadTag;
+
 } // namespace
 
 Logger::Sink Logger::m_sink = nullptr;
@@ -25,17 +34,35 @@ bool Logger::m_fileTried = false;
 
 void Logger::setSink(Sink sink)
 {
+    QMutexLocker locker(&g_logMutex);
     m_sink = std::move(sink);
+}
+
+void Logger::setThreadTag(const QString& tag)
+{
+    t_threadTag = tag;
+}
+
+QString Logger::threadTag()
+{
+    return t_threadTag;
 }
 
 void Logger::log(const QString& msg)
 {
     std::cout << msg.toUtf8().constData() << std::endl;
 
-    if (m_sink) {
-        m_sink(msg);
+    // 先取一份 sink 副本再在锁外调用：回调里做界面投递，不能阻塞其他线程写日志
+    Sink sink;
+    {
+        QMutexLocker locker(&g_logMutex);
+        sink = m_sink;
+    }
+    if (sink) {
+        sink(t_threadTag, msg);
     }
 
+    QMutexLocker locker(&g_logMutex);
     writeToFile(msg);
 }
 

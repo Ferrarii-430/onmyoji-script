@@ -5,6 +5,8 @@
 #include <QJsonObject>
 #include <QString>
 
+#include <mutex>
+
 #include "src/core/AppPaths.h"
 #include "src/core/Logger.h"
 #include "src/vision/ocr/OcrLite.h"
@@ -12,6 +14,16 @@
 namespace vision {
 
 namespace {
+
+// OCR 推理的全局串行锁。
+// OcrLite 内部持有 ONNX session 与若干中间缓冲，detect() 不是可重入的：
+// 多个标签页的任务线程同时识别会踩同一份状态，表现为结果错乱甚至崩溃。
+// 单次识别耗时几十毫秒，排队代价远小于出错的排查成本。
+std::mutex& ocrMutex()
+{
+    static std::mutex mutex;
+    return mutex;
+}
 
 // 推理参数与原 RapidOCR-json.exe 的调用参数保持一致（见旧 QProcess 实现与 cmd.txt）
 constexpr int kOcrNumThread = 4;
@@ -22,7 +34,8 @@ constexpr int kMaxSideLen = 3084;
 constexpr bool kDoAngle = false;
 constexpr bool kMostAngle = false;
 
-// OCR 引擎单例：模型常驻，只加载一次；加载失败抛异常并保持未初始化，下次调用重试
+// OCR 引擎单例：模型常驻，只加载一次；加载失败抛异常并保持未初始化，下次调用重试。
+// 调用方必须持有 ocrMutex()（初始化与推理共用同一把锁）。
 OcrLite& ocrLite()
 {
     static OcrLite lite;
@@ -67,6 +80,7 @@ QJsonObject ocrResultToJson(const OcrResult& result)
 
 bool initInProcessOcr()
 {
+    std::lock_guard<std::mutex> lock(ocrMutex());
     try {
         ocrLite();
         return true;
@@ -84,6 +98,9 @@ QJsonObject runRapidOCR(const cv::Mat& image, int padding)
     if (image.empty()) {
         return QJsonObject();
     }
+
+    // 多会话并发时在此排队，保证 OcrLite 内部状态不被同时访问
+    std::lock_guard<std::mutex> lock(ocrMutex());
 
     try {
         cv::Mat bgr;

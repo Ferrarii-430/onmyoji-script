@@ -19,6 +19,11 @@
 #include "src/core/Logger.h"
 #include "src/vision/TemplateMatcher.h"
 
+// 线程局部的方案上下文（声明见 ProfileStore.h）。
+// 只在这里定义一份，各线程首次访问时各自构造。
+thread_local QJsonArray m_configArray;
+thread_local ItemInfo currentItem;
+
 // 原子写入配置 JSON：QSaveFile 先写临时文件，commit() 时自动刷盘并原子替换目标文件。
 // 直接 WriteOnly 截断重写时进程被杀/断电会留下写了一半的损坏文件，导致所有方案丢失。
 static bool saveJsonAtomically(const QString& filePath, const QJsonArray& rootArray)

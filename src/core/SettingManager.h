@@ -5,8 +5,13 @@
 #ifndef SETTINGMANAGER_H
 #define SETTINGMANAGER_H
 #include <QJsonObject>
+#include <QReadLocker>
+#include <QReadWriteLock>
 
 
+// 全局配置。多会话并发后各任务线程会频繁读取这些字段，
+// 而设置页保存时会整体重载，因此所有读写都经读写锁保护：
+// 读多写少，QReadWriteLock 的并发读开销可以忽略。
 class SettingManager {
 public:
     // 获取单例实例
@@ -24,19 +29,19 @@ public:
     bool loadConfig(const QString& configPath);
 
     // 获取配置值
-    QString getMouseControlMode() const { return m_mouseControlMode; }
-    int getMouseSpeed() const { return m_mouseSpeed; }
-    QString getScreenshotMode() const { return m_screenshotMode; }
-    QString getMouseClickMode() const { return m_mouseClickMode; }
-    bool getPersistScreenshot() const { return m_persistScreenshot; }
+    QString getMouseControlMode() const { QReadLocker locker(&m_lock); return m_mouseControlMode; }
+    int getMouseSpeed() const { QReadLocker locker(&m_lock); return m_mouseSpeed; }
+    QString getScreenshotMode() const { QReadLocker locker(&m_lock); return m_screenshotMode; }
+    QString getMouseClickMode() const { QReadLocker locker(&m_lock); return m_mouseClickMode; }
+    bool getPersistScreenshot() const { QReadLocker locker(&m_lock); return m_persistScreenshot; }
     // 全局「自动协作关闭」：任务运行期间所有识别点击失败时自动扫协作弹窗并重试一次
-    bool getGlobalAutoCancelCollab() const { return m_globalAutoCancelCollab; }
+    bool getGlobalAutoCancelCollab() const { QReadLocker locker(&m_lock); return m_globalAutoCancelCollab; }
 
     // 获取原始JSON对象（用于扩展）
-    QJsonObject getRawConfig() const { return m_config; }
+    QJsonObject getRawConfig() const { QReadLocker locker(&m_lock); return m_config; }
 
     // 检查配置是否已加载
-    bool isLoaded() const { return m_loaded; }
+    bool isLoaded() const { QReadLocker locker(&m_lock); return m_loaded; }
 
     // 重新加载配置
     bool reloadConfig();
@@ -46,6 +51,9 @@ private:
     ~SettingManager() = default;
 
     bool parseConfig();
+
+    // 保护下列字段。parseConfig 由持写锁的 loadConfig 调用，内部不再加锁
+    mutable QReadWriteLock m_lock;
 
     QString m_configPath;
     QJsonObject m_config;

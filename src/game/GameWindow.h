@@ -18,8 +18,21 @@ public:
     GameWindow(const GameWindow&) = delete;
     GameWindow& operator=(const GameWindow&) = delete;
 
-    // 根据进程名重新定位游戏窗口句柄，成功返回 true
+    // 根据进程名重新定位游戏窗口句柄，成功返回 true。
+    // 已绑定实例时优先校验该实例是否仍存活，失效才回退到按进程名查找。
     bool locate();
+
+    // 绑定到指定游戏实例（多开时区分不同窗口）。
+    // pid 传 0 表示解除绑定，恢复「按进程名找第一个」的行为。
+    // 绑定后 locate() / processId() / 截图与点击都会作用于该实例。
+    void bindTo(DWORD pid, HWND hwnd);
+
+    // 当前绑定的实例 PID；未绑定返回 0
+    DWORD boundPid() const { return boundPid_; }
+    bool isBound() const { return boundPid_ != 0; }
+
+    // 当前窗口所属进程 PID（DWORD 形式），无窗口返回 0
+    DWORD currentPid() const;
 
     HWND handle() const { return hwnd_; }
     const std::string& targetProcessName() const { return target_; }
@@ -62,6 +75,10 @@ private:
     std::string target_ = "onmyoji.exe";
     HWND hwnd_ = nullptr;
     cv::Size lastCaptureSize_;
+
+    // 用户显式绑定的游戏实例；0 表示未绑定（按进程名自动查找）
+    DWORD boundPid_ = 0;
+    HWND boundHwnd_ = nullptr;
 
     // 上次已确认达标时的 minWidth：相同值且截图尺寸未变小时，
     // ensureMinWidthForCapture 走快速路径跳过逐帧窗口尺寸系统调用

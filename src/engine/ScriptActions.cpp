@@ -342,14 +342,28 @@ cv::Rect computeOcrRoi(const cv::Mat& winImg, const QRectF& roiPercent,
 
 ScriptActions& ScriptActions::instance()
 {
-    static ScriptActions instance;
-    return instance;
+    // 每线程一份，且刻意不析构：thread_local 对象在线程结束时销毁，
+    // 若线程晚于 QCoreApplication 退出，QObject 析构会打印告警甚至访问已销毁的
+    // 元对象系统。任务线程数量有限（一个会话一个），这点常驻开销可以接受。
+    thread_local ScriptActions* instance = new ScriptActions();
+    return *instance;
+}
+
+void ScriptActions::setShowImageCallback(ShowImageCallback callback)
+{
+    m_showImageCallback = std::move(callback);
 }
 
 void ScriptActions::processAndShowImage(const QString& imagePath)
 {
-    // 回显走信号槽（同线程直连），无需人为让出时间片；
     qDebug() << imagePath;
+
+    // 任务线程里没有 UI 连接，走注入的回调；
+    // 编辑器里手动测试步骤（UI 线程）没有回调，退回信号槽的直连行为
+    if (m_showImageCallback) {
+        m_showImageCallback(imagePath, cv::Mat());
+        return;
+    }
     emit requestShowImage(imagePath);
 }
 
@@ -368,9 +382,17 @@ cv::Mat ScriptActions::memoryResultImage() const
     return m_memoryResultImage.clone();
 }
 
+void ScriptActions::releaseMemoryResult()
+{
+    m_memoryResultImage.release();
+}
+
 QString ScriptActions::saveResultAndShow(const cv::Mat& resultImg)
 {
-    const QString savePath = AppPaths::instance().matchResultPath();
+    // 结果图按当前实例区分：多会话并发时，固定文件名会让两个标签页互相覆盖，
+    // 界面读到的可能是另一个实例的画面
+    const QString savePath =
+        AppPaths::instance().matchResultPathFor(GameWindow::instance().currentPid());
     if (SETTING_CONFIG.getPersistScreenshot()) {
         if (vision::imwriteQt(savePath, resultImg)) {
             processAndShowImage(savePath);
@@ -380,9 +402,15 @@ QString ScriptActions::saveResultAndShow(const cv::Mat& resultImg)
         Logger::log(QString("结果图写入失败: %1，回退为内存回显").arg(savePath));
     }
 
-    // 关闭持久化：结果图只存内存，回显走内存 key，省去每次识别的磁盘读写
+    // 关闭持久化：结果图只存内存，回显走内存 key，省去每次识别的磁盘读写。
+    // 图像必须随回调一起送出：worker 线程的实例与 UI 线程的 instance() 不是同一个对象，
+    // UI 侧再调 memoryResultImage() 只会拿到空图。
     m_memoryResultImage = resultImg.clone();
-    processAndShowImage(memoryResultKey());
+    if (m_showImageCallback) {
+        m_showImageCallback(memoryResultKey(), m_memoryResultImage);
+    } else {
+        emit requestShowImage(memoryResultKey());
+    }
     return memoryResultKey();
 }
 
@@ -1300,7 +1328,8 @@ void ScriptActions::clickDetection(const Detection& det, bool randomClick, const
         ? randomClickPoint(det.bbox, exclude)
         : cv::Point(det.bbox.x + det.bbox.width / 2, det.bbox.y + det.bbox.height / 2);
 
-    QString capturePath = AppPaths::instance().dx11CapturePath();
+    QString capturePath = AppPaths::instance().dx11CapturePathFor(
+        GameWindow::instance().currentPid());
     cv::Mat captureImg = vision::imreadQt(capturePath);
     QString labelName = ClassNameCache::getClassName(det.class_id);
     if (!captureImg.empty()) {

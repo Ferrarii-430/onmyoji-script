@@ -18,6 +18,7 @@
 #include "src/core/AppPaths.h"
 #include "src/core/Logger.h"
 #include "src/core/SettingManager.h"
+#include "src/game/GameContext.h"
 #include "src/game/capture/Dx11CaptureShared.h"
 #include "src/vision/ImageIo.h"
 
@@ -50,26 +51,76 @@ bool waitForProcessResponsive(QProcess& process, int timeoutMs)
 }
 
 // ------------------------------
-// 截图共享内存常驻缓存
+// 截图共享内存常驻缓存（按 PID 隔离）
 // 原实现每次读取（含 2ms 轮询读序号）都做 OpenFileMapping → MapView →
 // Unmap → Close 全套系统调用，等一帧最多 250 轮、读一帧 2 次映射。
 // 命名 section 由内核引用计数管理：本进程持有 handle 期间对象不会销毁；
 // 游戏重启、DLL 重新注入后，同名 CreateFileMapping 打开的仍是同一对象并
 // 重置 header（sequence 从 0 重新自增），读端 != prevSeq 判定依旧成立，
 // 因此打开成功一次后常驻复用即可，无需失效重建。
+//
+// 多开场景下缓存必须与 PID 绑定：切换目标实例时若不重建映射，
+// 会一直读到上一个游戏进程的画面（表现为绑定 B 却截到 A）。
+//
+// 并发场景下缓存还必须与线程绑定：每个会话的任务跑在自己的 worker 线程，
+// 线程 A 操作 PID 100、线程 B 操作 PID 200，若共用一份缓存会互相把对方的
+// 映射踢掉（每帧重建映射，性能塌陷且可能读到半帧）。
+// 用 thread_local 后每个执行线程只服务自己绑定的实例。
 // ------------------------------
-HANDLE g_captureSharedMapping = nullptr;
-void* g_captureSharedView = nullptr;
+struct CaptureChannel {
+    DWORD pid = 0;
+    HANDLE mapping = nullptr;
+    void* view = nullptr;
+    HANDLE readyEvent = nullptr;  // “新帧就绪”事件，nullptr 表示旧版 DLL 未创建
+};
+
+thread_local CaptureChannel g_channel;
+
+// 释放当前线程持有的共享内存句柄
+void releaseChannel()
+{
+    if (g_channel.view) {
+        UnmapViewOfFile(g_channel.view);
+    }
+    if (g_channel.mapping) {
+        CloseHandle(g_channel.mapping);
+    }
+    if (g_channel.readyEvent) {
+        CloseHandle(g_channel.readyEvent);
+    }
+    g_channel = CaptureChannel{};
+}
+
+// 线程退出时释放句柄。否则会话关闭后线程结束，映射要等进程退出才回收，
+// 反复开关标签页会累积内核句柄。
+struct ChannelGuard {
+    ~ChannelGuard() { releaseChannel(); }
+};
+thread_local ChannelGuard g_channelGuard;
+
+// 目标 PID 变化时释放旧句柄，保证后续读取的是当前实例的数据
+void resetChannelIfPidChanged(DWORD pid)
+{
+    if (g_channel.pid == pid) {
+        return;
+    }
+
+    releaseChannel();
+    g_channel.pid = pid;
+}
 
 // 确保共享内存视图已打开：首次调用执行打开，成功后常驻复用；
 // 共享内存尚不存在（DLL 未截到第一帧）等失败场景下每次重试，不缓存失败。
-bool ensureSharedCaptureView()
+bool ensureSharedCaptureView(DWORD pid)
 {
-    if (g_captureSharedView) {
+    resetChannelIfPidChanged(pid);
+
+    if (g_channel.view) {
         return true;
     }
 
-    HANDLE mapping = OpenFileMappingW(FILE_MAP_READ, FALSE, DX11_SHARED_NAME);
+    HANDLE mapping = OpenFileMappingW(FILE_MAP_READ, FALSE,
+                                      game::captureSharedName(pid).c_str());
     if (!mapping) {
         return false;
     }
@@ -82,19 +133,19 @@ bool ensureSharedCaptureView()
         return false;
     }
 
-    g_captureSharedMapping = mapping;
-    g_captureSharedView = view;
+    g_channel.mapping = mapping;
+    g_channel.view = view;
     return true;
 }
 
 // 读取共享内存中当前帧的序号（共享内存不可用时返回 0）
-uint32_t readDx11SharedSequence()
+uint32_t readDx11SharedSequence(DWORD pid)
 {
-    if (!ensureSharedCaptureView()) {
+    if (!ensureSharedCaptureView(pid)) {
         return 0;
     }
 
-    const Dx11CaptureShared* hdr = static_cast<const Dx11CaptureShared*>(g_captureSharedView);
+    const Dx11CaptureShared* hdr = static_cast<const Dx11CaptureShared*>(g_channel.view);
     if (hdr->magic == DX11_SHARED_MAGIC && hdr->version == DX11_SHARED_VERSION) {
         return hdr->sequence;
     }
@@ -103,17 +154,18 @@ uint32_t readDx11SharedSequence()
 
 // 从 DLL 写入的共享内存中直接读取最新一帧（BGRA），转换为 BGR 的 cv::Mat。
 // 无需 PNG 落盘/解码中转。
-bool readDx11SharedCapture(cv::Mat& outImg)
+bool readDx11SharedCapture(DWORD pid, cv::Mat& outImg)
 {
-    if (!ensureSharedCaptureView()) {
+    if (!ensureSharedCaptureView(pid)) {
         const DWORD err = GetLastError();
-        qWarning() << "无法打开截图共享内存 (错误码:" << err << ")";
+        qWarning() << "无法打开截图共享内存 (PID:" << pid << "错误码:" << err << ")";
         if (err == ERROR_FILE_NOT_FOUND) {
             // 共享内存由 DLL 在渲染线程成功截到第一帧时才创建；出现此错误说明
             // DLL 从未写入过共享内存，通常是注入或截图本身失败，而非读取端问题。
             qWarning() << "  提示: 共享内存尚未创建，说明 DLL 未成功截帧。"
                           "常见原因: 脚本未以管理员身份运行导致注入失败、"
-                          "游戏进程/位数不匹配、游戏窗口被最小化或未在渲染。"
+                          "游戏进程/位数不匹配、游戏窗口被最小化或未在渲染、"
+                          "或注入的 DLL 与脚本的命名规则不一致。"
                           "请查看上方注入器输出与 dx11_log.txt 确认。";
         } else if (err == ERROR_ACCESS_DENIED) {
             qWarning() << "  提示: 无权访问共享内存，请确认脚本与游戏进程的权限/完整性级别一致。";
@@ -121,7 +173,7 @@ bool readDx11SharedCapture(cv::Mat& outImg)
         return false;
     }
 
-    const Dx11CaptureShared* hdr = static_cast<const Dx11CaptureShared*>(g_captureSharedView);
+    const Dx11CaptureShared* hdr = static_cast<const Dx11CaptureShared*>(g_channel.view);
     if (!(hdr->magic == DX11_SHARED_MAGIC && hdr->version == DX11_SHARED_VERSION &&
           hdr->status == 0 && hdr->channels == 4 &&
           hdr->width > 0 && hdr->height > 0 &&
@@ -134,7 +186,7 @@ bool readDx11SharedCapture(cv::Mat& outImg)
     // onmyoji 的后备缓冲区格式为 DXGI_FORMAT_R8G8B8A8_UNORM（日志中“格式=28”），
     // 内存字节序为 R,G,B,A —— 因此必须按 RGBA 解析。此前误用 BGRA2BGR 会把
     // R/B 通道对调，导致读到的图像红蓝颠倒（与 DLL 侧 PNG 落盘表现一致）。
-    const uchar* pixels = static_cast<const uchar*>(g_captureSharedView) + sizeof(Dx11CaptureShared);
+    const uchar* pixels = static_cast<const uchar*>(g_channel.view) + sizeof(Dx11CaptureShared);
     const cv::Mat rgba(static_cast<int>(hdr->height), static_cast<int>(hdr->width),
                        CV_8UC4, const_cast<uchar*>(pixels));
     // cvtColor 会分配新内存，outImg 不再引用共享内存
@@ -161,9 +213,10 @@ bool checkHookToolsExist()
 }
 
 // 检查 DLL 的跨进程截图事件是否存在（即 DLL 是否已注入且支持快速路径）
-bool isDllEventAvailable()
+bool isDllEventAvailable(DWORD pid)
 {
-    HANDLE hEvent = OpenEventW(EVENT_MODIFY_STATE, FALSE, DX11_CAPTURE_REQUEST_EVENT_NAME);
+    HANDLE hEvent = OpenEventW(EVENT_MODIFY_STATE, FALSE,
+                               game::captureRequestEventName(pid).c_str());
     if (!hEvent) {
         return false;
     }
@@ -171,23 +224,23 @@ bool isDllEventAvailable()
     return true;
 }
 
-// 打开 DLL 的跨进程“新帧就绪”事件（打开成功后常驻复用）。
+// 打开 DLL 的跨进程“新帧就绪”事件（同一 PID 下打开成功后常驻复用）。
 // 新版 DLL 在写完共享内存后 SetEvent 该事件，script 端等待即可拿到新帧；
 // 返回 null 表示当前 DLL 为旧版本（尚未创建该事件），调用方需回退轮询序号。
 // 打开失败不做负缓存：DLL 后续注入/升级后能自动切换到事件驱动模式。
-HANDLE ensureFrameReadyEvent()
+HANDLE ensureFrameReadyEvent(DWORD pid)
 {
-    // INVALID_HANDLE_VALUE 表示尚未成功打开过；nullptr 表示旧版 DLL
-    static HANDLE s_readyEvent = INVALID_HANDLE_VALUE;
-    if (s_readyEvent != INVALID_HANDLE_VALUE) {
-        return s_readyEvent;
+    resetChannelIfPidChanged(pid);
+
+    if (g_channel.readyEvent) {
+        return g_channel.readyEvent;
     }
 
     // SYNCHRONIZE 权限：本进程只等待该事件，不 SetEvent
-    HANDLE h = OpenEventW(SYNCHRONIZE, FALSE, DX11_CAPTURE_READY_EVENT_NAME);
+    HANDLE h = OpenEventW(SYNCHRONIZE, FALSE, game::captureReadyEventName(pid).c_str());
     if (h) {
-        qInfo() << "已打开 DLL 新帧就绪事件，等待模式为事件驱动";
-        s_readyEvent = h;
+        qInfo() << "已打开 DLL 新帧就绪事件，等待模式为事件驱动 PID:" << pid;
+        g_channel.readyEvent = h;
     }
     return h;
 }
@@ -195,14 +248,15 @@ HANDLE ensureFrameReadyEvent()
 // 快速路径：通过跨进程事件直接触发 DLL 截图，无需启动注入器进程。
 // 返回 true 表示确认拿到新帧；false 表示未在超时内收到新帧。
 // 调用前应先通过 isDllEventAvailable() 确认事件存在。
-bool captureViaEvent(cv::Mat& winImg)
+bool captureViaEvent(DWORD pid, cv::Mat& winImg)
 {
-    HANDLE hEvent = OpenEventW(EVENT_MODIFY_STATE, FALSE, DX11_CAPTURE_REQUEST_EVENT_NAME);
+    HANDLE hEvent = OpenEventW(EVENT_MODIFY_STATE, FALSE,
+                               game::captureRequestEventName(pid).c_str());
     if (!hEvent) {
         return false;
     }
 
-    const uint32_t prevSeq = readDx11SharedSequence();
+    const uint32_t prevSeq = readDx11SharedSequence(pid);
 
     SetEvent(hEvent);
     CloseHandle(hEvent);
@@ -212,7 +266,7 @@ bool captureViaEvent(cv::Mat& winImg)
     // 主路径：DLL 是新版时等待“新帧就绪”事件（单次阻塞系统调用，无轮询）。
     // auto-reset 事件可能残留上一次超时未消费的旧信号，拿到信号后仍按
     // sequence != prevSeq 二次确认，旧信号则继续等剩余时间，不会误判。
-    if (HANDLE readyEvent = ensureFrameReadyEvent()) {
+    if (HANDLE readyEvent = ensureFrameReadyEvent(pid)) {
         QElapsedTimer timer;
         timer.start();
         while (timer.elapsed() < kFastPathFrameWaitMs) {
@@ -220,7 +274,7 @@ bool captureViaEvent(cv::Mat& winImg)
             if (WaitForSingleObject(readyEvent, remaining) != WAIT_OBJECT_0) {
                 break; // 超时或异常，按未拿到新帧处理
             }
-            if (readDx11SharedSequence() != prevSeq) {
+            if (readDx11SharedSequence(pid) != prevSeq) {
                 gotNewFrame = true;
                 break;
             }
@@ -231,7 +285,7 @@ bool captureViaEvent(cv::Mat& winImg)
         QElapsedTimer timer;
         timer.start();
         while (timer.elapsed() < kFastPathFrameWaitMs) {
-            if (readDx11SharedSequence() != prevSeq) {
+            if (readDx11SharedSequence(pid) != prevSeq) {
                 gotNewFrame = true;
                 break;
             }
@@ -243,13 +297,14 @@ bool captureViaEvent(cv::Mat& winImg)
         return false;
     }
 
-    return readDx11SharedCapture(winImg);
+    return readDx11SharedCapture(pid, winImg);
 }
 
 // 检查 DLL 的跨进程点击事件是否存在（即 DLL 是否已注入且支持点击快速路径）
-bool isClickEventAvailable()
+bool isClickEventAvailable(DWORD pid)
 {
-    HANDLE hEvent = OpenEventW(EVENT_MODIFY_STATE, FALSE, DX11_CLICK_REQUEST_EVENT_NAME);
+    HANDLE hEvent = OpenEventW(EVENT_MODIFY_STATE, FALSE,
+                               game::clickRequestEventName(pid).c_str());
     if (!hEvent) return false;
     CloseHandle(hEvent);
     return true;
@@ -258,11 +313,11 @@ bool isClickEventAvailable()
 // 快速路径通用实现：把一条点击/滑动命令写入共享内存并 SetEvent，
 // 轮询 doneSeq 确认 DLL 已投递完成。滑动时 DLL 在整个手势投递完成后才置位
 // doneSeq，确认超时按 durationMs 放宽。返回 true 表示 DLL 工作线程已确认完成。
-bool submitClickCommand(int x1, int y1, int x2, int y2,
+bool submitClickCommand(DWORD pid, int x1, int y1, int x2, int y2,
                         uint32_t trajectory, uint32_t durationMs)
 {
     HANDLE mapping = OpenFileMappingW(FILE_MAP_READ | FILE_MAP_WRITE,
-                                      FALSE, DX11_CLICK_SHARED_NAME);
+                                      FALSE, game::clickSharedName(pid).c_str());
     if (!mapping) return false;
 
     void* view = MapViewOfFile(mapping, FILE_MAP_READ | FILE_MAP_WRITE,
@@ -285,7 +340,8 @@ bool submitClickCommand(int x1, int y1, int x2, int y2,
     cmd->sequence = mySeq;
     cmd->doneSeq = 0;
 
-    HANDLE hEvent = OpenEventW(EVENT_MODIFY_STATE, FALSE, DX11_CLICK_REQUEST_EVENT_NAME);
+    HANDLE hEvent = OpenEventW(EVENT_MODIFY_STATE, FALSE,
+                               game::clickRequestEventName(pid).c_str());
     if (!hEvent) {
         UnmapViewOfFile(view);
         CloseHandle(mapping);
@@ -312,16 +368,16 @@ bool submitClickCommand(int x1, int y1, int x2, int y2,
 }
 
 // 快速路径：单击命令
-bool clickViaEvent(int x, int y)
+bool clickViaEvent(DWORD pid, int x, int y)
 {
-    return submitClickCommand(x, y, x, y, 0, 0);
+    return submitClickCommand(pid, x, y, x, y, 0, 0);
 }
 
 // 注入器运行后检测 DLL 注入状态：从未注入变为已注入时记录一条成功日志。
 // DLL 已注入时再走注入器路径（如快速路径失败回退）不会重复记录。
-void logDllInjectionStateChange(bool wasInjectedBefore, const QString& targetPid)
+void logDllInjectionStateChange(bool wasInjectedBefore, const QString& targetPid, DWORD pid)
 {
-    if (!wasInjectedBefore && isDllInjected()) {
+    if (!wasInjectedBefore && isDllInjected(pid)) {
         Logger::log(QString("DX11 hook DLL 注入成功 (PID: %1)").arg(targetPid));
     }
 }
@@ -330,13 +386,20 @@ void logDllInjectionStateChange(bool wasInjectedBefore, const QString& targetPid
 
 bool captureByDllInjection(const QString& targetPid, cv::Mat& winImg)
 {
+    // 目标 PID 决定共享内存与事件的名称，后续所有命名对象都依赖它
+    if (targetPid.isEmpty()) {
+        qWarning() << "无法获取目标进程ID";
+        return false;
+    }
+    const DWORD pid = static_cast<DWORD>(targetPid.toULong());
+
     // =========================================================================
     // 快速路径：通过跨进程事件直接触发已注入的 DLL 截图，无需启动进程。
     // 此路径延迟极低（通常 <50ms），且不会产生超时问题。
     // =========================================================================
-    if (isDllEventAvailable()) {
+    if (isDllEventAvailable(pid)) {
         for (int attempt = 0; attempt < kFastPathMaxRetries; ++attempt) {
-            if (captureViaEvent(winImg) && !winImg.empty()) {
+            if (captureViaEvent(pid, winImg) && !winImg.empty()) {
                 qDebug() << QString("截图成功(快速路径, 尝试次数：%1)，图像尺寸: %2 x %3  通道数: %4")
                                 .arg(attempt + 1).arg(winImg.cols).arg(winImg.rows).arg(winImg.channels());
                 return true;
@@ -355,8 +418,9 @@ bool captureByDllInjection(const QString& targetPid, cv::Mat& winImg)
     // =========================================================================
 
     // 传给注入器/远程 LoadLibrary 的路径统一转成 Windows 原生分隔符（反斜杠）。
-    QString DX11_CAPTURE_PATH = QDir::toNativeSeparators(AppPaths::instance().dx11CapturePath());
-    QString DX11_LOG_PATH = QDir::toNativeSeparators(AppPaths::instance().dx11LogPath());
+    // 截图与日志都按 PID 区分：多开时多个 DLL 实例写同一文件会互相覆写。
+    QString DX11_CAPTURE_PATH = QDir::toNativeSeparators(AppPaths::instance().dx11CapturePathFor(pid));
+    QString DX11_LOG_PATH = QDir::toNativeSeparators(AppPaths::instance().dx11LogPathFor(pid));
     QString DX11_HOOK_DLL_PATH = QDir::toNativeSeparators(AppPaths::instance().dx11HookDllPath());
     QString DX11_HOOK_DLL_NAME = AppPaths::instance().dx11HookDllName();
     QString remoteCaptureExe = AppPaths::instance().remoteCaptureExePath();
@@ -372,11 +436,6 @@ bool captureByDllInjection(const QString& targetPid, cv::Mat& winImg)
         captureDir.mkpath(".");
     }
 
-    if (targetPid.isEmpty()) {
-        qWarning() << "无法获取目标进程ID";
-        return false;
-    }
-
     if (!checkHookToolsExist()) {
         return false;
     }
@@ -387,10 +446,10 @@ bool captureByDllInjection(const QString& targetPid, cv::Mat& winImg)
     const QString capturePathArg = persist ? DX11_CAPTURE_PATH : QStringLiteral("__NO_FILE__");
 
     // 记录截图前的共享内存序号，用于确认拿到的是本次写入的新帧。
-    const uint32_t prevSeq = readDx11SharedSequence();
+    const uint32_t prevSeq = readDx11SharedSequence(pid);
 
     // 记录注入器运行前的注入状态，运行后用于检测"注入成功"并记录日志
-    const bool wasInjectedBefore = isDllInjected();
+    const bool wasInjectedBefore = isDllInjected(pid);
 
     QProcess process;
     // 合并 stdout/stderr，便于在注入或截图失败时看到注入器的完整诊断输出
@@ -414,10 +473,10 @@ bool captureByDllInjection(const QString& targetPid, cv::Mat& winImg)
         waitForProcessResponsive(process, 1000);
 
         // 注入器虽超时，但 DLL 可能已完成注入，检测并记录注入状态变化
-        logDllInjectionStateChange(wasInjectedBefore, targetPid);
+        logDllInjectionStateChange(wasInjectedBefore, targetPid, pid);
 
         // 即使注入器超时，DLL 可能已成功注入。尝试用快速路径读取。
-        if (captureViaEvent(winImg) && !winImg.empty()) {
+        if (captureViaEvent(pid, winImg) && !winImg.empty()) {
             Logger::log(QString("注入器超时但快速路径恢复成功，图像尺寸: %1 x %2")
                             .arg(winImg.cols).arg(winImg.rows));
             return true;
@@ -426,7 +485,7 @@ bool captureByDllInjection(const QString& targetPid, cv::Mat& winImg)
     }
 
     // 注入器已运行完毕，检测 DLL 是否由未注入变为已注入并记录
-    logDllInjectionStateChange(wasInjectedBefore, targetPid);
+    logDllInjectionStateChange(wasInjectedBefore, targetPid, pid);
 
     // 无论成功与否都记录注入器退出码与输出，便于定位“共享内存打不开”的真正原因。
     const int exitCode = process.exitCode();
@@ -441,11 +500,11 @@ bool captureByDllInjection(const QString& targetPid, cv::Mat& winImg)
     // 主路径：直接从共享内存读取像素数据，无需 PNG 落盘/解码中转。
     // 若渲染线程刚出新帧但序号尚未刷新，短暂轮询等待。
     for (int i = 0; i < 20; ++i) {
-        if (readDx11SharedSequence() != prevSeq) break;
+        if (readDx11SharedSequence(pid) != prevSeq) break;
         QThread::msleep(2);
     }
 
-    if (readDx11SharedCapture(winImg)) {
+    if (readDx11SharedCapture(pid, winImg)) {
         qDebug() << QString("截图成功(共享内存)，图像尺寸: %1 x %2  通道数: %3")
                         .arg(winImg.cols).arg(winImg.rows).arg(winImg.channels());
         return true;
@@ -478,7 +537,13 @@ bool captureByDllInjection(const QString& targetPid, cv::Mat& winImg)
 
 bool dllSetLogPath(const QString& targetPid)
 {
-    QString DX11_LOG_PATH = QDir::toNativeSeparators(AppPaths::instance().dx11LogPath());
+    if (targetPid.isEmpty()) {
+        qWarning() << "无法获取目标进程ID";
+        return false;
+    }
+
+    const DWORD pid = static_cast<DWORD>(targetPid.toULong());
+    QString DX11_LOG_PATH = QDir::toNativeSeparators(AppPaths::instance().dx11LogPathFor(pid));
     QString DX11_HOOK_DLL_PATH = QDir::toNativeSeparators(AppPaths::instance().dx11HookDllPath());
     QString DX11_HOOK_DLL_NAME = AppPaths::instance().dx11HookDllName();
     QString remoteCaptureExe = AppPaths::instance().remoteCaptureExePath();
@@ -486,11 +551,6 @@ bool dllSetLogPath(const QString& targetPid)
     QDir logDir = QFileInfo(DX11_LOG_PATH).absoluteDir();
     if (!logDir.exists()) {
         logDir.mkpath(".");
-    }
-
-    if (targetPid.isEmpty()) {
-        qWarning() << "无法获取目标进程ID";
-        return false;
     }
 
     if (!checkHookToolsExist()) {
@@ -547,11 +607,12 @@ bool dllSetLogPath(const QString& targetPid)
     return success;
 }
 
-bool isDllInjected()
+bool isDllInjected(DWORD pid)
 {
     // DLL 注入成功即在 DllMain 中创建该命名事件，事件存在 = DLL 在游戏进程内；
     // 游戏退出或尚未注入时事件不存在。仅打开句柄检查存在性，代价为一次系统调用。
-    HANDLE hEvent = OpenEventW(SYNCHRONIZE, FALSE, DX11_CAPTURE_REQUEST_EVENT_NAME);
+    HANDLE hEvent = OpenEventW(SYNCHRONIZE, FALSE,
+                               game::captureRequestEventName(pid).c_str());
     if (!hEvent) {
         return false;
     }
@@ -608,10 +669,16 @@ bool dllStopHook(const QString& targetPid)
 
 bool clickByDllInjection(const QString& targetPid, int x, int y)
 {
+    if (targetPid.isEmpty()) {
+        qWarning() << "点击失败：无法获取目标进程ID";
+        return false;
+    }
+    const DWORD pid = static_cast<DWORD>(targetPid.toULong());
+
     // =========================================================================
     // 快速路径：DLL 已注入时直接通过跨进程事件触发点击，延迟低、无需启动进程。
     // =========================================================================
-    if (isClickEventAvailable() && clickViaEvent(x, y)) {
+    if (isClickEventAvailable(pid) && clickViaEvent(pid, x, y)) {
         qDebug() << QString("点击成功(快速路径) (%1, %2)").arg(x).arg(y);
         return true;
     }
@@ -623,17 +690,13 @@ bool clickByDllInjection(const QString& targetPid, int x, int y)
     const QString dllPath = QDir::toNativeSeparators(AppPaths::instance().dx11HookDllPath());
     const QString dllName = AppPaths::instance().dx11HookDllName();
 
-    if (targetPid.isEmpty()) {
-        qWarning() << "点击失败：无法获取目标进程ID";
-        return false;
-    }
     if (!QFile::exists(remoteCaptureExe) || !QFile::exists(dllPath)) {
         qWarning() << "点击失败：注入器或 DLL 不存在" << remoteCaptureExe << dllPath;
         return false;
     }
 
     // 记录注入器运行前的注入状态，运行后用于检测"注入成功"并记录日志
-    const bool wasInjectedBefore = isDllInjected();
+    const bool wasInjectedBefore = isDllInjected(pid);
 
     QProcess process;
     process.setProcessChannelMode(QProcess::MergedChannels);
@@ -652,7 +715,7 @@ bool clickByDllInjection(const QString& targetPid, int x, int y)
                    << process.readAll();
         process.kill();
         waitForProcessResponsive(process, 1000);
-        logDllInjectionStateChange(wasInjectedBefore, targetPid);
+        logDllInjectionStateChange(wasInjectedBefore, targetPid, pid);
         return false;
     }
 
@@ -663,7 +726,7 @@ bool clickByDllInjection(const QString& targetPid, int x, int y)
         return false;
     }
 
-    logDllInjectionStateChange(wasInjectedBefore, targetPid);
+    logDllInjectionStateChange(wasInjectedBefore, targetPid, pid);
     Logger::log(QString("点击成功(注入器) (%1, %2)").arg(x).arg(y));
     return true;
 }
@@ -671,11 +734,17 @@ bool clickByDllInjection(const QString& targetPid, int x, int y)
 bool swipeByDllInjection(const QString& targetPid, int x1, int y1, int x2, int y2,
                          const int trajectory, const int durationMs)
 {
+    if (targetPid.isEmpty()) {
+        qWarning() << "滑动失败：无法获取目标进程ID";
+        return false;
+    }
+    const DWORD pid = static_cast<DWORD>(targetPid.toULong());
+
     // =========================================================================
     // 快速路径：DLL 已注入时直接通过跨进程事件触发滑动，无需启动进程。
     // =========================================================================
-    if (isClickEventAvailable()
-        && submitClickCommand(x1, y1, x2, y2,
+    if (isClickEventAvailable(pid)
+        && submitClickCommand(pid, x1, y1, x2, y2,
                               static_cast<uint32_t>(trajectory),
                               static_cast<uint32_t>(durationMs))) {
         qDebug() << QString("滑动成功(快速路径) (%1, %2)->(%3, %4)").arg(x1).arg(y1).arg(x2).arg(y2);
@@ -689,17 +758,13 @@ bool swipeByDllInjection(const QString& targetPid, int x1, int y1, int x2, int y
     const QString dllPath = QDir::toNativeSeparators(AppPaths::instance().dx11HookDllPath());
     const QString dllName = AppPaths::instance().dx11HookDllName();
 
-    if (targetPid.isEmpty()) {
-        qWarning() << "滑动失败：无法获取目标进程ID";
-        return false;
-    }
     if (!QFile::exists(remoteCaptureExe) || !QFile::exists(dllPath)) {
         qWarning() << "滑动失败：注入器或 DLL 不存在" << remoteCaptureExe << dllPath;
         return false;
     }
 
     // 记录注入器运行前的注入状态，运行后用于检测"注入成功"并记录日志
-    const bool wasInjectedBefore = isDllInjected();
+    const bool wasInjectedBefore = isDllInjected(pid);
 
     QProcess process;
     process.setProcessChannelMode(QProcess::MergedChannels);
@@ -723,7 +788,7 @@ bool swipeByDllInjection(const QString& targetPid, int x1, int y1, int x2, int y
                    << process.readAll();
         process.kill();
         waitForProcessResponsive(process, 1000);
-        logDllInjectionStateChange(wasInjectedBefore, targetPid);
+        logDllInjectionStateChange(wasInjectedBefore, targetPid, pid);
         return false;
     }
 
@@ -737,7 +802,7 @@ bool swipeByDllInjection(const QString& targetPid, int x1, int y1, int x2, int y
         return false;
     }
 
-    logDllInjectionStateChange(wasInjectedBefore, targetPid);
+    logDllInjectionStateChange(wasInjectedBefore, targetPid, pid);
     Logger::log(QString("滑动成功(注入器) (%1, %2)->(%3, %4)").arg(x1).arg(y1).arg(x2).arg(y2));
     return true;
 }

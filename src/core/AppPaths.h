@@ -41,8 +41,33 @@ public:
         return applicationDirPath() + "/src/resource/thumbnail/debug_capture_result.png";
     }
 
+    // 按游戏实例区分的中转文件：多开时每个实例各写各的，避免互相覆写。
+    // DLL 侧的截图名与日志名都由此传入，规则改这里即可。
+    QString dx11CapturePathFor(DWORD pid) const {
+        return applicationDirPath()
+               + QString("/src/resource/thumbnail/debug_capture_%1.png").arg(pid);
+    }
+
+    QString dx11LogPathFor(DWORD pid) const {
+        return applicationDirPath()
+               + QString("/src/resource/log/dx11_log_%1.txt").arg(pid);
+    }
+
     QString matchResultPath() const {
         return applicationDirPath() + "/src/resource/thumbnail/debug_match_result.png";
+    }
+
+    // 按游戏实例区分的识别结果图：多标签页并发运行时各写各的，
+    // 否则 A 会话刚写完的调试图会被 B 会话覆盖，界面回显的可能是别人的画面。
+    QString matchResultPathFor(DWORD pid) const {
+        return applicationDirPath()
+               + QString("/src/resource/thumbnail/debug_match_result_%1.png").arg(pid);
+    }
+
+    // 按游戏实例区分的原始截图落盘路径（persistScreenshot 开启时使用）
+    QString debugCapturePathFor(DWORD pid) const {
+        return applicationDirPath()
+               + QString("/src/resource/thumbnail/debug_capture_%1.png").arg(pid);
     }
 
     QString dx11LogPath() const {

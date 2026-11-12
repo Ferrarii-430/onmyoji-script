@@ -22,13 +22,14 @@ namespace scenarios
 {
 
     namespace {}
-    ScriptActions& actions = ScriptActions::instance();
-    int currentInterface = 0;
-    int MAX_WAIT_NUM = 15;
-    int MAX_WAIT_TIME = 2000; //最长25秒
-    bool autoSendRequestEnable = false; //是否开启自动发送 组队/入队 请求
-    bool isCaptain = false; //是否为队长
-    bool mitama_isCastingLocked = false; //阵容是否锁定
+    // 按线程隔离：每个会话绑定自己的 ScriptActions（内部持有该线程的截图与点击上下文）
+    static thread_local ScriptActions& actions = ScriptActions::instance();
+    thread_local int currentInterface = 0;
+    thread_local int MAX_WAIT_NUM = 15;
+    thread_local int MAX_WAIT_TIME = 2000; //最长25秒
+    thread_local bool autoSendRequestEnable = false; //是否开启自动发送 组队/入队 请求
+    thread_local bool isCaptain = false; //是否为队长
+    thread_local bool mitama_isCastingLocked = false; //阵容是否锁定
 
     // 重置跨轮次状态：阵容锁定标记只在单次任务运行内保持，
     // 任务结束/停止后重置，下次启动任务重新执行锁定流程

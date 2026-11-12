@@ -34,7 +34,8 @@ constexpr double kYoloScore = 0.55; // YOLO 命中阈值
 constexpr bool randomClick = true;
 
 //0->未知状态   1->单体状态     2->群体状态
-int status = 0;
+// 按线程隔离：每个会话独立判断当前处于单体还是群体状态
+thread_local int status = 0;
 
 } // namespace
 

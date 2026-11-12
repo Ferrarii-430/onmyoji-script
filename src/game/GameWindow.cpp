@@ -39,12 +39,38 @@ HWND resolveMessageTarget(HWND topWindow, cv::Point& clientPoint)
 
 GameWindow& GameWindow::instance()
 {
-    static GameWindow instance;
+    // 每个线程一份：任务在各自的 worker 线程里执行，
+    // 绑定的 PID / 窗口句柄 / 上次截图尺寸都属于该线程的执行上下文，
+    // 这样多会话并发时互不干扰，且所有既有调用点（GameWindow::instance()）
+    // 都无需改动即可自动作用于「当前线程正在操作的那个实例」。
+    thread_local GameWindow instance;
     return instance;
 }
 
 bool GameWindow::locate()
 {
+    // 已绑定实例：先校验绑定是否仍有效，失效才回退到自动查找。
+    // 多开时按进程名找「第一个」会命中错误的窗口，绑定是唯一可靠的来源。
+    if (boundPid_ != 0) {
+        if (platform::isProcessAlive(boundPid_)) {
+            HWND bound = IsWindow(boundHwnd_) ? boundHwnd_
+                                              : platform::findWindowByPid(boundPid_);
+            if (bound) {
+                hwnd_ = bound;
+                boundHwnd_ = bound;
+                return true;
+            }
+        }
+
+        Logger::log(QString("绑定的游戏实例已失效（PID %1），改为自动查找")
+                        .arg(boundPid_));
+        boundPid_ = 0;
+        boundHwnd_ = nullptr;
+        // 切换实例后缓存的尺寸与调整记录都失效
+        lastCaptureSize_ = cv::Size();
+        lastEnsuredMinWidth_ = 0;
+    }
+
     DWORD pid = platform::findPidByProcessName(target_);
     if (pid == 0) {
         Logger::log(QString("找不到桌面版游戏进程： %1").arg(target_.c_str()));
@@ -57,6 +83,39 @@ bool GameWindow::locate()
         return false;
     }
     return true;
+}
+
+void GameWindow::bindTo(DWORD pid, HWND hwnd)
+{
+    boundPid_ = pid;
+    boundHwnd_ = hwnd;
+
+    // 切换实例时清掉与上一个窗口相关的缓存，避免用旧尺寸做坐标换算
+    lastCaptureSize_ = cv::Size();
+    lastEnsuredMinWidth_ = 0;
+
+    if (pid != 0 && hwnd != nullptr) {
+        hwnd_ = hwnd;
+    } else if (pid == 0) {
+        hwnd_ = nullptr;
+    }
+
+    if (pid != 0) {
+        Logger::log(QString("已切换游戏实例：PID %1").arg(pid));
+    } else {
+        Logger::log(QString("已解除窗口绑定，恢复自动查找"));
+    }
+}
+
+DWORD GameWindow::currentPid() const
+{
+    if (!IsWindow(hwnd_)) {
+        return 0;
+    }
+
+    DWORD pid = 0;
+    GetWindowThreadProcessId(hwnd_, &pid);
+    return pid;
 }
 
 QString GameWindow::processId()

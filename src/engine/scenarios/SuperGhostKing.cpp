@@ -28,12 +28,12 @@ using core::waitRandomWithEventProcessing;
 namespace scenarios {
 
     // 本文件内所有处理方法统一复用的脚本动作实例
-    static ScriptActions& actions = ScriptActions::instance();
+    static thread_local ScriptActions& actions = ScriptActions::instance();
 
-    QString currentLineup = "";
+    thread_local QString currentLineup = "";
     // 当前强力追击状态：空值表示还没识别过，避免「已知关闭」与「未知」混淆
-    std::optional<bool> currentStrongPursuitStatus;
-    static std::optional<bool> isLock; // 阵容锁定状态，仅本文件内使用
+    thread_local std::optional<bool> currentStrongPursuitStatus;
+    static thread_local std::optional<bool> isLock; // 阵容锁定状态，仅本文件内使用
 
     namespace
     {

@@ -19,22 +19,26 @@ namespace {
 
 // 截图连续失败计数：成功一次即清零；达到 kMaxConsecutiveCaptureFailures
 // 时触发通知并重新从 0 累计（避免每次失败都重复回调）。
-int g_consecutiveFailures = 0;
-CaptureFailNotifier g_failNotifier;
+//
+// 必须是 thread_local：每个会话的任务跑在自己的 worker 线程，
+// 各实例的截图成功率互不相干。若共用一份计数，A 实例的连续失败会把
+// B 实例正在跑的任务一起熔断掉。
+thread_local int t_consecutiveFailures = 0;
+thread_local CaptureFailNotifier t_failNotifier;
 
 // 成功截图：清零连续失败计数
 void noteCaptureSuccess()
 {
-    g_consecutiveFailures = 0;
+    t_consecutiveFailures = 0;
 }
 
 // 截图失败：累计并按需触发熔断通知
 void noteCaptureFailure()
 {
-    ++g_consecutiveFailures;
-    if (g_consecutiveFailures >= kMaxConsecutiveCaptureFailures && g_failNotifier) {
-        g_failNotifier(g_consecutiveFailures);
-        g_consecutiveFailures = 0;
+    ++t_consecutiveFailures;
+    if (t_consecutiveFailures >= kMaxConsecutiveCaptureFailures && t_failNotifier) {
+        t_failNotifier(t_consecutiveFailures);
+        t_consecutiveFailures = 0;
     }
 }
 
@@ -42,12 +46,12 @@ void noteCaptureFailure()
 
 void setCaptureFailNotifier(CaptureFailNotifier notifier)
 {
-    g_failNotifier = std::move(notifier);
+    t_failNotifier = std::move(notifier);
 }
 
 void resetCaptureFailCount()
 {
-    g_consecutiveFailures = 0;
+    t_consecutiveFailures = 0;
 }
 
 cv::Mat captureGameWindow()
@@ -100,9 +104,11 @@ cv::Mat captureGameWindow()
         return winImg;
     }
 
-    // 持久化开关开启时才保存 debug 图片
+    // 持久化开关开启时才保存 debug 图片。
+    // 文件名按实例 PID 区分：多标签页并发时各写各的，否则会互相覆盖
     if (SETTING_CONFIG.getPersistScreenshot()) {
-        QString saveCapturePath = AppPaths::instance().thumbnailPath() + "/debug_capture_result.png";
+        const DWORD capturePid = window.currentPid();
+        QString saveCapturePath = AppPaths::instance().debugCapturePathFor(capturePid);
         vision::imwriteQt(saveCapturePath, winImg);
     }
 

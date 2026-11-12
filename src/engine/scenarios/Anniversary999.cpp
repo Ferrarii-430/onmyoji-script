@@ -16,7 +16,8 @@ using core::waitRandomWithEventProcessing;
 
 namespace scenarios {
 
-    bool anniversary_isCastingLocked = false;
+    // 按线程隔离：每个会话的任务在自己的 worker 线程执行，阵容锁定状态互不影响
+    thread_local bool anniversary_isCastingLocked = false;
 
     // 重置跨轮次状态：阵容锁定标记只在单次任务运行内保持，
     // 任务结束/停止后重置，下次启动任务重新执行锁定流程

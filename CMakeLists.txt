@@ -59,6 +59,8 @@ add_executable(qtTest WIN32
         src/core/SettingManager.h
         src/core/UpdateChecker.cpp
         src/core/UpdateChecker.h
+        src/core/WindowBindingStore.cpp
+        src/core/WindowBindingStore.h
 
         # platform: Windows 平台能力（进程/DPI/鼠标模拟）
         src/platform/DPIHelper.h
@@ -66,8 +68,12 @@ add_executable(qtTest WIN32
         src/platform/MouseSimulator.h
         src/platform/ProcessUtils.cpp
         src/platform/ProcessUtils.h
+        src/platform/WindowPicker.cpp
+        src/platform/WindowPicker.h
 
         # game: 游戏窗口与截图
+        src/game/GameContext.cpp
+        src/game/GameContext.h
         src/game/GameWindow.cpp
         src/game/GameWindow.h
         src/game/capture/CaptureService.cpp
@@ -129,10 +135,14 @@ add_executable(qtTest WIN32
         # ui: 界面层
         src/ui/main/mainwindow.cpp
         src/ui/main/mainwindow.h
-        src/ui/main/mainwindow.ui
+        src/ui/session/sessionwidget.cpp
+        src/ui/session/sessionwidget.h
+        src/ui/session/sessionwidget.ui
         src/ui/editTask/edittaskdialog.cpp
         src/ui/editTask/edittaskdialog.h
         src/ui/editTask/edittaskdialog.ui
+        src/ui/bindWindow/BindWindowDialog.cpp
+        src/ui/bindWindow/BindWindowDialog.h
         src/ui/bossConfigForm/BossConfigDialog.cpp
         src/ui/bossConfigForm/BossConfigDialog.h
         src/ui/typeOpenCVForm/typeopencvform.cpp

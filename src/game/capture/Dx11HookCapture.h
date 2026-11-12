@@ -1,6 +1,7 @@
 #ifndef DX11HOOKCAPTURE_H
 #define DX11HOOKCAPTURE_H
 
+#include <windows.h>
 #include <QString>
 #include <opencv2/core/mat.hpp>
 
@@ -23,9 +24,10 @@ bool swipeByDllInjection(const QString& targetPid, int x1, int y1, int x2, int y
 // 修改注入 DLL 的日志输出路径
 bool dllSetLogPath(const QString& targetPid);
 
-// 检查 hook DLL 是否已注入游戏进程（通过 DLL 创建的命名事件判断，
+// 检查 hook DLL 是否已注入指定游戏进程（通过 DLL 创建的命名事件判断，
 // 无需启动注入器进程）。用于退出时决定是否需要执行卸载。
-bool isDllInjected();
+// 命名事件带 PID 后缀，因此多开时能准确判断某一个实例的注入状态。
+bool isDllInjected(DWORD pid);
 
 // 停止/卸载注入的 DX11 hook
 bool dllStopHook(const QString& targetPid);

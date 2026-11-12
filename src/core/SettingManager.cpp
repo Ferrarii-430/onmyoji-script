@@ -2,19 +2,20 @@
 
 #include <QDebug>
 #include <QDir>
+#include <QWriteLocker>
 #include <qjsondocument.h>
 #include <qjsonparseerror.h>
 
 #include "src/core/AppPaths.h"
 
 bool SettingManager::loadConfig() {
-    // 统一走 AppPaths：带 8.3 短路径转换，中文安装路径下与其它资源路径行为一致
-    m_configPath = AppPaths::instance().settingPath();
-
-    return loadConfig(m_configPath);
+    // 统一走 AppPaths：带 8.3 短路径转换，中文安装路径下与其它资源路径行为一致。
+    // 直接转发给带路径的版本，避免同一流程里两次进入写锁（QReadWriteLock 不可重入）
+    return loadConfig(AppPaths::instance().settingPath());
 }
 
 bool SettingManager::loadConfig(const QString& configPath) {
+    QWriteLocker locker(&m_lock);
     m_configPath = configPath;
 
     QFile configFile(m_configPath);

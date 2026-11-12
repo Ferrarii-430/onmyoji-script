@@ -267,6 +267,35 @@
     <enum>Qt::ToolButtonStyle::ToolButtonTextOnly</enum>
    </property>
   </widget>
+  <widget class="QToolButton" name="bindWindowButton">
+   <property name="geometry">
+    <rect>
+     <x>330</x>
+     <y>8</y>
+     <width>110</width>
+     <height>30</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>绑定窗口</string>
+   </property>
+   <property name="toolButtonStyle">
+    <enum>Qt::ToolButtonStyle::ToolButtonTextOnly</enum>
+   </property>
+  </widget>
+  <widget class="QLabel" name="bindStateLabel">
+   <property name="geometry">
+    <rect>
+     <x>598</x>
+     <y>314</y>
+     <width>346</width>
+     <height>20</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>绑定窗口：未绑定</string>
+   </property>
+  </widget>
   <widget class="QLabel" name="systemConfigTips">
    <property name="geometry">
     <rect>
