@@ -1,5 +1,6 @@
 #include "src/game/capture/CaptureService.h"
 
+#include <cmath>
 #include <utility>
 
 #include <opencv2/imgcodecs.hpp>
@@ -12,6 +13,7 @@
 #include "src/game/capture/Dx11HookCapture.h"
 #include "src/game/capture/WindowCapture.h"
 #include "src/platform/ProcessUtils.h"
+#include "src/platform/DPIHelper.h"
 
 namespace capture {
 
@@ -110,6 +112,51 @@ cv::Mat captureGameWindow()
         const DWORD capturePid = window.currentPid();
         QString saveCapturePath = AppPaths::instance().debugCapturePathFor(capturePid);
         vision::imwriteQt(saveCapturePath, winImg);
+    }
+
+    // 画幅诊断：ROI 以百分比保存，只有在两个环境的画幅比例一致时才能通用。
+    // 这里把「截图尺寸 / 客户区 / 窗口矩形 / DPI」一次打全，
+    // 便于跨分辨率排查时直接对比两边的日志。只在尺寸变化时输出，避免逐帧刷屏。
+    {
+        thread_local cv::Size t_lastDiagSize;
+        if (winImg.size() != t_lastDiagSize) {
+            t_lastDiagSize = winImg.size();
+
+            RECT clientRect{};
+            RECT windowRect{};
+            const HWND hwnd = window.handle();
+            if (hwnd) {
+                GetClientRect(hwnd, &clientRect);
+                GetWindowRect(hwnd, &windowRect);
+            }
+            const int clientW = clientRect.right - clientRect.left;
+            const int clientH = clientRect.bottom - clientRect.top;
+            const int windowW = windowRect.right - windowRect.left;
+            const int windowH = windowRect.bottom - windowRect.top;
+
+            const double captureAspect = winImg.rows > 0
+                                             ? static_cast<double>(winImg.cols) / winImg.rows
+                                             : 0.0;
+            const double clientAspect = clientH > 0
+                                            ? static_cast<double>(clientW) / clientH
+                                            : 0.0;
+            constexpr double kReferenceAspect = 16.0 / 9.0;
+            const bool aspectOff = captureAspect > 0.0
+                                   && std::abs(captureAspect - kReferenceAspect) / kReferenceAspect > 0.02;
+
+            Logger::log(QString("[截图诊断] 截图 %1x%2（比例 %3）| 客户区 %4x%5（比例 %6）| 窗口 %7x%8 | DPI %9% | %10")
+                            .arg(winImg.cols)
+                            .arg(winImg.rows)
+                            .arg(QString::number(captureAspect, 'f', 4))
+                            .arg(clientW)
+                            .arg(clientH)
+                            .arg(QString::number(clientAspect, 'f', 4))
+                            .arg(windowW)
+                            .arg(windowH)
+                            .arg(QString::number(DPIHelper::GetWindowDPIScaling(hwnd), 'f', 0))
+                            .arg(aspectOff ? QStringLiteral("⚠ 非 16:9（同一 ROI 百分比在其他画幅下会框到不同位置）")
+                                           : QStringLiteral("16:9")));
+        }
     }
 
     noteCaptureSuccess();

@@ -126,6 +126,32 @@ void drawClickMarker(cv::Mat& img, const cv::Point& clickPt)
                    cv::MARKER_CROSS, radius * 2, 1);
 }
 
+// 在识别框上方绘制标签文字（分数/类别名）；框贴近顶部导致文字超出画面时，
+// 改画到框内顶部，并把文字夹取到图像范围内，保证标签始终可见。
+void drawLabelNearBox(cv::Mat& img, const cv::Rect& box, const std::string& text,
+                      const double fontScale, const int thickness, const cv::Scalar& color)
+{
+    int baseline = 0;
+    const cv::Size textSize =
+        cv::getTextSize(text, cv::FONT_HERSHEY_SIMPLEX, fontScale, thickness, &baseline);
+
+    int x = box.x;
+    int y = box.y - 10;
+    if (y - textSize.height < 0) {
+        // 上方空间不足：画在框内顶部
+        y = box.y + textSize.height + 6;
+    }
+
+    // 贴边（左右/底部）时同样夹取，避免文字被裁掉
+    x = std::clamp(x, 0, std::max(0, img.cols - textSize.width - 1));
+    const int minY = textSize.height;
+    const int maxY = std::max(minY, img.rows - baseline - 1);
+    y = std::clamp(y, minY, maxY);
+
+    cv::putText(img, text, cv::Point(x, y),
+                cv::FONT_HERSHEY_SIMPLEX, fontScale, color, thickness);
+}
+
 // 按比例生成四边排除条带（left/right/top/bottom），供随机点击避开按钮边框。
 // 右侧/下侧条带直接延伸到框边缘，+1 补偿整型截断，避免最右/最下 1px 漏网
 std::vector<cv::Rect> buildExcludeAreas(const cv::Rect& rect, const ClickExclude& exclude)
@@ -301,6 +327,23 @@ cv::Rect computeOcrRoi(const cv::Mat& winImg, const QRectF& roiPercent,
     outOcrImg = cv::Mat();
     outScale = 1.0;
     outCropped = false;
+
+    // 识别底图画幅：跨分辨率排查时用来对比两端「实际识别的是多大、什么比例的图」。
+    // 只在尺寸变化时记一条，避免每轮识别都刷屏。
+    {
+        thread_local cv::Size t_lastOcrBaseSize;
+        if (winImg.size() != t_lastOcrBaseSize) {
+            t_lastOcrBaseSize = winImg.size();
+            const double aspect = winImg.rows > 0
+                                      ? static_cast<double>(winImg.cols) / winImg.rows
+                                      : 0.0;
+            Logger::log(QString("[OCR画幅] 识别底图 %1x%2（比例 %3）")
+                            .arg(winImg.cols)
+                            .arg(winImg.rows)
+                            .arg(QString::number(aspect, 'f', 4)));
+        }
+    }
+
     const cv::Rect fullRect(0, 0, winImg.cols, winImg.rows);
     if (roiPercent.width() <= 0.0 || roiPercent.height() <= 0.0) {
         outOcrImg = prepareFullImageForOcr(winImg, enhance);
@@ -567,6 +610,8 @@ std::vector<OpenCvMatch> ScriptActions::opencvFindAll(const QString& templPath, 
     const auto templWithMask = loadTemplateWithMask(tempSavePath, templateCacheHit);
     if (templWithMask.gray.empty()) {
         Logger::log("opencvFindAll: 模板图片加载失败: " + tempSavePath);
+        // 没有模板也回显当前画面，保证等待循环里的缩略图仍在更新
+        saveResultAndShow(winImg);
         return results;
     }
     if (!templateCacheHit) {
@@ -608,6 +653,7 @@ std::vector<OpenCvMatch> ScriptActions::opencvFindAll(const QString& templPath, 
 
     // 基准坐标 -> DX11 原始捕获坐标，并做 HSV 颜色校验
     cv::Mat resultImg = winImg.clone();
+
     for (const auto& m : matches) {
         cv::Rect matchRect = vision::convertNormalizedRectToCapture(m.rect, scaleInfo);
 
@@ -623,10 +669,9 @@ std::vector<OpenCvMatch> ScriptActions::opencvFindAll(const QString& templPath, 
 
         // 在结果图上绘制 ROI 框 + 分数标签
         cv::rectangle(resultImg, matchRect, cv::Scalar(0, 255, 0), 2);
-        QString label = QString("%1").arg(m.score, 0, 'f', 2);
-        cv::putText(resultImg, label.toStdString(),
-                    cv::Point(matchRect.x, matchRect.y - 8),
-                    cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 255, 0), 2);
+        drawLabelNearBox(resultImg, matchRect,
+                         QString::number(m.score, 'f', 2).toStdString(),
+                         0.6, 2, cv::Scalar(0, 255, 0));
     }
 
     Logger::log(QString("opencvFindAll: 共识别到 %1 个目标").arg(results.size()));
@@ -642,7 +687,8 @@ bool ScriptActions::opencvContains(const QString& templPath, const double thresh
     return !opencvFindAll(templPath, threshold, colorCheck).empty();
 }
 
-QJsonArray ScriptActions::ocrRecognizes(const QRectF& roiPercent, const ocr::Enhance enhance)
+QJsonArray ScriptActions::ocrRecognizes(const QRectF& roiPercent, const ocr::Enhance enhance,
+                                        const double minScore)
 {
     cv::Mat winImg = capture::captureGameWindow();
 
@@ -692,6 +738,26 @@ QJsonArray ScriptActions::ocrRecognizes(const QRectF& roiPercent, const ocr::Enh
             item["box"] = adjustedBox;
             dataArray[i] = item;
         }
+    }
+
+    // 置信度过滤：低于阈值的整条结果丢弃。
+    // 必须在坐标映射之后做——映射是对下标就地改写，先过滤会让映射错位。
+    // minScore <= 0 表示不填阈值，返回全部结果（保持原有行为）。
+    if (minScore > 0.0) {
+        QJsonArray filtered;
+        for (const QJsonValue& value : dataArray) {
+            const QJsonObject item = value.toObject();
+            if (item["score"].toDouble() >= minScore) {
+                filtered.append(item);
+            }
+        }
+
+        if (filtered.size() != dataArray.size()) {
+            qDebug() << QStringLiteral("[OCR] 按阈值 %1 过滤掉 %2 条低分结果")
+                            .arg(minScore)
+                            .arg(dataArray.size() - filtered.size());
+        }
+        dataArray = filtered;
     }
 
     return dataArray;
@@ -978,6 +1044,10 @@ bool ScriptActions::ocrContainsText(const QString& ocrText, const double thresho
         return false;
     }
 
+    // 与其他 Contains 检测保持一致：纯检测也回显本次截图，
+    // 避免等待循环里界面缩略图长时间停在旧画面
+    saveResultAndShow(winImg);
+
     cv::Mat ocrImg;
     double ignoredScale = 1.0;
     bool cropped = false;
@@ -1161,8 +1231,7 @@ QString ScriptActions::yoloRecognizesAndClickImpl(const double threshold, const 
         // qDebug() << det.confidence << ", id:" << det.class_id;
         cv::rectangle(captureImg, det.bbox, cv::Scalar(0, 255, 0), 2);
         std::string label = labelName.toStdString();
-        cv::putText(captureImg, label, cv::Point(det.bbox.x, det.bbox.y - 10),
-                   cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 0), 1);
+        drawLabelNearBox(captureImg, det.bbox, label, 0.5, 1, cv::Scalar(0, 255, 0));
 
         if (comparesEqual(targetLabelName, labelName))
         {
@@ -1227,8 +1296,7 @@ std::vector<Detection> ScriptActions::yoloRecognizes(const double threshold)
         QString labelName = ClassNameCache::getClassName(det.class_id);
         cv::rectangle(captureImg, det.bbox, cv::Scalar(0, 255, 0), 2);
         std::string label = labelName.toStdString();
-        cv::putText(captureImg, label, cv::Point(det.bbox.x, det.bbox.y - 10),
-                   cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 0), 1);
+        drawLabelNearBox(captureImg, det.bbox, label, 0.5, 1, cv::Scalar(0, 255, 0));
         det.className = labelName;
     }
 
@@ -1335,8 +1403,7 @@ void ScriptActions::clickDetection(const Detection& det, bool randomClick, const
     if (!captureImg.empty()) {
         cv::rectangle(captureImg, det.bbox, cv::Scalar(0, 255, 0), 2);
         std::string label = labelName.toStdString();
-        cv::putText(captureImg, label, cv::Point(det.bbox.x, det.bbox.y - 10),
-                   cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 0), 1);
+        drawLabelNearBox(captureImg, det.bbox, label, 0.5, 1, cv::Scalar(0, 255, 0));
         drawClickMarker(captureImg, physicalClickPt);
         saveResultAndShow(captureImg);
     } else {

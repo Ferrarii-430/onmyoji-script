@@ -9,6 +9,8 @@
 #include <QFileDialog>
 #include <QJsonObject>
 #include <QMessageBox>
+#include <cmath>
+#include <windows.h>
 #include <opencv2/imgproc.hpp>
 
 #include "src/core/Logger.h"
@@ -17,6 +19,7 @@
 #include "src/engine/ScriptActions.h"
 #include "src/game/GameWindow.h"
 #include "src/game/capture/CaptureService.h"
+#include "src/platform/DPIHelper.h"
 #include "RoiPreviewWidget.h"
 //TODO form窗体模板
 
@@ -199,6 +202,65 @@ void OcrForm::onCaptureImageClicked()
     ui->roiPreview->setImage(QPixmap::fromImage(qimg.copy()));
     updateRoiPreview();
     Logger::log(QString("已获取游戏截图作为预览底图：%1x%2").arg(winImg.cols).arg(winImg.rows));
+
+    // 截图诊断：跨分辨率排查时，对比两个环境下这行日志即可。
+    // 一次输出截图尺寸、客户区、窗口矩形、DPI，以及当前 ROI 换算成的像素矩形。
+    // 只记录信息、不做任何拦截或弹窗。
+    {
+        const HWND hwnd = GameWindow::instance().handle();
+        RECT clientRect{};
+        RECT windowRect{};
+        if (hwnd) {
+            GetClientRect(hwnd, &clientRect);
+            GetWindowRect(hwnd, &windowRect);
+        }
+        const int clientW = clientRect.right - clientRect.left;
+        const int clientH = clientRect.bottom - clientRect.top;
+        const int windowW = windowRect.right - windowRect.left;
+        const int windowH = windowRect.bottom - windowRect.top;
+
+        const double captureAspect = winImg.rows > 0
+                                         ? static_cast<double>(winImg.cols) / winImg.rows
+                                         : 0.0;
+        const double clientAspect = clientH > 0
+                                        ? static_cast<double>(clientW) / clientH
+                                        : 0.0;
+
+        const double roiX = ui->roiXBox->value();
+        const double roiY = ui->roiYBox->value();
+        const double roiW = ui->roiWBox->value();
+        const double roiH = ui->roiHBox->value();
+        const int pixX = static_cast<int>(std::lround(winImg.cols * roiX / 100.0));
+        const int pixY = static_cast<int>(std::lround(winImg.rows * roiY / 100.0));
+        const int pixW = static_cast<int>(std::lround(winImg.cols * roiW / 100.0));
+        const int pixH = static_cast<int>(std::lround(winImg.rows * roiH / 100.0));
+
+        constexpr double kRefAspect = 16.0 / 9.0;
+        const bool aspectOff = captureAspect > 0.0
+                               && std::abs(captureAspect - kRefAspect) / kRefAspect > 0.02;
+
+        Logger::log(QString("[截图诊断] 截图 %1x%2（比例 %3）| 客户区 %4x%5（比例 %6）| 窗口 %7x%8 | DPI %9% | "
+                            "ROI(%10,%11,%12,%13)% -> 像素(%14,%15,%16,%17) | %18")
+                        .arg(winImg.cols)
+                        .arg(winImg.rows)
+                        .arg(QString::number(captureAspect, 'f', 4))
+                        .arg(clientW)
+                        .arg(clientH)
+                        .arg(QString::number(clientAspect, 'f', 4))
+                        .arg(windowW)
+                        .arg(windowH)
+                        .arg(QString::number(DPIHelper::GetWindowDPIScaling(hwnd), 'f', 0))
+                        .arg(roiX)
+                        .arg(roiY)
+                        .arg(roiW)
+                        .arg(roiH)
+                        .arg(pixX)
+                        .arg(pixY)
+                        .arg(pixW)
+                        .arg(pixH)
+                        .arg(aspectOff ? QStringLiteral("⚠ 画幅非 16:9")
+                                       : QStringLiteral("画幅 16:9")));
+    }
 }
 
 void OcrForm::initStepInputBoxSelect(QString configId, const QString &stepsId)

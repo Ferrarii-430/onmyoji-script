@@ -174,6 +174,57 @@ bool captureWindowToMat(HWND hwnd, cv::Mat& outBGR)
         return false;
     }
 
+    // 11. 裁掉非客户区（标题栏/边框），把坐标系统一到「客户区」。
+    //
+    // PrintWindow 画的是整个窗口，而脚本其余所有坐标——ROI 百分比、OCR/YOLO
+    // 结果坐标、结果图上画的框——都以客户区为基准（DirectX 截图抓 swap chain，
+    // 本来就不含非客户区）。不裁的话，同一个 ROI 在不同窗口尺寸下覆盖的内容不同：
+    // 标题栏是固定像素，窗口越小占的高度比例越大，画面被整体下推，
+    // 表现为「小分辨率下 ROI 覆盖的区域比大分辨率偏上」。
+    {
+        RECT winRect{};
+        RECT clientRect{};
+        const bool hasRects = GetWindowRect(hwnd, &winRect) != 0
+                              && GetClientRect(hwnd, &clientRect) != 0;
+        const bool needClip = hasRects
+                              && clientRect.right > 0 && clientRect.bottom > 0
+                              && (clientRect.right != outBGR.cols
+                                  || clientRect.bottom != outBGR.rows);
+
+        if (needClip) {
+            POINT clientOrigin{0, 0};
+            if (ClientToScreen(hwnd, &clientOrigin)) {
+                // 位图 (0,0) 对应窗口矩形左上角（PrintWindow 的绘制原点）
+                const int offsetX = clientOrigin.x - winRect.left;
+                const int offsetY = clientOrigin.y - winRect.top;
+                const cv::Rect inCapture(offsetX, offsetY,
+                                         clientRect.right, clientRect.bottom);
+                const cv::Rect full(0, 0, outBGR.cols, outBGR.rows);
+
+                if ((inCapture & full) == inCapture) {
+                    outBGR = outBGR(inCapture).clone();
+
+                    // 截图频率很高，尺寸没变就不重复刷日志
+                    static thread_local int lastClippedW = -1;
+                    static thread_local int lastClippedH = -1;
+                    if (outBGR.cols != lastClippedW || outBGR.rows != lastClippedH) {
+                        lastClippedW = outBGR.cols;
+                        lastClippedH = outBGR.rows;
+                        Logger::log(QString("截图已裁剪到客户区 %1x%2（整窗 %3x%4，偏移 %5,%6）")
+                                        .arg(outBGR.cols).arg(outBGR.rows)
+                                        .arg(w).arg(h).arg(offsetX).arg(offsetY));
+                    }
+                } else {
+                    // 偏移/尺寸不可信时宁可不裁：保留原行为，避免坐标错乱
+                    Logger::log(QString("客户区(%1,%2 %3x%4) 超出截图范围 %5x%6，保留整窗截图")
+                                    .arg(offsetX).arg(offsetY)
+                                    .arg(clientRect.right).arg(clientRect.bottom)
+                                    .arg(outBGR.cols).arg(outBGR.rows));
+                }
+            }
+        }
+    }
+
     Logger::log(QString("成功捕获完整窗口: %1x%2")
               .arg(outBGR.cols)
               .arg(outBGR.rows));

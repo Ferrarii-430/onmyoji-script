@@ -203,6 +203,12 @@ sessionwidget* mainwindow::createSession()
         return peerDisplayNamesFor(static_cast<quint32>(pid), session);
     });
 
+    // 唯一标签页时无需手动绑定：启动任务会自动用第一个游戏实例。
+    // 每次都现查数量，标签页增减后立即生效。
+    session->setSingleSessionProbe([this, session]() {
+        return m_tabs->count() == 1 && m_tabs->indexOf(session) == 0;
+    });
+
     connect(session, &sessionwidget::bindingChanged, this, [this]() {
         if (m_restoring) {
             return;

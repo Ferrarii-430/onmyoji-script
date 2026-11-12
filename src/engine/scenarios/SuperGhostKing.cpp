@@ -269,11 +269,11 @@ namespace scenarios {
             return false;
         }
 
-        waitRandomWithEventProcessing(2500, 300);
+        waitRandomWithEventProcessing(4000, 300);
 
         //获取鬼王名称
-        QJsonArray ocrData = actions.ocrRecognizes(QRectF(38.4, 16.1, 6.5, 31.1));
-        // qDebug() << "[debug] ocrData:" << ocrData;
+        QJsonArray ocrData = actions.ocrRecognizes(QRectF(33.6, 18.4, 15.1, 27.1), ocr::Enhance::Upscale, 0.6);
+        qDebug() << "[debug] ocrData:" << ocrData;
         if (ocrData.empty())
         {
             Logger::log(QString("无法识别鬼王名称"));
@@ -327,8 +327,8 @@ namespace scenarios {
             utils::OcrTextTracker groupTopTracker;
             for (int i = 0; i < 10; ++i)
             {
-                QJsonArray groupData = actions.ocrRecognizes(QRectF(37.7, 35.0, 11.1, 51.8));
-                // qDebug() << "[debug] groupData:" << groupData;
+                QJsonArray groupData = actions.ocrRecognizes(QRectF(37.7, 35.0, 11.1, 51.8), ocr::Enhance::Upscale | ocr::Enhance::AutoInvert, 0.6);
+                qDebug() << "[debug] groupData:" << groupData;
                 //文本内容与上次一致（忽略 box/score 波动），说明滑动未改变列表内容，已到顶部，结束循环
                 if (groupTopTracker.unchangedSinceLast(groupData)) {
                     Logger::log(QString("分组列表别结果与上次一致，已滑动到顶部"));
@@ -398,7 +398,7 @@ namespace scenarios {
             utils::OcrTextTracker presetTopTracker;
             //确定有多少个预设可选择，防止识别到错误的数据
             auto switchNumberArray = actions.opencvFindAll(screenshotPath + "super-switch-soul.png", 0.6, false);
-            // qDebug() << "[debug] switchNumberArray:" << switchNumberArray.size();
+            qDebug() << "[debug] switchNumberArray:" << switchNumberArray.size();
             constexpr QRectF presetsRoiArray[5] = {
                 {48.5, 32.3, 30.8, 13.4}, //0或者1个
                 {48.5, 32.3, 5.1, 26.0}, //2个
@@ -424,8 +424,8 @@ namespace scenarios {
 
             for (int i = 0; i < 10; ++i)
             {
-                QJsonArray presetData = actions.ocrRecognizes(presetsRoi, ocr::Enhance::Upscale);
-                // qDebug() << "[debug] presetData:" << presetData;
+                QJsonArray presetData = actions.ocrRecognizes(presetsRoi, ocr::Enhance::Upscale | ocr::Enhance::AutoInvert, 0.6);
+                qDebug() << "[debug] presetData:" << presetData;
 
                 //文本内容与上次一致（忽略 box/score 波动），说明滑动未改变列表内容，已到顶部，结束循环
                 if (presetTopTracker.unchangedSinceLast(presetData)) {
@@ -450,7 +450,8 @@ namespace scenarios {
             Logger::log(QString("开始寻找目标预设列表"));
             for (int i = 0; i < 10; ++i)
             {
-                QJsonArray presetData = actions.ocrRecognizes(presetsRoi, ocr::Enhance::Upscale);
+                QJsonArray presetData = actions.ocrRecognizes(presetsRoi, ocr::Enhance::Upscale | ocr::Enhance::AutoInvert, 0.6);
+                qDebug() << "[debug] presetData:" << presetData;
 
                 //文本内容与上次一致（忽略 box/score 波动），说明滑动未改变列表内容，已到底部，结束循环
                 if (presetSearchTracker.unchangedSinceLast(presetData)) {
@@ -635,7 +636,7 @@ namespace scenarios {
             waitRandomWithEventProcessing(3500,300);
 
             //有准备就点一下，没有则不用管
-            if (actions.yoloRecognizesAndClick(0.50, true, "battle-ready").isEmpty())
+            if (!actions.yoloRecognizesAndClick(0.50, true, "battle-ready").isEmpty())
             {
                 Logger::log(QString("点击【准备】"));
             }
@@ -839,6 +840,7 @@ namespace scenarios {
         const QJsonObject item = fatigueData.at(0).toObject();
         const QString text = item["text"].toString();
         const QString fatigueText = text.split("/").value(0);
+        Logger::log(QString("当前疲劳值：【%1】").arg(fatigueText));
         return fatigueText.toInt();
     }
 

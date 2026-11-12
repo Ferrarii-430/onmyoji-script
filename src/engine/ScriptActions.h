@@ -119,8 +119,10 @@ public:
     // enhance 默认 Upscale：小裁剪图自动放大是本就存在的行为，保持不变；
     // 其余增强项（灰度/对比度/锐化/反色）默认关闭，需显式开启。
     // 裁剪模式下全部项生效；识别整张图片时只应用逐像素项，不做放大。
+    // minScore 为置信度阈值：分数低于该值的结果直接丢弃；不填（默认 0）表示不过滤。
     QJsonArray ocrRecognizes(const QRectF& roiPercent = QRectF(),
-                             ocr::Enhance enhance = ocr::Enhance::Upscale);
+                             ocr::Enhance enhance = ocr::Enhance::Upscale,
+                             double minScore = 0.0);
     QString ocrRecognizesAndClick(const QString& ocrText, double threshold, bool randomClick,
                                   const QRectF& roiPercent = QRectF(),
                                   ocr::Enhance enhance = ocr::Enhance::Upscale,
@@ -145,6 +147,7 @@ public:
     // 判断区域内是否出现目标文字（纯检测，不点击）：
     // 识别结果与 ocrText 完全相等（== 全等匹配，非子串）且分数 >= threshold 时返回 true；
     // 未命中、命中但分数不足或截图失败返回 false。命名参考 yoloContainsLabels。
+    // 与 opencvContains / yoloContainsLabels 一致，调用后会把本次截图回显到界面。
     bool ocrContainsText(const QString& ocrText, double threshold,
                          const QRectF& roiPercent = QRectF(),
                          ocr::Enhance enhance = ocr::Enhance::Upscale);

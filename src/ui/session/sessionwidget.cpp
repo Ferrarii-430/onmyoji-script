@@ -59,16 +59,25 @@ void warnSharedInstance(QWidget* parent, const QString& title, const QString& te
     box.exec();
 }
 
-// 鬼王列表配置是「系统方案-超鬼王」独有的功能，方案 id 直接写死在程序里：
-// 只有它显示「自定义配置」入口，其余系统方案一律不显示
-constexpr const char* kSuperGhostKingConfigId = "627CE2C8-01C9-4828-B4AE-4F5A360E7946";
+// 鬼王列表配置是「系统方案-超鬼王」系列独有的功能，方案 id 直接写死在程序里：
+// 只有下列方案显示「阵容配置」入口，其余系统方案一律不显示
+constexpr const char* kSuperGhostKingConfigIds[] = {
+    "627CE2C8-01C9-4828-B4AE-4F5A360E7946", // 系统方案-超鬼王
+    "7C0CE007-30B5-4560-92B9-1892E13A8C26"  // 系统方案-超鬼王(协同)
+};
 
-// 是否显示该方案的「自定义配置」按钮：先按 id 命中超鬼王，
+// 是否显示该方案的「阵容配置」按钮：先按 id 命中任一超鬼王方案，
 // 再看方案对象的 showBossConfig 字段是否有意关掉（缺省视为显示）
 bool canShowBossConfigButton(const QString &configId)
 {
-    if (configId.compare(QString::fromLatin1(kSuperGhostKingConfigId),
-                         Qt::CaseInsensitive) != 0) {
+    bool matched = false;
+    for (const char *id : kSuperGhostKingConfigIds) {
+        if (configId.compare(QString::fromLatin1(id), Qt::CaseInsensitive) == 0) {
+            matched = true;
+            break;
+        }
+    }
+    if (!matched) {
         return false;
     }
     for (const QJsonValue &value : m_configArray) {
@@ -308,6 +317,45 @@ void sessionwidget::bindInstance(DWORD pid, HWND hwnd, const QString& displayNam
 void sessionwidget::setPeerLookup(std::function<QStringList(DWORD)> lookup)
 {
     m_peerLookup = std::move(lookup);
+}
+
+void sessionwidget::setSingleSessionProbe(std::function<bool()> probe)
+{
+    m_singleSessionProbe = std::move(probe);
+}
+
+bool sessionwidget::isOnlySession() const
+{
+    // 没注入就当作「不是唯一」：多标签页下擅自选实例比让用户点一下更糟
+    return m_singleSessionProbe && m_singleSessionProbe();
+}
+
+bool sessionwidget::autoBindFirstInstance()
+{
+    const std::vector<DWORD> pids = platform::findAllPidsByProcessName("onmyoji.exe");
+    if (pids.empty()) {
+        Logger::log(QStringLiteral("未找到运行中的阴阳师进程（onmyoji.exe），请先启动游戏"));
+        return false;
+    }
+
+    for (DWORD pid : pids) {
+        HWND hwnd = platform::findWindowByPid(pid);
+        if (!hwnd) {
+            continue;
+        }
+
+        const std::wstring title = platform::getWindowTitle(hwnd);
+        bindInstance(pid, hwnd,
+                     title.empty() ? QStringLiteral("onmyoji.exe")
+                                   : QString::fromWCharArray(title.c_str()));
+        activateBinding();
+
+        Logger::log(QStringLiteral("未手动绑定窗口，已自动使用第一个游戏实例（PID %1）").arg(pid));
+        return true;
+    }
+
+    Logger::log(QStringLiteral("找到阴阳师进程但没有可用游戏窗口，请点击「绑定窗口」手动选择"));
+    return false;
 }
 
 void sessionwidget::setSharedPeers(const QStringList& peers)
@@ -795,8 +843,15 @@ void sessionwidget::startTaskButtonClick()
     }
 
     if (m_boundPid == 0) {
-        Logger::log(QStringLiteral("请先点击「绑定窗口」选择本标签页要操作的游戏实例"));
-        return;
+        // 只有一个标签页时沿用旧逻辑：自动使用第一个游戏实例，不必手动绑定；
+        // 多标签页时无法判断本页该操作哪一个实例，必须由用户显式选择
+        if (!isOnlySession()) {
+            Logger::log(QStringLiteral("请先点击「绑定窗口」选择本标签页要操作的游戏实例"));
+            return;
+        }
+        if (!autoBindFirstInstance()) {
+            return;
+        }
     }
 
     // 共用实例提醒：不阻止启动（用户可能就是要这样对照操作），

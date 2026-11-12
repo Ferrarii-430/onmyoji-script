@@ -57,6 +57,11 @@ public:
     // 仅在绑定/启动任务时用于「共用实例」提醒，返回空表示独占。
     void setPeerLookup(std::function<QStringList(DWORD)> lookup);
 
+    // 由 shell 注入：当前是否只有本标签页一个。
+    // 只有唯一标签页时无需手动绑定，按旧逻辑自动定位第一个游戏实例；
+    // 多标签页时无法判断本页该操作哪个实例，必须由用户显式绑定。
+    void setSingleSessionProbe(std::function<bool()> probe);
+
     // 由 shell 在任意标签页绑定关系变化后调用：
     // peers 为绑定同一 PID 的其他标签页显示名，空表示本页独占该实例。
     // 不拦截操作，只刷新标题角标与绑定状态提示。
@@ -114,6 +119,12 @@ private:
     QStringList m_sharedPeers;
     std::function<QStringList(DWORD)> m_peerLookup;
 
+    // 是否唯一标签页；未注入时按「不是唯一」处理（不敢擅自替用户选实例）
+    std::function<bool()> m_singleSessionProbe;
+
+    // 是否唯一标签页（未注入 probe 时保守返回 false）
+    bool isOnlySession() const;
+
     // 已经就「共用实例」提醒过的 PID，避免每次启动任务都弹窗；
     // 冲突解除后清零，下次再共用会重新提醒
     DWORD m_warnedSharedPid = 0;
@@ -129,6 +140,10 @@ private:
 
     // 组装启动任务时的执行上下文（固定 pid/hwnd，任务线程据此绑定窗口）
     GameContext buildContext() const;
+
+    // 唯一标签页且未手动绑定时，按旧逻辑定位第一个游戏实例并绑定。
+    // 成功返回 true 并刷新界面；找不到实例时记日志并返回 false。
+    bool autoBindFirstInstance();
 
     void showSystemConfigForm(const QString &configId);
     void setTaskRunningState(bool running);
