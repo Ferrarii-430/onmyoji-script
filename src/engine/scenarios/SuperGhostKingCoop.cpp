@@ -154,6 +154,9 @@ namespace scenarios {
         //   config.base.schemeName / defaultLineupName / defaultGreenLabel 等方案级配置
         Q_UNUSED(config); // 参数已接通，流程待实现
 
+        //识别是否鬼王邀请，没有则循环等待
+
+
         // 空流程直接返回 false 终止循环，避免被无限重复执行
         return false;
     }

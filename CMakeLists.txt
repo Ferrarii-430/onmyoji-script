@@ -176,6 +176,8 @@ add_executable(qtTest WIN32
         src/ui/setting/settingdialog.ui
         src/engine/scenarios/Mitama.cpp
         src/engine/scenarios/Mitama.h
+        src/engine/scenarios/Awakening.cpp
+        src/engine/scenarios/Awakening.h
         src/engine/scenarios/ScenarioRegistry.cpp
         src/engine/scenarios/ScenarioRegistry.h
         src/engine/scenarios/GuessCollect.cpp

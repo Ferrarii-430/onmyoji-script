@@ -103,6 +103,38 @@
     ]
   },
   {
+    "id": "A7E3C1D2-5B64-4F90-8C1A-2D9E7F3B6A21",
+    "name": "系统方案-自动觉醒",
+    "visible": true,
+    "type": "system",
+    "tip": "自动循环刷觉醒副本，支持单人或组队模式。需要在觉醒副本界面启动，需提前配备好觉醒阵容。",
+    "systemConfig": [
+      {
+        "key": "teamPlay",
+        "label": "组队模式",
+        "control": "switch",
+        "value": true,
+        "tip": "开启后需两人组队。组队模式建议在 组队/战斗界面开启功能。"
+      }
+    ],
+    "steps": [
+      {
+        "identifyErrorHandle": "next",
+        "imagePath": null,
+        "jumpStepsId": null,
+        "ocrText": null,
+        "offsetTime": null,
+        "randomClick": true,
+        "randomWait": null,
+        "score": 0.55,
+        "stepsId": "3E9B5C71-8A2D-4F64-B0C7-6D1A93E5C2F8",
+        "taskName": "自动觉醒副本",
+        "time": null,
+        "type": "SYSTEM_AWAKENING"
+      }
+    ]
+  },
+  {
     "id": "D942C777-2449-41P2-A595-044486E39SG13",
     "name": "系统方案-六道之门",
     "visible": false,

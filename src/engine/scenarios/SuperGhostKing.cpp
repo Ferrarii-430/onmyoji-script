@@ -576,7 +576,7 @@ namespace scenarios {
             if (!currentStrongPursuitStatus.value())
             {
                 //只有关闭状态下需要开启
-                if (actions.ocrRecognizesAndClick("2.5倍伤害", 0.65, true, QRectF(81.0, 68.3, 19.0, 13.3), ocr::Enhance::Upscale).isEmpty())
+                if (actions.ocrRecognizesAndClick("2.5倍伤害", 0.60, true, QRectF(81.0, 66.3, 19.0, 13.3), ocr::Enhance::Upscale | ocr::Enhance::AutoInvert).isEmpty())
                 {
                     Logger::log(QString("开启【强力追击】失败"));
                 }
@@ -803,6 +803,7 @@ namespace scenarios {
                 if (actions.opencvContains(screenshotPath + "anniversary-challenge.png", 0.65, true))
                 {
                     isKill = false;
+                    Logger::log(QString("鬼王未击杀，继续挑战"));
                     break;
                 }
             }
@@ -811,7 +812,6 @@ namespace scenarios {
             {
                 break;
             }
-            Logger::log(QString("鬼王未击杀，继续战斗"));
 
             if (num == 9)
             {
