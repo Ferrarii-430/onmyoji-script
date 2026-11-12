@@ -405,6 +405,10 @@ void sessionwidget::loadListWidgetData()
         QJsonObject step = visibleArr[0].toObject();
         QString id = step["id"].toString();
         QString name = step["name"].toString();
+        // 默认选中项必须同时写入本标签页的 m_selectedItem：
+        // 全局 currentItem 是所有会话共用的，启动任务只看 m_selectedItem
+        m_selectedItem.id = id;
+        m_selectedItem.taskName = name;
         commonSetCurrentItem(id,name);
         ui->currentTaskName->setText(name);
         showStepsInTable(visibleArr[0].toObject()["steps"].toArray()); //默认显示第一个可见配置的方案内容
@@ -412,6 +416,7 @@ void sessionwidget::loadListWidgetData()
     else
     {
         // 所有方案均隐藏：清空选中状态与方案内容表格
+        m_selectedItem = ItemInfo{};
         commonSetCurrentItem(QString(), QString());
         ui->currentTaskName->setText(QStringLiteral("（无方案）"));
         ui->tableWidget->clear();
@@ -951,16 +956,9 @@ void sessionwidget::onProgrammeRemoveBtnClicked()
         if (removeConfigById(AppPaths::instance().configPath(), currentItem.id))
         {
             Logger::log("已删除配置: " + currentItem.taskName);
-            loadListWidgetData();  // 刷新配置
-            commonSetCurrentItem("","");
-            ui->currentTaskName->setText("");
-            if (m_configArray.size() > 0)
-            {
-                const QString id = m_configArray[0].toObject()["id"].toString();
-                const QString name = m_configArray[0].toObject()["name"].toString();
-                commonSetCurrentItem(id,name);
-                ui->currentTaskName->setText(name);
-            }
+            // 刷新列表，由 loadListWidgetData 重新选定第一个可见方案，
+            // 保证界面选中项与 m_selectedItem 同步
+            loadListWidgetData();
         }
         else
         {

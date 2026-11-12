@@ -7,7 +7,7 @@
 
 #include <QDate>
 #include <QDateTime>
-#include <QElapsedTimer>
+#include <QEventLoop>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -16,6 +16,7 @@
 #include <QNetworkRequest>
 #include <QString>
 #include <QTime>
+#include <QTimer>
 #include <QUrl>
 #include <QUrlQuery>
 
@@ -93,9 +94,10 @@ namespace scenarios
             return false;
         }
 
-        // 通用表单 POST 上报（Spring @RequestParam 风格）：阻塞等待响应（最长 15s）期间
-        // 持续处理 Qt 事件保持 UI 响应；手动停止任务时提前中断。成功返回 true，
-        // responseOut 带回响应体（成功）或错误信息（失败）
+        // 通用表单 POST 上报（Spring @RequestParam 风格）：阻塞等待响应（最长 15s）。
+        // 任务运行在独立 worker 线程，QNetworkAccessManager 的 socket 通知与
+        // finished 信号需要该线程的事件循环才能送达，因此这里跑一个局部事件循环；
+        // 超时或手动停止任务时退出循环，再按 reply 状态收尾。
         bool postForm(const QString& apiPath, const QList<QPair<QString, QString>>& fields, QString& responseOut)
         {
             constexpr int kTimeoutMs = 15 * 1000;
@@ -117,12 +119,30 @@ namespace scenarios
             // frp 内网穿透链路证书链可能不完整，跳过证书校验保证上报可达
             reply->ignoreSslErrors();
 
-            // 同步等待响应：手动停止任务时提前中断并放弃本次上报
-            QElapsedTimer timer;
-            timer.start();
-            while (!reply->isFinished() && timer.elapsed() < kTimeoutMs && TaskRunner::instance().isRunning()) {
-                waitWithEventProcessing(50);
-            }
+            // 同步等待响应：局部事件循环驱动 QNetworkAccessManager，
+            // finished 到达、超时或任务被停止时退出。
+            // 停止状态用 50ms 定时器轮询，保证停止任务能及时中断等待
+            QEventLoop loop;
+            QTimer timeoutTimer;
+            timeoutTimer.setSingleShot(true);
+            QObject::connect(&timeoutTimer, &QTimer::timeout, &loop, &QEventLoop::quit);
+            QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+
+            QTimer stopTimer;
+            stopTimer.setInterval(50);
+            QObject::connect(&stopTimer, &QTimer::timeout, &loop, [&loop]() {
+                if (!TaskRunner::instance().isRunning()) {
+                    loop.quit();
+                }
+            });
+
+            timeoutTimer.start(kTimeoutMs);
+            stopTimer.start();
+            loop.exec();
+
+            stopTimer.stop();
+            timeoutTimer.stop();
+
             if (!reply->isFinished()) {
                 reply->abort();
                 reply->deleteLater();
