@@ -15,8 +15,11 @@
 #include <QScopedValueRollback>
 #include <QSet>
 #include <QSignalBlocker>
+#include <QStyle>
 #include <QTimer>
 #include <QDebug>
+#include <QApplication>
+#include <QEventLoop>
 #include <QInputDialog>
 #include <QCheckBox>
 #include <QComboBox>
@@ -39,6 +42,7 @@
 #include "src/engine/ScriptActions.h"
 #include "src/engine/TaskRunner.h"
 #include "src/game/GameWindow.h"
+#include "src/game/capture/CaptureService.h"
 #include "src/platform/DPIHelper.h"
 #include "src/platform/ProcessUtils.h"
 #include "src/platform/WindowPicker.h"
@@ -179,6 +183,10 @@ sessionwidget::sessionwidget(QWidget *parent) :
     connect(ui->bindWindowButton, &QToolButton::clicked,
             this, &sessionwidget::onBindWindowBtnClicked);
 
+    //绑定缩略图右上角的「获取截图」按钮
+    connect(ui->captureShotButton, &QToolButton::clicked,
+            this, &sessionwidget::onCaptureShotBtnClicked);
+
     //绑定方案内容上移按钮
     connect(ui->programmeContentUpButton, &QToolButton::clicked,
             this, &sessionwidget::onProgrammeUpBtnClicked);
@@ -304,14 +312,12 @@ QString sessionwidget::tabTitle() const
                              : QStringLiteral("未绑定");
 
     // 与其他标签页共用同一实例时给出角标：允许共用，但必须一眼可见
-    QString title = m_sharedPeers.isEmpty() ? base
-                                            : base + QStringLiteral(" ⚠共用");
-
-    // 多标签页可同时运行，标题上标出运行中的那个便于快速识别
-    if (m_runner && m_runner->isRunning()) {
-        return QStringLiteral("▶ ") + title;
-    }
-    return title;
+    //
+    // 「运行中」不再拼进标题文字：QTabBar 的标签文字颜色由 QSS 统一控制，
+    // 想让某个标签的「▶」单独变绿只能上自定义 delegate。改为绿色 tab icon，
+    // 由 mainwindow::refreshTabTitle 按 isTaskRunning() 设置/清除
+    return m_sharedPeers.isEmpty() ? base
+                                   : base + QStringLiteral(" ⚠共用");
 }
 
 QString sessionwidget::displayName() const
@@ -1411,11 +1417,90 @@ void sessionwidget::onBindWindowBtnClicked()
                     .arg(picked.clientHeight));
 }
 
+// 缩略图右上角的「获取截图」：手动截一张本标签页绑定实例的画面。
+// 多开时标签页标题上虽然有 PID，但看不出窗口里是哪个账号，
+// 点一下就能确认这个标签页对应的到底是哪一个游戏窗口。
+void sessionwidget::onCaptureShotBtnClicked()
+{
+    if (m_boundPid == 0) {
+        // 唯一标签页沿用启动任务时的自动绑定；多标签页必须由用户显式选择，
+        // 否则截到的是「第一个」实例，反而更容易看错
+        if (!isOnlySession() || !autoBindFirstInstance()) {
+            Logger::log(QStringLiteral("本标签页还没有绑定游戏窗口，请先点击「绑定窗口」"));
+            QMessageBox::information(
+                this, QStringLiteral("获取截图"),
+                QStringLiteral("本标签页还没有绑定游戏窗口。\n\n"
+                               "请先点击「绑定窗口」选择要操作的游戏实例，再获取截图。"));
+            return;
+        }
+    }
+
+    // 截图走 UI 线程的 GameWindow 上下文：先确认本页绑定的实例还活着，再指向本页的窗口。
+    // 这里不用 locate()：它找不到绑定的实例时会回退成「按进程名找第一个」，
+    // 那正好会截到别的实例——而截错实例正是这个按钮要避免的事
+    HWND hwnd = IsWindow(m_boundHwnd) ? m_boundHwnd
+                                      : platform::findWindowByPid(m_boundPid);
+    if (!platform::isProcessAlive(m_boundPid) || hwnd == nullptr) {
+        ui->openCVIdentifyLabel->clear();
+        ui->openCVIdentifyLabel->setText(QStringLiteral("窗口已失效"));
+        Logger::log(QStringLiteral("获取截图失败：绑定的游戏实例已失效（PID %1），请重新绑定")
+                        .arg(m_boundPid));
+        return;
+    }
+    GameWindow::instance().bindTo(m_boundPid, hwnd);
+
+    // 截图本身要几百毫秒（含窗口尺寸校正），给个等待反馈，
+    // 否则用户会以为按钮没响应而反复点
+    QToolButton* button = ui->captureShotButton;
+    button->setEnabled(false);
+    button->setText(QStringLiteral("截图中..."));
+    QApplication::setOverrideCursor(Qt::WaitCursor);
+    QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+
+    const cv::Mat img = capture::captureGameWindow();
+
+    QApplication::restoreOverrideCursor();
+    button->setText(QStringLiteral("获取截图"));
+    button->setEnabled(true);
+
+    if (img.empty()) {
+        ui->openCVIdentifyLabel->clear();
+        ui->openCVIdentifyLabel->setText(QStringLiteral("截图失败"));
+        Logger::log(QStringLiteral("获取截图失败：没有截到游戏画面，请确认游戏窗口是否还在、"
+                                   "截图方式设置是否正确"));
+        return;
+    }
+
+    Logger::log(QStringLiteral("已获取当前实例画面（%1×%2，PID %3）")
+                    .arg(img.cols)
+                    .arg(img.rows)
+                    .arg(m_boundPid));
+
+    // 传深拷贝：showOpenCVIdentifyImage 会就地把 BGR 转成 RGB
+    showOpenCVIdentifyImage(QString(), img.clone());
+}
+
 void sessionwidget::updateBindStateLabel()
 {
     if (!ui->bindStateLabel) {
         return;
     }
+
+    // 「绑定窗口」按钮跟着绑定状态换一套视觉：未绑定时用醒目的琥珀色，
+    // 提示「还差这一步才能开跑」；已绑定则退回白底描边的次级样式，
+    // 不再和启动/停止抢视线（见 Theme.cpp 里 #bindWindowButton 的规则）
+    const bool bound = (m_boundPid != 0);
+    QToolButton* bindBtn = ui->bindWindowButton;
+    bindBtn->setText(bound ? QStringLiteral("更换绑定") : QStringLiteral("绑定窗口"));
+    bindBtn->setToolTip(
+        bound ? QStringLiteral("当前绑定：%1（PID %2）\n点击可切换到其他游戏窗口")
+                    .arg(displayName())
+                    .arg(m_boundPid)
+              : QStringLiteral("本标签页还没有绑定游戏实例，点击选择一个游戏窗口"));
+    // QSS 用 [bound="true"] 区分两套配色，改完属性必须重新 polish 才会生效
+    bindBtn->setProperty("bound", bound);
+    bindBtn->style()->unpolish(bindBtn);
+    bindBtn->style()->polish(bindBtn);
 
     if (m_boundPid == 0) {
         ui->bindStateLabel->setStyleSheet(QString());

@@ -118,6 +118,9 @@ public:
     void onProgrammeRemoveBtnClicked();
     void onSettingBtnClicked();
     void onBindWindowBtnClicked();
+    // 缩略图右上角的「获取截图」：手动截一张本页绑定实例的画面，
+    // 多开时用来确认这个标签页对应的是哪一个游戏窗口
+    void onCaptureShotBtnClicked();
     void onProgrammeContentAddBtnClicked();
     void onProgrammeUpBtnClicked();
     void onProgrammeDownBtnClicked();
@@ -186,7 +189,7 @@ private:
     void setTaskRunningState(bool running);
     void showCycleProgress(int completed, int total);
 
-    // 刷新「绑定窗口：xxx」状态文本
+    // 刷新「绑定窗口：xxx」状态文本与「绑定窗口」按钮的视觉状态
     void updateBindStateLabel();
 
     void loadListWidgetData();

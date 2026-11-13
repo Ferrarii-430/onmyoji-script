@@ -3,6 +3,7 @@
 #include <QApplication>
 #include <QDir>
 #include <QFont>
+#include <QIcon>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPalette>
@@ -76,6 +77,92 @@ QToolButton#settingButton {
 }
 QToolButton#settingButton:hover { background-color: #7586a0; }
 QToolButton#settingButton:pressed { background-color: #55637d; }
+
+/* 绑定窗口：与「添加/删除/设置」区分开。
+   未绑定 -> 琥珀色实心，这是启动任务前必须先做的一步；
+   已绑定 -> 白底描边，退回次级操作，不和启动/停止抢视线 */
+QToolButton#bindWindowButton {
+    background-color: #f59e0b;
+    color: #ffffff;
+    font-weight: bold;
+}
+QToolButton#bindWindowButton:hover { background-color: #fbb03b; }
+QToolButton#bindWindowButton:pressed { background-color: #d9860a; }
+QToolButton#bindWindowButton[bound="true"] {
+    background-color: #ffffff;
+    color: #3f4756;
+    border: 1px solid #c8ccd8;
+    font-weight: normal;
+}
+QToolButton#bindWindowButton[bound="true"]:hover {
+    background-color: #eef0fb;
+    border-color: #5b6cf0;
+    color: #3f4cb8;
+}
+QToolButton#bindWindowButton[bound="true"]:pressed {
+    background-color: #e2e6fa;
+    border-color: #4a59d6;
+}
+
+/* 获取截图：缩略图旁的次级操作，白底描边，不与主操作抢颜色 */
+QToolButton#captureShotButton {
+    background-color: #ffffff;
+    color: #4a4d57;
+    border: 1px solid #d4d7e0;
+    font-weight: normal;
+}
+QToolButton#captureShotButton:hover {
+    background-color: #eef0fb;
+    border-color: #5b6cf0;
+    color: #3f4cb8;
+}
+QToolButton#captureShotButton:pressed {
+    background-color: #e2e6fa;
+    border-color: #4a59d6;
+}
+QToolButton#captureShotButton:disabled {
+    background-color: #f2f3f7;
+    color: #a2a6b4;
+    border-color: #e2e4ec;
+}
+
+/* ---------- 标签栏翻页按钮 ---------- */
+/* 标签多到溢出时 QTabBar 会冒出两个 QToolButton（ScrollLeft/RightButton，
+   固定 16px 宽）。它们默认继承上面 QToolButton 的通用规则，结果：
+   - padding: 3px 8px 把 16px 宽的内容区挤成 0，箭头被直接裁掉，只剩纯色方块；
+   - 就算放开 padding，color: #ffffff 也会把箭头画成白色，落在浅色背景上
+     等于没有箭头。
+   这里单独给出盒模型和深色箭头：两个 16px 宽的白色小圆角按钮，
+   横向贴在一起读成一条翻页控件，箭头用深灰保证在浅色标签栏上看得清 */
+QTabBar QToolButton#ScrollLeftButton,
+QTabBar QToolButton#ScrollRightButton {
+    background-color: #ffffff;
+    color: #3f4756;
+    border: 1px solid #cfd4e2;
+    border-radius: 4px;
+    /* 只在竖直方向留白：两个按钮横向贴在一起，读起来像一条翻页控件 */
+    margin: 4px 0px;
+    padding: 0px;
+}
+QTabBar QToolButton#ScrollLeftButton:hover,
+QTabBar QToolButton#ScrollRightButton:hover {
+    background-color: #eef0fb;
+    color: #3f4cb8;
+    border-color: #5b6cf0;
+}
+QTabBar QToolButton#ScrollLeftButton:pressed,
+QTabBar QToolButton#ScrollRightButton:pressed {
+    background-color: #e2e6fa;
+    color: #4a59d6;
+    border-color: #4a59d6;
+}
+/* 翻到头时按钮进 disabled，箭头跟着变淡 */
+QTabBar QToolButton#ScrollLeftButton:disabled,
+QTabBar QToolButton#ScrollRightButton:disabled {
+    background-color: #eceef4;
+    color: #b8bcc9;
+    border-color: #dfe2ec;
+}
 
 /* ---------- 输入控件 ---------- */
 QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox, QTextEdit {
@@ -326,6 +413,38 @@ void apply(QApplication& app)
     qss.replace("%ARROW_DOWN%", makeArrowIcon(false, arrowColor));
     qss.replace("%CHECK_MARK%", makeCheckIcon(Qt::white));
     app.setStyleSheet(qss);
+}
+
+QIcon runningIndicator()
+{
+    // 首次调用时绘制并缓存：标签页标题每次变化都会取这个图标
+    static const QIcon icon = []() {
+        constexpr int kSize = 16;
+
+        QPixmap pm(kSize * 2, kSize * 2); // 2x 供高 DPI 缩放
+        pm.setDevicePixelRatio(2.0);
+        pm.fill(Qt::transparent);
+
+        QPainter painter(&pm);
+        painter.setRenderHint(QPainter::Antialiasing);
+        painter.setPen(Qt::NoPen);
+
+        // 浅绿底圆 + 实心绿三角：浅色标签栏上也能一眼认出「这个标签在跑」
+        painter.setBrush(QColor(0xdc, 0xf5, 0xe3));
+        painter.drawEllipse(QRectF(0.5, 0.5, kSize - 1.0, kSize - 1.0));
+
+        QPainterPath triangle;
+        triangle.moveTo(6.1, 4.5);
+        triangle.lineTo(11.6, 8.0);
+        triangle.lineTo(6.1, 11.5);
+        triangle.closeSubpath();
+        painter.setBrush(QColor(0x16, 0xa3, 0x4a));
+        painter.drawPath(triangle);
+
+        painter.end();
+        return QIcon(pm);
+    }();
+    return icon;
 }
 
 } // namespace theme

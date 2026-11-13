@@ -4,6 +4,7 @@
 #include <QDateTime>
 #include <QHash>
 #include <QHBoxLayout>
+#include <QIcon>
 #include <QLabel>
 #include <QMessageBox>
 #include <QTabWidget>
@@ -22,6 +23,7 @@
 #include "src/game/capture/Dx11HookCapture.h"
 #include "src/platform/ProcessUtils.h"
 #include "src/ui/session/sessionwidget.h"
+#include "src/ui/theme/Theme.h"
 #include "src/vision/ClassNameCache.h"
 #include "src/vision/OcrEngine.h"
 #include "src/vision/YOLODetector.h"
@@ -80,6 +82,9 @@ void mainwindow::setupUi()
     m_tabs->setTabsClosable(true);
     m_tabs->setMovable(true);
     m_tabs->setDocumentMode(true);
+    // 固定成 16px：运行角标（theme::runningIndicator）按这个尺寸绘制，
+    // 交给样式决定的大小在不同 DPI 下会把它拉糊
+    m_tabs->setIconSize(QSize(16, 16));
     rootLayout->addWidget(m_tabs, 1);
 
     // 底部工具条：新建标签页。
@@ -308,6 +313,12 @@ void mainwindow::refreshTabTitle(sessionwidget* session)
     }
 
     m_tabs->setTabText(index, session->tabTitle());
+
+    // 运行中：在标签文字左侧挂一个绿色播放三角。
+    // 用 tab icon 而不是把「▶」拼进标题文字——QTabBar 的标签文字颜色
+    // 由 QSS 统一控制，想让单个标签的三角变绿只能自定义 delegate
+    m_tabs->setTabIcon(index, session->isTaskRunning() ? theme::runningIndicator()
+                                                       : QIcon());
 
     // 共用实例的完整说明放 tooltip：标题栏放不下，但鼠标一悬停就能看清是谁
     if (session->sharedPeers().isEmpty()) {

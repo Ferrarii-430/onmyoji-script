@@ -211,6 +211,25 @@
     <string/>
    </property>
   </widget>
+  <widget class="QToolButton" name="captureShotButton">
+   <property name="geometry">
+    <rect>
+     <x>855</x>
+     <y>8</y>
+     <width>112</width>
+     <height>30</height>
+    </rect>
+   </property>
+   <property name="toolTip">
+    <string>截取当前绑定实例的画面，用来确认这个标签页对应哪个游戏窗口</string>
+   </property>
+   <property name="text">
+    <string>获取截图</string>
+   </property>
+   <property name="toolButtonStyle">
+    <enum>Qt::ToolButtonStyle::ToolButtonTextOnly</enum>
+   </property>
+  </widget>
   <widget class="QWidget" name="horizontalLayoutWidget">
    <property name="geometry">
     <rect>
