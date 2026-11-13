@@ -228,6 +228,20 @@ sessionwidget* mainwindow::createSession()
         persistSessions();
     });
 
+    // config.json 是全进程共享的方案配置：任一标签页新增/删除/改名方案、
+    // 增删改步骤或导入配置后，其他标签页必须重建列表，
+    // 否则只有动手的那个标签页能看到变化（表现为「新方案只出现在一个标签页」）。
+    // 只广播给其他标签页：发起方在自己的处理流程里已经刷新过了。
+    connect(session, &sessionwidget::profilesChanged, this,
+            [this, session](const QString& configId) {
+                for (int i = 0; i < m_tabs->count(); ++i) {
+                    auto* other = qobject_cast<sessionwidget*>(m_tabs->widget(i));
+                    if (other && other != session) {
+                        other->reloadProfiles(configId);
+                    }
+                }
+            });
+
     connect(session, &sessionwidget::taskFinished, this, [this, session]() {
         // 关闭标签页时若任务在跑，等它真正结束再删
         if (session->property("closeAfterStop").toBool()) {

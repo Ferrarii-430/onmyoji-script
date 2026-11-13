@@ -12,6 +12,9 @@
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QJsonArray>
+#include <QScopedValueRollback>
+#include <QSet>
+#include <QSignalBlocker>
 #include <QTimer>
 #include <QDebug>
 #include <QInputDialog>
@@ -186,9 +189,31 @@ sessionwidget::sessionwidget(QWidget *parent) :
 
     //监听编辑方案名称
     connect(ui->listWidget, &QListWidget::itemChanged, this, [this](QListWidgetItem *item) {
-        // 这里可以保存修改到配置文件等
-        updateProgrammeContent(AppPaths::instance().configPath(), currentItem.id, item->text());
-        loadListWidgetData();
+        if (m_reloadingProfiles || !item) {
+            return;
+        }
+
+        // 用条目自己携带的 id，而不是全局 currentItem：
+        // currentItem 是「最后一次点击」，多标签页下会把别的标签页选中的方案改名
+        const QString configId = item->data(Qt::UserRole).toString();
+        const QString newName = item->text().trimmed();
+        if (configId.isEmpty() || newName.isEmpty()) {
+            return;
+        }
+
+        // 不能在 itemChanged 的调用栈里重建列表：clear() 会析构正在发这条信号的
+        // 条目，后续访问即悬空。延后一拍写文件并重建，顺带避免重入
+        QTimer::singleShot(0, this, [this, configId, newName]() {
+            refreshConfig();
+            updateProgrammeContent(AppPaths::instance().configPath(), configId, newName);
+
+            refreshConfig();
+            rebuildProgrammeList();
+            focusProgrammeInList(configId);
+
+            // 改名是全局改动，其他标签页的列表也要跟着变
+            emit profilesChanged(configId);
+        });
     });
 
     //读取setting的配置
@@ -451,6 +476,8 @@ void sessionwidget::saveSystemConfigAsDefault(const QString& configId)
     m_systemConfigOverrides.remove(configId);
     emit systemConfigOverridesChanged();
     Logger::log(QStringLiteral("已将当前参数保存为方案默认值"));
+    // 默认值写进了 config.json：新建/其他标签页读的是同一份，通知列表同步
+    emit profilesChanged(configId);
 }
 
 void sessionwidget::resetSystemConfigToDefault(const QString& configId)
@@ -526,103 +553,176 @@ GameContext sessionwidget::buildContext() const
 void sessionwidget::loadListWidgetData()
 {
     refreshConfig();
+    rebuildProgrammeList();
+    // 首次加载/增删方案后统一落到第一个可见方案（与原行为一致）。
+    // 需要在重建后保留本页选择的场景走 reloadProfiles()
+    selectFirstVisibleProgramme();
+}
 
+// 重建方案列表条目。只做「条目与 m_configArray 对齐」这件事，
+// 不改变本页选中的方案——多标签页下，别的标签页改配置不应该带走本页的选择。
+void sessionwidget::rebuildProgrammeList()
+{
+    // 重建期间屏蔽 itemChanged：clear()/addItem 过程中的条目变化不是用户改名，
+    // 若被当成改名写回，会把别的标签页正在编辑的方案覆盖掉
+    const QSignalBlocker blocker(ui->listWidget);
     ui->listWidget->clear();
 
-    QJsonArray arr = m_configArray;
+    for (const QJsonValue &val : m_configArray) {
+        const QJsonObject obj = val.toObject();
 
-    // 显隐字段过滤：visible 为 false 的方案不在列表中显示；
-    // 缺省视为 true，兼容无该字段的旧配置
-    QJsonArray visibleArr;
-    for (int i = 0; i < arr.size(); i++) {
-        if (arr[i].toObject()["visible"].toBool(true)) {
-            visibleArr.append(arr[i]);
+        // 显隐字段过滤：visible 为 false 的方案不在列表中显示；
+        // 缺省视为 true，兼容无该字段的旧配置
+        if (!obj.value("visible").toBool(true)) {
+            continue;
+        }
+
+        auto *item = new QListWidgetItem(obj.value("name").toString(), ui->listWidget);
+        // 绑定额外数据（Qt::UserRole 是给用户自定义数据用的）
+        item->setData(Qt::UserRole, obj.value("id").toString());
+        item->setFlags(item->flags() | Qt::ItemIsEditable); // 添加可编辑标志
+    }
+}
+
+QJsonObject sessionwidget::findConfigById(const QString& configId) const
+{
+    if (configId.isEmpty()) {
+        return QJsonObject();
+    }
+    for (const QJsonValue &val : m_configArray) {
+        if (!val.isObject()) {
+            continue;
+        }
+        const QJsonObject obj = val.toObject();
+        if (obj.value("id").toString() == configId) {
+            return obj;
+        }
+    }
+    return QJsonObject();
+}
+
+// 在列表中定位并选中指定方案，同时把本页的选中状态写到 m_selectedItem。
+// 注意：全局 currentItem 是所有会话共用的「最后一次点击」，
+// 启动任务与所有写文件的地方都必须以 m_selectedItem 为准。
+bool sessionwidget::focusProgrammeInList(const QString& configId)
+{
+    const QJsonObject obj = findConfigById(configId);
+    if (obj.isEmpty() || !obj.value("visible").toBool(true)) {
+        return false;
+    }
+
+    {
+        // 程序化改选中项不应触发任何用户编辑语义
+        const QSignalBlocker blocker(ui->listWidget);
+        for (int row = 0; row < ui->listWidget->count(); ++row) {
+            QListWidgetItem *item = ui->listWidget->item(row);
+            if (item && item->data(Qt::UserRole).toString() == configId) {
+                ui->listWidget->setCurrentItem(item);
+                break;
+            }
         }
     }
 
-    for (int i = 0; i < visibleArr.size(); i++) {
-        QJsonObject obj = visibleArr[i].toObject();
+    m_selectedItem.id = configId;
+    m_selectedItem.taskName = obj.value("name").toString();
+    commonSetCurrentItem(m_selectedItem.id, m_selectedItem.taskName);
+    ui->currentTaskName->setText(m_selectedItem.taskName);
+    return true;
+}
 
-        QString name = obj["name"].toString();
-        QString id   = obj["id"].toString();   // 假设 JSON 里有 id 字段
-
-        // 创建列表项
-        QListWidgetItem *item = new QListWidgetItem(name);
-
-        // 绑定额外数据（Qt::UserRole 是给用户自定义数据用的）
-        item->setData(Qt::UserRole, id);
-        item->setFlags(item->flags() | Qt::ItemIsEditable); // 添加可编辑标志
-
-        ui->listWidget->addItem(item);
+void sessionwidget::selectFirstVisibleProgramme()
+{
+    for (const QJsonValue &val : m_configArray) {
+        const QJsonObject obj = val.toObject();
+        if (!obj.value("visible").toBool(true)) {
+            continue;
+        }
+        if (focusProgrammeInList(obj.value("id").toString())) {
+            refreshSelectedProgrammeContent();
+            return;
+        }
     }
 
-    if (visibleArr.size() > 0)
-    {
-        QJsonObject step = visibleArr[0].toObject();
-        QString id = step["id"].toString();
-        QString name = step["name"].toString();
-        // 默认选中项必须同时写入本标签页的 m_selectedItem：
-        // 全局 currentItem 是所有会话共用的，启动任务只看 m_selectedItem
-        m_selectedItem.id = id;
-        m_selectedItem.taskName = name;
-        commonSetCurrentItem(id,name);
-        ui->currentTaskName->setText(name);
-        showStepsInTable(visibleArr[0].toObject()["steps"].toArray()); //默认显示第一个可见配置的方案内容
+    // 所有方案均隐藏/为空：清空选中状态与方案内容区
+    m_selectedItem = ItemInfo{};
+    commonSetCurrentItem(QString(), QString());
+    ui->currentTaskName->setText(QStringLiteral("（无方案）"));
+    if (m_systemConfigForm) {
+        m_systemConfigForm->hide();
     }
-    else
-    {
-        // 所有方案均隐藏：清空选中状态与方案内容表格
-        m_selectedItem = ItemInfo{};
-        commonSetCurrentItem(QString(), QString());
-        ui->currentTaskName->setText(QStringLiteral("（无方案）"));
+    ui->tableWidget->clear();
+    ui->tableWidget->setRowCount(0);
+    ui->tableWidget->setColumnCount(0);
+}
+
+// 按本页选择重建内容区。系统方案展示配置表单，普通方案展示步骤表格
+void sessionwidget::refreshSelectedProgrammeContent()
+{
+    const QJsonObject obj = findConfigById(m_selectedItem.id);
+    if (obj.isEmpty()) {
+        return;
+    }
+
+    if (obj.value("type").toString() == QStringLiteral("system")) {
         ui->tableWidget->clear();
         ui->tableWidget->setRowCount(0);
         ui->tableWidget->setColumnCount(0);
+        ui->programmeContentAddBtn->setDisabled(true);
+        // 按该系统方案的 systemConfig 生成可编辑表单(无自定义配置则退回原提示)
+        showSystemConfigForm(m_selectedItem.id);
+        return;
     }
+
+    ui->programmeContentAddBtn->setDisabled(false);
+    showStepsInTable(obj.value("steps").toArray());
+}
+
+// 其他标签页改了 config.json：重建列表，但保留本页自己的选择。
+// 只重建「本页正在看的方案」的内容区，别的方案被改动时不打断本页操作。
+void sessionwidget::reloadProfiles(const QString& changedConfigId)
+{
+    if (m_reloadingProfiles) {
+        return;
+    }
+    QScopedValueRollback<bool> guard(m_reloadingProfiles, true);
+
+    const QString selectedId = m_selectedItem.id;
+
+    refreshConfig();
+    rebuildProgrammeList();
+
+    if (!selectedId.isEmpty() && focusProgrammeInList(selectedId)) {
+        if (changedConfigId.isEmpty() || changedConfigId == selectedId) {
+            refreshSelectedProgrammeContent();
+        }
+        return;
+    }
+
+    // 本页选中的方案已被删除/隐藏/被导入替换：退回第一个可见方案
+    selectFirstVisibleProgramme();
 }
 
 // 点击了方案列表
 void sessionwidget::onItemClicked(QListWidgetItem *item) {
     if (!item) return;
-    // 获取显示文本
-    QString name = item->text();
-    QString id   = item->data(Qt::UserRole).toString();
-    // Logger::log(QString( "onItemClicked->选中项 name:" + name + ", id:" + id));
 
-    // 记住本标签页的选择：全局 currentItem 是各会话共用的，
-    // 别的标签页切换方案会把它改掉，启动任务时不能依赖它
-    m_selectedItem.id = id;
-    m_selectedItem.taskName = name;
+    const QString id = item->data(Qt::UserRole).toString();
+    if (id.isEmpty()) return;
 
-    commonSetCurrentItem(id,name);
-    ui->currentTaskName->setText(name);
-
-    QJsonObject obj = QJsonObject(); //默认为空
-    //读取对应的方案步骤数据到表格
-    for (const QJsonValue &val : m_configArray) {
-        if (!val.isObject()) {
-            continue;
-        }
-        obj = val.toObject();
-        if (obj["id"].toString() == id) {
-            break;
-        }
+    // 兜底：列表可能是旧的（别的标签页刚改过 config.json）。
+    // 点到的方案在内存里找不到时补读一次文件再重试，避免「点了没反应」
+    if (findConfigById(id).isEmpty()) {
+        refreshConfig();
+        rebuildProgrammeList();
     }
 
-    QJsonArray steps = obj["steps"].toArray();
-    if (obj["type"] == "system")
-    {
-        ui->tableWidget->clear(); // 清空表格
-        ui->tableWidget->setRowCount(0);
-        ui->tableWidget->setColumnCount(0);
-        ui->programmeContentAddBtn->setDisabled(true);
-        // 按该系统方案的 systemConfig 生成可编辑表单(无自定义配置则退回原提示)
-        showSystemConfigForm(id);
-    }else
-    {
-        ui->programmeContentAddBtn->setDisabled(false);
-        showStepsInTable(steps);
+    if (!focusProgrammeInList(id)) {
+        Logger::log(QStringLiteral("该方案已不存在，方案列表已同步为最新配置"));
+        selectFirstVisibleProgramme();
+        return;
     }
+
+    refreshSelectedProgrammeContent();
 }
 
 // 按系统方案的 systemConfig 描述动态生成可编辑表单。
@@ -712,11 +812,13 @@ void sessionwidget::showSystemConfigForm(const QString &configId)
         entryLayout->addStretch(1);
 
         connect(editBtn, &QPushButton::clicked, this, [this, configId]() {
-            BossConfigDialog dialog(currentItem.taskName, getBossConfig(configId), this);
+            BossConfigDialog dialog(m_selectedItem.taskName, getBossConfig(configId), this);
             if (dialog.exec() != QDialog::Accepted) {
                 return;
             }
             updateBossConfig(AppPaths::instance().configPath(), configId, dialog.list());
+            // 鬼王列表存在 config.json 里，属于全局数据：其他标签页同步刷新
+            emit profilesChanged(configId);
         });
 
         form->addRow(QStringLiteral("阵容配置"), entryRow);
@@ -931,10 +1033,16 @@ void sessionwidget::showStepsInTable(const QJsonArray &steps) {
         QPushButton *editBtn = new QPushButton("编辑");
         ui->tableWidget->setCellWidget(i, 3, wrapCellWidget(editBtn));
         connect(editBtn, &QPushButton::clicked, this, [this, step]() {
+            // 步骤属于本页选中的方案：配置 id 以 m_selectedItem 为准，
+            // 不能用全局 currentItem（别的标签页切换方案后会指到别处）
+            const QString configId = m_selectedItem.id;
+            if (configId.isEmpty()) {
+                return;
+            }
             // 弹窗修改，或进入编辑模式
-            EditTaskDialog* dlg = new EditTaskDialog(EditMode::Edit,step,currentItem.id,nullptr);
+            EditTaskDialog* dlg = new EditTaskDialog(EditMode::Edit,step,configId,nullptr);
             dlg->show();
-            connect(dlg, &EditTaskDialog::accepted,[dlg, this]() {
+            connect(dlg, &EditTaskDialog::accepted, this, [this, dlg, configId]() {
                 QJsonObject data = dlg->resultData();
                 if (data.isEmpty()) {
                     return;
@@ -944,9 +1052,12 @@ void sessionwidget::showStepsInTable(const QJsonArray &steps) {
                 if (data["type"].toString() == "OPENCV") {
                     saveBase64ImageToFile(data);
                 }
-                updateConfigInJsonFile(AppPaths::instance().configPath(), currentItem.id, data);
+                // 以文件最新内容为基准，避免覆盖别的标签页刚做的改动
+                refreshConfig();
+                updateConfigInJsonFile(AppPaths::instance().configPath(), configId, data);
                 QTimer::singleShot(0, dlg, &QObject::deleteLater); // 延迟一拍
                 showCurrentSelectStepsInTable();
+                emit profilesChanged(configId);
             });
             connect(dlg, &EditTaskDialog::imagePathRequested, this, [this](const QString& path) { showOpenCVIdentifyImage(path); });
         });
@@ -962,9 +1073,15 @@ void sessionwidget::showStepsInTable(const QJsonArray &steps) {
                                         QMessageBox::Yes | QMessageBox::No);
 
             if (reply == QMessageBox::Yes) {
-                // qDebug() << "点击了删除: 行=" << i << " id=" << step["stepsId"].toString();
-                removeConfigById(AppPaths::instance().configPath(), currentItem.id, step["stepsId"].toString());
+                const QString configId = m_selectedItem.id;
+                if (configId.isEmpty()) {
+                    return;
+                }
+                // 以文件最新内容为基准，避免覆盖别的标签页刚做的改动
+                refreshConfig();
+                removeConfigById(AppPaths::instance().configPath(), configId, step["stepsId"].toString());
                 showCurrentSelectStepsInTable();
+                emit profilesChanged(configId);
             }
         });
 
@@ -977,29 +1094,20 @@ void sessionwidget::showStepsInTable(const QJsonArray &steps) {
 void sessionwidget::showCurrentSelectStepsInTable()
 {
     refreshConfig();
-    if (currentItem.id.isEmpty())
+    // 只看本页自己的选择：全局 currentItem 可能已被别的标签页改掉
+    if (m_selectedItem.id.isEmpty())
     {
         Logger::log(QString("当前选择方案ID为空"));
         return;
     }
 
-
-    bool hasConfigId = false;
-    for (int i = 0; i < m_configArray.size(); ++i)
+    if (findConfigById(m_selectedItem.id).isEmpty())
     {
-        QJsonObject obj = m_configArray[i].toObject();
-        if (obj["id"].toString() == currentItem.id)
-        {
-            showStepsInTable(obj["steps"].toArray());
-            hasConfigId = true;
-            break;
-        }
+        Logger::log("没有ConfigId: " + m_selectedItem.id);
+        return;
     }
 
-    if (!hasConfigId)
-    {
-        Logger::log("没有ConfigId: " + currentItem.id);
-    }
+    refreshSelectedProgrammeContent();
 }
 
 //开启当前选中的任务
@@ -1159,10 +1267,42 @@ void sessionwidget::onProgrammeAddBtnClicked()
     );
 
     if (ok && !configName.isEmpty()) {
+        // 以文件里的最新配置为基准：m_configArray 可能落后（别的标签页刚改过），
+        // 直接拿旧数组覆盖写会把别人的改动抹掉
+        refreshConfig();
+
+        // 记录添加前的方案 id，添加后据此找出新方案并自动选中它，
+        // 用户不必再去列表里找刚建的这一条
+        QSet<QString> before;
+        for (const QJsonValue &val : m_configArray) {
+            before.insert(val.toObject().value("id").toString());
+        }
+
         addConfigToJsonFile(AppPaths::instance().configPath(), configName);
         // 输入了有效内容
         Logger::log("已添加新的配置: " + configName);
-        loadListWidgetData();
+
+        refreshConfig();
+        rebuildProgrammeList();
+
+        QString newId;
+        for (const QJsonValue &val : m_configArray) {
+            const QJsonObject obj = val.toObject();
+            const QString id = obj.value("id").toString();
+            if (!before.contains(id)) {
+                newId = id;
+                break;
+            }
+        }
+
+        if (!newId.isEmpty() && focusProgrammeInList(newId)) {
+            refreshSelectedProgrammeContent();
+        } else {
+            selectFirstVisibleProgramme();
+        }
+
+        // 方案列表变了：其他标签页必须重建，否则新方案只在当前标签页可见
+        emit profilesChanged(newId);
     } else {
         // 用户取消或输入为空
         Logger::log(QString("用户未输入或无效的配置名称"));
@@ -1172,7 +1312,7 @@ void sessionwidget::onProgrammeAddBtnClicked()
 // 按钮点击槽函数
 void sessionwidget::onProgrammeRemoveBtnClicked()
 {
-    if (currentItem.id.isEmpty())
+    if (m_selectedItem.id.isEmpty())
     {
         Logger::log(QString("未选中配置"));
         return;
@@ -1182,22 +1322,26 @@ void sessionwidget::onProgrammeRemoveBtnClicked()
     reply = QMessageBox::question(
         this,
         tr("确认删除"),
-        tr("确定要删除配置 “%1” 吗？").arg(currentItem.taskName),
+        tr("确定要删除配置 “%1” 吗？").arg(m_selectedItem.taskName),
         QMessageBox::Yes | QMessageBox::No
     );
 
     if (reply == QMessageBox::Yes)
     {
-        if (removeConfigById(AppPaths::instance().configPath(), currentItem.id))
+        // 以文件里的最新配置为基准，避免用旧数组覆盖掉别的标签页的改动
+        refreshConfig();
+        if (removeConfigById(AppPaths::instance().configPath(), m_selectedItem.id))
         {
-            Logger::log("已删除配置: " + currentItem.taskName);
+            Logger::log("已删除配置: " + m_selectedItem.taskName);
             // 刷新列表，由 loadListWidgetData 重新选定第一个可见方案，
             // 保证界面选中项与 m_selectedItem 同步
             loadListWidgetData();
+            // 方案列表变了：其他标签页同步重建
+            emit profilesChanged(QString());
         }
         else
         {
-            Logger::log("删除配置失败: " + currentItem.taskName);
+            Logger::log("删除配置失败: " + m_selectedItem.taskName);
         }
     }
     else
@@ -1321,6 +1465,8 @@ void sessionwidget::onSettingBtnClicked()
             ui->tableWidget->setColumnCount(0);
             ui->currentTaskName->setText(QStringLiteral("（无方案）"));
         }
+        // 导入会整体替换 config.json：其他标签页也必须重建列表
+        emit profilesChanged(QString());
     });
     if (dialog.exec() == QDialog::Accepted) {
         // 设置已保存和应用
@@ -1331,10 +1477,17 @@ void sessionwidget::onSettingBtnClicked()
 
 void sessionwidget::onProgrammeContentAddBtnClicked()
 {
+    // 步骤加到本页选中的方案上：全局 currentItem 可能被别的标签页改掉
+    const QString configId = m_selectedItem.id;
+    if (configId.isEmpty()) {
+        Logger::log(QStringLiteral("当前未选中方案"));
+        return;
+    }
+
     QJsonObject empty;
-    EditTaskDialog* dlg = new EditTaskDialog(EditMode::Add,empty,currentItem.id,nullptr); // 非模态
+    EditTaskDialog* dlg = new EditTaskDialog(EditMode::Add,empty,configId,nullptr); // 非模态
     dlg->show();
-    connect(dlg, &EditTaskDialog::accepted, [dlg, this]() {
+    connect(dlg, &EditTaskDialog::accepted, this, [this, dlg, configId]() {
         QJsonObject data = dlg->resultData();
         // 保存 JSON
         if (data.isEmpty()) {
@@ -1344,9 +1497,13 @@ void sessionwidget::onProgrammeContentAddBtnClicked()
         if (data["type"].toString() == "OPENCV") {
             saveBase64ImageToFile(data);
         }
-        addConfigToJsonFile(AppPaths::instance().configPath(),currentItem.id,data);
+        // 以文件最新内容为基准，避免覆盖别的标签页刚做的改动
+        refreshConfig();
+        addConfigToJsonFile(AppPaths::instance().configPath(),configId,data);
         QTimer::singleShot(0, dlg, &QObject::deleteLater);  // 延迟一拍
         showCurrentSelectStepsInTable();
+        // 步骤变了：其他标签页若正看着这个方案，内容区要跟着刷新
+        emit profilesChanged(configId);
     });
     connect(dlg, &EditTaskDialog::imagePathRequested, this, [this](const QString& path) { showOpenCVIdentifyImage(path); });
 }
@@ -1355,9 +1512,11 @@ void sessionwidget::onProgrammeUpBtnClicked()
 {
     int currentRow = ui->tableWidget->currentRow();
     if (currentRow >= 0) {
-        moveProgramme(AppPaths::instance().configPath(), currentItem.id, currentRow, true);
+        refreshConfig();
+        moveProgramme(AppPaths::instance().configPath(), m_selectedItem.id, currentRow, true);
         showCurrentSelectStepsInTable();
         ui->tableWidget->selectRow(currentRow-1);
+        emit profilesChanged(m_selectedItem.id);
     } else {
         Logger::log(QString("没有选择方案内容的任何行"));
     }
@@ -1367,9 +1526,11 @@ void sessionwidget::onProgrammeDownBtnClicked()
 {
     int currentRow = ui->tableWidget->currentRow();
     if (currentRow >= 0) {
-        moveProgramme(AppPaths::instance().configPath(), currentItem.id, currentRow, false);
+        refreshConfig();
+        moveProgramme(AppPaths::instance().configPath(), m_selectedItem.id, currentRow, false);
         showCurrentSelectStepsInTable();
         ui->tableWidget->selectRow(currentRow+1);
+        emit profilesChanged(m_selectedItem.id);
     } else {
         Logger::log(QString("没有选择方案内容的任何行"));
     }

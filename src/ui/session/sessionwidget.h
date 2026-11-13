@@ -81,6 +81,11 @@ public:
 
     bool isTaskRunning() const;
 
+    // 其他标签页改动了 config.json（全局共享）后由 shell 调用：
+    // 重建本页方案列表并尽量保留本页自己的选中项，不越权改动别的标签页状态。
+    // changedConfigId 为受影响的方案 id；列表结构变化（新增/删除/导入）时为空。
+    void reloadProfiles(const QString& changedConfigId);
+
     // 协作式停止：请求停止但不阻塞等待，结束时会发 taskFinished
     void stopTask();
 
@@ -97,6 +102,11 @@ signals:
     void bindingChanged();
     // 本标签页的系统方案配置变化（供 shell 持久化）
     void systemConfigOverridesChanged();
+    // 本标签页改动了 config.json（新增/删除/改名方案、增删改步骤、导入配置）。
+    // config.json 是全进程共享的，shell 据此让其他标签页重建方案列表，
+    // 否则只有动手的那个标签页能看到变化。
+    // configId 为受影响的方案 id；列表结构变化（新增/删除/导入）时为空。
+    void profilesChanged(const QString& configId);
     // 标签页标题需要更新
     void titleChanged();
     // 任务开始/结束
@@ -180,6 +190,21 @@ private:
     void updateBindStateLabel();
 
     void loadListWidgetData();
+    // 只重建列表条目，不做选中处理（调用方自己决定选中哪个方案）
+    void rebuildProgrammeList();
+    // 在列表中选中指定方案，并同步本页的选中状态与标题；方案不存在/被隐藏时返回 false
+    bool focusProgrammeInList(const QString& configId);
+    // 选中第一个可见方案；一个可见方案都没有时清空选中与内容区
+    void selectFirstVisibleProgramme();
+    // 按本页当前选择重建内容区（普通方案→步骤表格，系统方案→配置表单）
+    void refreshSelectedProgrammeContent();
+    // 从 m_configArray 取方案对象，找不到返回空对象
+    QJsonObject findConfigById(const QString& configId) const;
+
+    // 重建列表期间置位：itemChanged 只在用户真的改名时才写回文件，
+    // 否则程序重建条目会被当成改名，把别的标签页的方案名覆盖掉
+    bool m_reloadingProfiles = false;
+
     void onItemClicked(QListWidgetItem *item);
     void showStepsInTable(const QJsonArray &steps);
     void showCurrentSelectStepsInTable();

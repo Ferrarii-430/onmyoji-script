@@ -526,7 +526,7 @@ namespace scenarios {
                 if (actions.yoloRecognizesAndClick(0.80, false, "common-btn-yellow_confirm").isEmpty())
                 {
                     Logger::log(QString("无法识别到【确定】按钮"));
-                    return false;
+                    //此处不一定需要切换
                 }
             }
 
@@ -536,7 +536,7 @@ namespace scenarios {
                 if (actions.yoloRecognizesAndClick(0.80, false, "common-btn-yellow_confirm").isEmpty())
                 {
                     Logger::log(QString("无法识别到【确定】按钮"));
-                    return false;
+                    //此处不一定需要切换
                 }
             }
 
