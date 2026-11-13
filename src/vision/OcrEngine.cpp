@@ -86,9 +86,11 @@ bool initInProcessOcr()
         return true;
     } catch (const Ort::Exception& e) {
         qWarning() << "PP-OCRv6 模型加载失败:" << e.what();
+        Logger::log(QString("PP-OCRv6 模型加载失败: %1").arg(e.what()));
         return false;
     } catch (const std::exception& e) {
         qWarning() << "PP-OCRv6 引擎初始化异常:" << e.what();
+        Logger::log(QString("PP-OCRv6 引擎初始化异常: %1").arg(e.what()));
         return false;
     }
 }

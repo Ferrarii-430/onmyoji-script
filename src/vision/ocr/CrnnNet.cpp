@@ -2,8 +2,10 @@
 // 搬运自上游并按本项目精简：去掉 CUDA 与调试图片输出。
 #include "CrnnNet.h"
 #include "OcrUtils.h"
+#include <cstdio>
 #include <fstream>
 #include <numeric>
+#include <stdexcept>
 
 CrnnNet::~CrnnNet() {
     delete session;
@@ -28,6 +30,23 @@ void CrnnNet::initModel(const std::string &pathStr, const std::string &keysPath)
     outputNamesPtr = getOutputNames(session);
 
     //load keys
+#ifdef _WIN32
+    // 必须用宽路径打开：打包目录含中文（如 F:/工具/...）时，std::ifstream 的窄路径
+    // 会按 ANSI 代码页解析而打开失败，keys 为空会让 OCR 只出检测框、文字全部为空
+    std::FILE *keysFile = _wfopen(strToWstr(keysPath).c_str(), L"rb");
+    if (keysFile == nullptr) {
+        throw std::runtime_error("OCR 字典文件打开失败: " + keysPath);
+    }
+    char buffer[1024];
+    while (std::fgets(buffer, sizeof(buffer), keysFile) != nullptr) {
+        std::string line(buffer);
+        while (!line.empty() && (line.back() == '\n' || line.back() == '\r')) {
+            line.pop_back();
+        }
+        keys.push_back(std::move(line));
+    }
+    std::fclose(keysFile);
+#else
     std::ifstream in(keysPath.c_str());
     std::string line;
     if (in) {
@@ -37,6 +56,7 @@ void CrnnNet::initModel(const std::string &pathStr, const std::string &keysPath)
     } else {
         return;
     }
+#endif
     keys.insert(keys.begin(), "#");
     keys.emplace_back(" ");
 }

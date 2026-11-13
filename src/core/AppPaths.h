@@ -36,21 +36,32 @@ public:
 #endif
     }
 
+    // 注入器 / hook DLL 属于独立子模块，中转文件路径按 ANSI 窄字符处理：
+    // 应用目录含中文时 DLL 侧打不开（日志、持久化截图会静默失败），
+    // 因此含非 ASCII 字符时统一回退到全 ASCII 的 ProgramData 目录。
+    // 应用侧读写走同一方法，保证写入与回读的路径一致。
+    QString dx11WorkDir() const {
+        if (!isAsciiPath(applicationDirPath())) {
+            return QStringLiteral("C:/ProgramData/yys-script/src/resource");
+        }
+        return applicationDirPath() + "/src/resource";
+    }
+
     // 路径获取方法
     QString dx11CapturePath() const {
-        return applicationDirPath() + "/src/resource/thumbnail/debug_capture_result.png";
+        return dx11WorkDir() + "/thumbnail/debug_capture_result.png";
     }
 
     // 按游戏实例区分的中转文件：多开时每个实例各写各的，避免互相覆写。
     // DLL 侧的截图名与日志名都由此传入，规则改这里即可。
     QString dx11CapturePathFor(DWORD pid) const {
-        return applicationDirPath()
-               + QString("/src/resource/thumbnail/debug_capture_%1.png").arg(pid);
+        return dx11WorkDir()
+               + QString("/thumbnail/debug_capture_%1.png").arg(pid);
     }
 
     QString dx11LogPathFor(DWORD pid) const {
-        return applicationDirPath()
-               + QString("/src/resource/log/dx11_log_%1.txt").arg(pid);
+        return dx11WorkDir()
+               + QString("/log/dx11_log_%1.txt").arg(pid);
     }
 
     QString matchResultPath() const {
@@ -71,7 +82,7 @@ public:
     }
 
     QString dx11LogPath() const {
-        return applicationDirPath() + "/src/resource/log/dx11_log.txt";
+        return dx11WorkDir() + "/log/dx11_log.txt";
     }
 
     // 应用自身日志（Logger 输出），与 dx11 hook 日志同目录但独立轮转
@@ -144,6 +155,15 @@ private:
     ~AppPaths() = default;
 
 #ifdef Q_OS_WIN
+    static bool isAsciiPath(const QString& path) {
+        for (const QChar& c : path) {
+            if (c.unicode() > 127) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     static QString toShortPath(const QString& path) {
         const wchar_t* wPath = reinterpret_cast<const wchar_t*>(path.utf16());
         const DWORD len = GetShortPathNameW(wPath, nullptr, 0);

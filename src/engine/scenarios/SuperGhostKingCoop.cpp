@@ -281,7 +281,7 @@ namespace scenarios {
             utils::OcrTextTracker groupTopTracker;
             for (int i = 0; i < 10; ++i)
             {
-                QJsonArray groupData = actions.ocrRecognizes(QRectF(37.7, 35.0, 11.1, 51.8), ocr::Enhance::Upscale | ocr::Enhance::AutoInvert, 0.6);
+                QJsonArray groupData = actions.ocrRecognizes(QRectF(37.7, 29.7, 11.1, 56.1), ocr::Enhance::Upscale, 0.6);
                 qDebug() << "[debug] groupData:" << groupData;
                 //文本内容与上次一致（忽略 box/score 波动），说明滑动未改变列表内容，已到顶部，结束循环
                 if (groupTopTracker.unchangedSinceLast(groupData)) {
@@ -296,7 +296,7 @@ namespace scenarios {
                     return false;
                 }
                 //等列表滚动动画结束再识别，否则可能读到滑动前的旧画面
-                waitRandomWithEventProcessing(2000,200);
+                waitRandomWithEventProcessing(2500,200);
             }
 
             //寻找目标分组列表
@@ -305,7 +305,7 @@ namespace scenarios {
             utils::OcrTextTracker groupingTracker;
             for (int i = 0; i < 10; ++i)
             {
-                QJsonArray groupingData = actions.ocrRecognizes(QRectF(37.7, 35.0, 11.1, 51.8), ocr::Enhance::Upscale);
+                QJsonArray groupingData = actions.ocrRecognizes(QRectF(37.7, 29.7, 11.1, 56.1), ocr::Enhance::Upscale, 0.6);
 
                 //文本内容与上次一致（忽略 box/score 波动），说明滑动未改变列表内容，已到底部，结束循环
                 if (groupingTracker.unchangedSinceLast(groupingData)) {
@@ -338,7 +338,7 @@ namespace scenarios {
                     return false;
                 }
                 //等列表滚动动画结束再识别，否则可能读到滑动前的旧画面
-                waitRandomWithEventProcessing(2000,200);
+                waitRandomWithEventProcessing(2500,200);
             }
             if (!foundGrouping) {
                 Logger::log(QString("未找到分组: %1").arg(config.base.schemeName));
@@ -354,10 +354,10 @@ namespace scenarios {
             auto switchNumberArray = actions.opencvFindAll(screenshotPath + "super-switch-soul.png", 0.6, false);
             qDebug() << "[debug] switchNumberArray:" << switchNumberArray.size();
             constexpr QRectF presetsRoiArray[5] = {
-                {48.5, 32.3, 30.8, 13.4}, //0或者1个
-                {48.5, 32.3, 5.1, 26.0}, //2个
-                {48.5, 32.3, 5.1, 39.8}, //3个
-                {48.5, 32.3, 30.8, 45.0}};//大于3个
+                {48.5, 30.4, 30.8, 14.6}, //0或者1个
+                {48.5, 30.4, 30.8, 28.1}, //2个
+                {48.5, 30.4, 30.8, 41.6}, //3个
+                {48.5, 30.4, 30.8, 47.2}};//大于3个
             QRectF presetsRoi = {};
             switch (switchNumberArray.size())
             {
