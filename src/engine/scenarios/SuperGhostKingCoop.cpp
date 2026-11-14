@@ -182,7 +182,6 @@ namespace scenarios {
         const QString screenshotPath = AppPaths::instance().screenshotPath();
 
         //识别是否鬼王邀请，没有则循环等待 10分钟
-        Logger::log(QString("等待鬼王邀请"));
         bool inviteFound = false;
         for (int i = 0; i < 200 && TaskRunner::instance().isRunning() && !inviteFound; ++i)
         {
@@ -626,10 +625,14 @@ namespace scenarios {
 
             waitRandomWithEventProcessing(3500,300);
 
-            //有准备就点一下，没有则不用管
-            if (!actions.yoloRecognizesAndClick(0.50, true, "battle-ready").isEmpty())
+            //仅当已确认锁定阵容时无需准备，未锁定或锁定失败时尝试点击【准备】
+            if (!isLock.value_or(false))
             {
-                Logger::log(QString("点击【准备】"));
+                //有准备就点一下，没有则不用管
+                if (!actions.yoloRecognizesAndClick(0.50, true, "battle-ready").isEmpty())
+                {
+                    Logger::log(QString("点击【准备】"));
+                }
             }
 
             //判断是否进入战斗

@@ -17,6 +17,7 @@
 #include "src/vision/Geometry.h"
 
 using core::waitWithEventProcessing;
+using core::waitRandomWithEventProcessing;
 
 namespace scenarios {
 
@@ -61,16 +62,16 @@ bool openRealmAndAttack(const Detection& det)
 // 循环条件检查任务状态：点「停止」后立即中断等待，而非傻等满全部轮询
 bool surrenderBattle()
 {
-    constexpr int kEnterBattleAttempts = 6;  // 6次 * 1秒 = 6秒
+    constexpr int kEnterBattleAttempts = 10;  // 10次 * 1秒 = 10秒
     for (int attempts = 0; attempts < kEnterBattleAttempts && TaskRunner::instance().isRunning(); ++attempts) {
         waitWithEventProcessing(1000);
 
-        if (ScriptActions::instance().yoloContainsLabels(0.4, {"common-exit-battle", "common-chat"}, false)) {
+        if (ScriptActions::instance().yoloContainsLabels(0.5, {"common-exit-battle"}, false)) {
             Logger::log(QString("准备退出战斗"));
-            waitWithEventProcessing(800);
+            waitRandomWithEventProcessing(1800, 300);
 
             GameWindow::instance().postKey(VK_ESCAPE);
-            waitWithEventProcessing(200);
+            waitRandomWithEventProcessing(500, 200);
             GameWindow::instance().postKey(VK_RETURN);
 
             Logger::log(QString("识别失败并点击"));
