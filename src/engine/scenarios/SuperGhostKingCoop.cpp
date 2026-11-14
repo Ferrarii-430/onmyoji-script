@@ -583,7 +583,7 @@ namespace scenarios {
                 isLock = true;
             } else
             {
-                Logger::log(QString("锁定阵容失败"));
+                Logger::log(QString("锁定阵容失败，可能阵容已锁定"));
             }
         }
 

@@ -36,13 +36,13 @@
 
 分数阈值是 0 ~ 1 之间的数字，建议填 0.55 ~ 0.75；点击「开始截图」选择需要识别的图片，OK 保存即可。
 
-![选择方案](img/img1.png)
+<img src="img/img1.png" alt="选择方案" width="600">
 
-![输入数据](img/img2.png)
+<img src="img/img2.png" alt="输入数据" width="600">
 
-![截图识别](img/img3.png)
+<img src="img/img3.png" alt="截图识别" width="600">
 
-![识别类型](img/img4.png)
+<img src="img/img4.png" alt="识别类型" width="600">
 
 **总共 5 种识别类型，具体使用可自行探索。**
 
@@ -52,13 +52,13 @@
 
 启动后界面会显示「运行中」及实时进度 `(已执行/总次数)`；点击「停止」会等待当前任务执行完成后退出，期间按钮显示「正在停止...」。
 
-![设置循环](img/img5.png)
+<img src="img/img5.png" alt="设置循环" width="600">
 
 ### 3. 系统方案
 
 系统方案使用看软件中的 tip 提示，系统方案不可更改。
 
-![系统方案](img/img6.png)
+<img src="img/img6.png" alt="系统方案" width="600">
 
 ### 4. 鼠标模式
 
