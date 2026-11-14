@@ -225,9 +225,20 @@ namespace scenarios {
         waitRandomWithEventProcessing(1500, 300);
 
         //获取鬼王名称
-        QJsonArray ocrData = actions.ocrRecognizes(QRectF(33.6, 18.4, 15.1, 27.1), ocr::Enhance::Upscale, 0.6);
-        qDebug() << "[debug] ocrData:" << ocrData;
-        if (ocrData.empty())
+        bool getBossNameStatus = false;
+        QJsonArray ocrData;
+        for (int i = 0; i < 5; ++i)
+        {
+            ocrData = actions.ocrRecognizes(QRectF(33.6, 18.4, 15.1, 27.1), ocr::Enhance::Upscale, 0.6);
+            qDebug() << "[debug] ocrData:" << ocrData;
+            if (!ocrData.isEmpty())
+            {
+                getBossNameStatus = true;
+                break;
+            }
+            waitWithEventProcessing(1000);
+        }
+        if (!getBossNameStatus)
         {
             Logger::log(QString("无法识别鬼王名称"));
             return false;
@@ -447,54 +458,64 @@ namespace scenarios {
                 return false;
             }
 
-            // 识别所有预设队伍切换按钮
-            auto detections = actions.opencvFindAll(screenshotPath + "super-switch-soul.png", 0.6, false);
-            if (detections.empty()) {
-                Logger::log(QString("未找到预设队伍切换按钮"));
-                return false;
-            }
-
-            // 在 detections 中找出 Y 轴最接近预设 box 中心的项并点击
-            const int targetY = presetRect.y + presetRect.height / 2;
-            const OpenCvMatch* best = nullptr;
-            int minDY = INT_MAX;
-            for (const auto& det : detections) {
-                const int dy = std::abs(det.center.y - targetY);
-                if (dy < minDY) {
-                    minDY = dy;
-                    best = &det;
-                }
-            }
-            if (best) {
-                GameWindow::instance().clickInWindow(utils::makeClickPoint(best->rect, false));
-                Logger::log(QString("点击预设队伍切换: score=%1 位置(%2,%3) 目标Y=%4 偏差=%5")
-                            .arg(best->score, 0, 'f', 2).arg(best->center.x).arg(best->center.y)
-                            .arg(targetY).arg(minDY));
-            }
-
-            waitRandomWithEventProcessing(2000,200);
-
-            //点击确认切换御魂
-            if (actions.yoloContainsLabels(0.60, {"common-popup-confirm"}, false))
+            if (config.base.schemeName != "队伍租借")
             {
-                if (actions.yoloRecognizesAndClick(0.80, false, "common-btn-yellow_confirm").isEmpty())
-                {
-                    Logger::log(QString("无法识别到【确定】按钮"));
-                    //此处不一定需要切换
+                // 识别所有预设队伍切换按钮
+                auto detections = actions.opencvFindAll(screenshotPath + "super-switch-soul.png", 0.6, false);
+                if (detections.empty()) {
+                    Logger::log(QString("未找到预设队伍切换按钮"));
+                    return false;
                 }
-            }
 
-            //切换契灵 可能需要再点击一次确定
-            if (actions.yoloContainsLabels(0.60, {"common-popup-confirm"}, false))
+                // 在 detections 中找出 Y 轴最接近预设 box 中心的项并点击
+                const int targetY = presetRect.y + presetRect.height / 2;
+                const OpenCvMatch* best = nullptr;
+                int minDY = INT_MAX;
+                for (const auto& det : detections) {
+                    const int dy = std::abs(det.center.y - targetY);
+                    if (dy < minDY) {
+                        minDY = dy;
+                        best = &det;
+                    }
+                }
+                if (best) {
+                    GameWindow::instance().clickInWindow(utils::makeClickPoint(best->rect, false));
+                    Logger::log(QString("点击预设队伍切换: score=%1 位置(%2,%3) 目标Y=%4 偏差=%5")
+                                .arg(best->score, 0, 'f', 2).arg(best->center.x).arg(best->center.y)
+                                .arg(targetY).arg(minDY));
+                }
+
+                waitRandomWithEventProcessing(2000,200);
+
+                //点击确认切换御魂
+                if (actions.yoloContainsLabels(0.50, {"common-popup-confirm"}, false))
+                {
+                    waitRandomWithEventProcessing(1200,200);
+                    if (actions.yoloRecognizesAndClick(0.55, false, "common-btn-yellow_confirm").isEmpty())
+                    {
+                        Logger::log(QString("无法识别到【确定】按钮"));
+                        //此处不一定需要切换
+                    }
+                }
+
+                waitRandomWithEventProcessing(1500,200);
+
+                //切换契灵 可能需要再点击一次确定
+                if (actions.yoloContainsLabels(0.50, {"common-popup-confirm"}, false))
+                {
+                    waitRandomWithEventProcessing(1200,200);
+                    if (actions.yoloRecognizesAndClick(0.55, false, "common-btn-yellow_confirm").isEmpty())
+                    {
+                        Logger::log(QString("无法识别到【确定】按钮"));
+                        //此处不一定需要切换
+                    }
+                }
+
+                waitRandomWithEventProcessing(2000,200);
+            }else
             {
-                if (actions.yoloRecognizesAndClick(0.80, false, "common-btn-yellow_confirm").isEmpty())
-                {
-                    Logger::log(QString("无法识别到【确定】按钮"));
-                    //此处不一定需要切换
-                }
+                Logger::log(QString("队伍租借 无需切换御魂"));
             }
-
-            waitRandomWithEventProcessing(2000,200);
 
             //点击目标预设队伍
             GameWindow::instance().clickInWindow(utils::makeClickPoint(presetRect, false));
@@ -530,7 +551,7 @@ namespace scenarios {
             if (!currentStrongPursuitStatus.value())
             {
                 //只有关闭状态下需要开启
-                if (actions.ocrRecognizesAndClick("2.5倍伤害", 0.60, true, QRectF(81.0, 66.3, 19.0, 13.3), ocr::Enhance::Upscale | ocr::Enhance::AutoInvert).isEmpty())
+                if (actions.ocrRecognizesAndClick("2.5倍伤害", 0.60, true, QRectF(76.3, 39.0, 23.7, 43.8), ocr::Enhance::Upscale | ocr::Enhance::AutoInvert).isEmpty())
                 {
                     Logger::log(QString("开启【强力追击】失败"));
                     return false;
@@ -543,7 +564,7 @@ namespace scenarios {
             if (currentStrongPursuitStatus.value())
             {
                 //只有开启状态下需要关闭
-                if (actions.opencvRecognizesAndClick(screenshotPath + "super-check.png", 0.65, false, true).isEmpty())
+                if (actions.opencvRecognizesAndClick(screenshotPath + "super-check.png", 0.55, false, true).isEmpty())
                 {
                     Logger::log(QString("关闭【强力追击】失败"));
                     return false;
@@ -585,6 +606,21 @@ namespace scenarios {
                 return false;
             }
 
+            if (config.base.schemeName == "队伍租借")
+            {
+                //队伍租借需要点击确定
+                waitRandomWithEventProcessing(1200,200);
+                if (actions.yoloContainsLabels(0.50, {"common-popup-confirm"}, false))
+                {
+                    waitRandomWithEventProcessing(1000,200);
+                    if (actions.yoloRecognizesAndClick(0.55, false, "common-btn-yellow_confirm").isEmpty())
+                    {
+                        Logger::log(QString("无法识别到【确定】按钮"));
+                        //此处不一定需要切换
+                    }
+                }
+            }
+
             //这里可能会触发喝茶
             //TODO 自动喝茶的逻辑还没写
 
@@ -598,11 +634,11 @@ namespace scenarios {
 
             //判断是否进入战斗
             bool isEngageInBattle = false;
-            for (int i = 0; i < 5 && TaskRunner::instance().isRunning(); ++i)
+            for (int i = 0; i < 10 && TaskRunner::instance().isRunning(); ++i)
             {
                 //先等1秒
                 waitRandomWithEventProcessing(1000,200);
-                if (actions.yoloContainsLabels(0.45, {"common-exit-battle"}, false))
+                if (actions.yoloContainsLabels(0.50, {"common-exit-battle"}, false))
                 {
                     Logger::log(QString("已进入【超鬼王】战斗场景"));
                     isEngageInBattle = true;

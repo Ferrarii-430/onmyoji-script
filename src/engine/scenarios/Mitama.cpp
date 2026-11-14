@@ -6,6 +6,7 @@
 #include "ScenarioRegistry.h"
 
 #include <QJsonObject>
+#include <QRandomGenerator>
 #include <QString>
 #include <QStringList>
 
@@ -17,6 +18,7 @@
 #include "src/engine/TaskRunner.h"
 
 using core::waitWithEventProcessing;
+using core::waitRandomWithEventProcessing;
 
 namespace scenarios
 {
@@ -90,7 +92,7 @@ namespace scenarios
                 //先开锁定
                 if (!mitama_isCastingLocked)
                 {
-                    QString savePathCommonUnlock = actions.opencvRecognizesAndClick(screenshotPath + "common-unlock.png", 0.65, true, true);
+                    QString savePathCommonUnlock = actions.opencvRecognizesAndClick(screenshotPath + "super-lock.png", 0.75, true, true);
                     if (!savePathCommonUnlock.isEmpty())
                     {
                         mitama_isCastingLocked = true;
@@ -101,19 +103,7 @@ namespace scenarios
                 waitWithEventProcessing(2000);
 
                 //先判断是不是队长
-                QJsonArray teamData = actions.ocrRecognizes(QRectF(80, 65, 100, 100), ocr::Enhance::Upscale);
-                isCaptain = false;
-                for (int i = 0; i < teamData.size(); ++i)
-                {
-                    QJsonObject item = teamData[i].toObject();
-                    QString text = item["text"].toString();
-
-                    if (text.contains("战"))
-                    {
-                        isCaptain = true;
-                        break;
-                    }
-                }
+                isCaptain = actions.opencvContains(screenshotPath + "challenge-btn.png", 0.65, false);
                 Logger::log(QString("当前为【%1】状态").arg(isCaptain ? QStringLiteral("队长") : QStringLiteral("队友")));
 
                 if (isCaptain)
@@ -125,9 +115,9 @@ namespace scenarios
                     for (int i = 0; i < MAX_WAIT_NUM && TaskRunner::instance().isRunning(); ++i)
                     {
                         //循环等待队友进入
+                        Logger::log(QString("等待战斗结束...(%1/%2)").arg(i+1).arg(MAX_WAIT_NUM));
                         waitWithEventProcessing(MAX_WAIT_TIME);
-                        QString savePathChallengeBtnActive = actions.opencvRecognizesAndClick(screenshotPath + "challenge-btn-active.png", 0.65, true, true);
-                        if (!savePathChallengeBtnActive.isEmpty())
+                        if (!actions.opencvRecognizesAndClick(screenshotPath + "challenge-btn-active.png", 0.65, true, true, ClickExclude{0.2, 0.2, 0.2, 0.2}).isEmpty())
                         {
                             //进入战斗
                             Logger::log(QString("点击进入御魂副本战斗"));
@@ -137,7 +127,7 @@ namespace scenarios
                     }
                     if (!enteredBattle)
                     {
-                        Logger::log(QString("等待挑战按钮超时"));
+                        Logger::log(QString("等待队友超时"));
                         return false;
                     }
                 } else
@@ -145,10 +135,22 @@ namespace scenarios
                     //队友模式不需要点击，只需要等待队长发送邀请
                     //如果已经开启了自动接受邀请，那么则全程不需要动
                     //理论上直接等待几秒即可，等待自动进入战斗
-                    waitWithEventProcessing(5000);
+                    Logger::log(QString("等待房主进入战斗"));
+                    waitWithEventProcessing(3000);
                 }
             } else
             {
+                //先开锁定
+                if (!mitama_isCastingLocked)
+                {
+                    QString savePathCommonUnlock = actions.opencvRecognizesAndClick(screenshotPath + "common-unlock.png", 0.65, true, true);
+                    if (!savePathCommonUnlock.isEmpty())
+                    {
+                        mitama_isCastingLocked = true;
+                        Logger::log(QString("锁定阵容"));
+                    }
+                }
+
                 //单人模式
                 isCaptain = true;
                 const QString settled = actions.ocrRecognizesAndClickAny({"挑战"}, 0.8, true, QRectF(80, 65, 100, 100), ocr::Enhance::Upscale);
@@ -162,12 +164,12 @@ namespace scenarios
         }
 
     ready:
-        waitWithEventProcessing(3000);
+        waitWithEventProcessing(500);
         // 如果有准备按钮则点击，否则无视，因为正常会手动点锁定
         if (!mitama_isCastingLocked)
         {
-            actions.yoloRecognizesAndClick(0.60, false, "battle-ready");
-            waitWithEventProcessing(2000);
+            actions.yoloRecognizesAndClick(0.55, false, "battle-ready");
+            waitWithEventProcessing(500);
         }
 
     battle:
@@ -175,15 +177,22 @@ namespace scenarios
         {
             bool enteredBattleScene = false;
             // 循环条件检查任务状态：点「停止」后立即中断等待，而非傻等满全部轮询
-            for (int i = 0; i < MAX_WAIT_NUM && TaskRunner::instance().isRunning(); ++i)
+            for (int i = 0; i < 9 && TaskRunner::instance().isRunning(); ++i)
             {
-                waitWithEventProcessing(MAX_WAIT_TIME);
-                if (actions.yoloContainsLabels(0.55, {"common-exit-battle"}, false))
+                //有准备就点一下
+                if (!mitama_isCastingLocked)
+                {
+                    actions.yoloRecognizesAndClick(0.55, false, "battle-ready");
+                    waitWithEventProcessing(500);
+                }
+
+                if (actions.yoloContainsLabels(0.50, {"common-exit-battle"}, false))
                 {
                     Logger::log(QString("已进入御魂战斗场景"));
                     enteredBattleScene = true;
                     break;
                 }
+                waitWithEventProcessing(MAX_WAIT_TIME);
             }
             if (!enteredBattleScene)
             {
@@ -216,21 +225,87 @@ namespace scenarios
             }
         }
 
-        //进入领取御魂奖励状态
+        waitWithEventProcessing(1000);
+
+        Logger::log(QString("等待获取战斗结果"));
+
+        //判断战斗结果
         {
-            bool isError = true;
+            bool battleResult = false;
+            for (int i = 0; i < MAX_WAIT_NUM && TaskRunner::instance().isRunning(); ++i)
+            {
+                if (actions.opencvContains(screenshotPath + "battle-victory.png", 0.65, true))
+                {
+                    waitWithEventProcessing(1000);
+                    actions.opencvRecognizesAndClick(screenshotPath + "battle-victory.png", 0.65, true, true);
+                    Logger::log(QString("战斗胜利"));
+                    battleResult = true;
+                    break;
+                }
+                waitWithEventProcessing(200);
+
+                if (actions.ocrContainsText("可以按照以下方式提升自己战斗力", 0.70, QRectF(15.2, 44.5, 70.4, 49.4), ocr::Enhance::Upscale))
+                {
+                    Logger::log(QString("识别到战斗结束"));
+                    battleResult = false;
+                    waitWithEventProcessing(2000);
+                    break;
+                }
+                waitWithEventProcessing(1000);
+            }
+            if (!battleResult)
+            {
+                Logger::log(QString("等待战斗结果超时 或者 战斗失败"));
+                return false;
+            }
+        }
+
+        waitRandomWithEventProcessing(3000, 300);
+
+        //判断是否获取到超鬼王门票
+        {
+            if (!actions.ocrRecognizesAndClickAny(QStringList{"今日已获得裂变之眼：", "今日已获得裂变之眼", "今日已获得裂变之眼:"}, 0.65, false, QRectF(26.5, 42.4, 47.9, 23.1), ocr::Enhance::Upscale).isEmpty())
+            {
+                Logger::log(QString("领取超鬼王门票"));
+                waitRandomWithEventProcessing(1200, 200);
+            }
+        }
+
+        //进入领取觉醒奖励状态
+        {
+            bool isError = false;
             // 循环条件检查任务状态：点「停止」后立即中断等待，而非傻等满全部轮询
             for (int i = 0; i < MAX_WAIT_NUM && TaskRunner::instance().isRunning(); ++i)
             {
-                QString savePathBattleEnd = actions.opencvRecognizesAndClick(screenshotPath + "battle_end.png", 0.65, true);
-                waitWithEventProcessing(MAX_WAIT_TIME);
-                if (!savePathBattleEnd.isEmpty())
+                if (actions.ocrContainsText("点击屏幕继续", 0.70, QRectF(36.3, 89.0, 27.5, 11.0), ocr::Enhance::Upscale))
                 {
-                    isError = false;
-                    break;
+                    //随机点击退出页面
+                    QString savePathReceiveRewards;
+
+                    // 随机生成 0 或 1
+                    if (QRandomGenerator::global()->bounded(2) == 0)
+                    {
+                        savePathReceiveRewards = actions.clickInRoi(QRectF(5.9, 19.0, 11.1, 62.3), true);
+                    }else
+                    {
+                        savePathReceiveRewards = actions.clickInRoi(QRectF(86.3, 19.6, 11.1, 62.3), true);
+                    }
+
+                    //点击退出伤害页面
+                    if (!savePathReceiveRewards.isEmpty())
+                    {
+                        Logger::log(QString("退出【奖励页面】成功"));
+                        isError = true;
+                        break;
+                    }else
+                    {
+                        //这里不需要重试
+                        Logger::log(QString("退出【奖励页面】失败"));
+                    }
                 }
+                waitWithEventProcessing(MAX_WAIT_TIME);
             }
-            if (isError)
+            if (!isError)
             {
                 Logger::log(QString("等待战斗完成超时"));
                 return false;
@@ -299,7 +374,7 @@ namespace scenarios
                         // 优先扫描 turn-on-auto.png（开启自动入队），命中则点击并开启自动模式；
                         // 未命中再扫描 accept_invitation.png（单次接受邀请）。
                         // 只有 turn-on-auto.png 才会开启 autoSendRequestEnable。
-                        QString savePathAuto = actions.opencvRecognizesAndClick(screenshotPath + "turn-on-auto.png", 0.8, false);
+                        QString savePathAuto = actions.opencvRecognizesAndClick(screenshotPath + "turn-on-auto.png", 0.7, false, true);
                         if (!savePathAuto.isEmpty())
                         {
                             autoSendRequestEnable = true;
@@ -376,6 +451,14 @@ namespace scenarios
         QString screenshotPath = AppPaths::instance().screenshotPath();
         QString savePath = actions.opencvRecognizesAndClick(screenshotPath + "battle_end.png", 0.65, true);
         if (!savePath.isEmpty())
+        {
+            return 4; //奖励领取界面
+        }
+
+        waitWithEventProcessing(200);
+
+        //有时候可能battle_end会被奖励遮挡 额外添加一个备用的
+        if (actions.ocrContainsText("点击屏幕继续", 0.70, QRectF(36.3, 89.0, 27.5, 11.0), ocr::Enhance::Upscale))
         {
             return 4; //奖励领取界面
         }
