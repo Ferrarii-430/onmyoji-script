@@ -7,8 +7,6 @@
 
 #include <QJsonArray>
 #include <QJsonObject>
-#include <QList>
-#include <QMap>
 #include <QRandomGenerator>
 #include <QRegularExpression>
 #include <QString>
@@ -537,11 +535,8 @@ namespace scenarios {
         waitRandomWithEventProcessing(2000,200);
 
         // 只有还没识别过当前状态时才需要看界面，识别一次后跨轮次复用
-        if (!currentStrongPursuitStatus.has_value())
-        {
-            currentStrongPursuitStatus = actions.opencvContains(screenshotPath + "super-check.png", 0.75, true);
-            Logger::log(QString("当前【强力追击】状态：%1").arg(currentStrongPursuitStatus.value() ? QStringLiteral("是") : QStringLiteral("否")));
-        }
+        currentStrongPursuitStatus = actions.opencvContains(screenshotPath + "super-check.png", 0.85, true);
+        Logger::log(QString("当前【强力追击】状态：%1").arg(currentStrongPursuitStatus.value() ? QStringLiteral("是") : QStringLiteral("否")));
 
         //判断是否需要开启强力追击
         if (param.strongPursuit)
@@ -550,7 +545,7 @@ namespace scenarios {
             if (!currentStrongPursuitStatus.value())
             {
                 //只有关闭状态下需要开启
-                if (actions.ocrRecognizesAndClick("2.5倍伤害", 0.60, true, QRectF(76.3, 39.0, 23.7, 43.8), ocr::Enhance::Upscale | ocr::Enhance::AutoInvert).isEmpty())
+                if (actions.ocrRecognizesAndClick("2.5倍伤害", 0.60, true, QRectF(76.3, 39.0, 23.7, 43.8), ocr::Enhance::Upscale).isEmpty())
                 {
                     Logger::log(QString("开启【强力追击】失败"));
                     return false;
@@ -563,7 +558,7 @@ namespace scenarios {
             if (currentStrongPursuitStatus.value())
             {
                 //只有开启状态下需要关闭
-                if (actions.opencvRecognizesAndClick(screenshotPath + "super-check.png", 0.55, false, true).isEmpty())
+                if (actions.ocrRecognizesAndClick("2.5倍伤害", 0.60, false, QRectF(76.3, 39.0, 23.7, 43.8), ocr::Enhance::Upscale).isEmpty())
                 {
                     Logger::log(QString("关闭【强力追击】失败"));
                     return false;
@@ -714,7 +709,7 @@ namespace scenarios {
                 Logger::log(QString("等待战斗结束...(%1/36)").arg(i+1));
                 waitWithEventProcessing(5000);
                 //是否有【本次伤害】文字
-                if (actions.ocrContainsText("本次伤害", 0.55, QRectF(40.2, 39.0, 19.0, 11.6)))
+                if (actions.ocrContainsText("本次伤害", 0.55, QRectF(27.7, 31.9, 45.0, 37.1), ocr::Enhance::Upscale))
                 {
                     Logger::log(QString("战斗已经结束"));
                     isBattleOfEnd = true;
@@ -837,110 +832,28 @@ namespace scenarios {
         }
         waitRandomWithEventProcessing(2000, 200);
 
-        QJsonArray ticketsData = actions.ocrRecognizes(QRectF(24.9, 38.1, 51.28, 23.2), ocr::Enhance::Upscale, 0.75);
-
-        // 提取「持有:x」，按 box 左边界从左到右排序，第 1~6 个分别对应 1~6 星
-        struct TicketEntry
-        {
-            int left = 0;
-            int count = 0;
-            cv::Rect rect;
-        };
-        QList<TicketEntry> entries;
-        static const QRegularExpression holdRe(QStringLiteral("持有[：:]?\\s*(\\d+)"));
-        for (const QJsonValue &value : ticketsData)
-        {
-            const QJsonObject item = value.toObject();
-            const QRegularExpressionMatch match = holdRe.match(item.value("text").toString());
-            if (!match.hasMatch())
-            {
-                continue;
-            }
-
-            // box 格式 [[x1,y1],[x2,y2],[x3,y3],[x4,y4]]，ocrRecognizes 已映射回窗口坐标
-            const QJsonArray box = item.value("box").toArray();
-            if (box.size() != 4)
-            {
-                continue;
-            }
-            int minX = 0;
-            int minY = 0;
-            int maxX = 0;
-            int maxY = 0;
-            bool firstPoint = true;
-            for (const QJsonValue &pointValue : box)
-            {
-                const QJsonArray point = pointValue.toArray();
-                if (point.size() < 2)
-                {
-                    continue;
-                }
-                const int px = point[0].toInt();
-                const int py = point[1].toInt();
-                if (firstPoint)
-                {
-                    minX = maxX = px;
-                    minY = maxY = py;
-                    firstPoint = false;
-                    continue;
-                }
-                minX = std::min(minX, px);
-                minY = std::min(minY, py);
-                maxX = std::max(maxX, px);
-                maxY = std::max(maxY, py);
-            }
-            if (firstPoint)
-            {
-                continue;
-            }
-
-            entries.append({minX, match.captured(1).toInt(),
-                            cv::Rect(minX, minY, maxX - minX, maxY - minY)});
-        }
-        std::sort(entries.begin(), entries.end(), [](const TicketEntry &a, const TicketEntry &b)
-        {
-            return a.left < b.left;
-        });
-
-        // 星级 -> 持有数量/点击区域（后续判断直接用 starHoldings.value(star, 0)）
-        QMap<int, int> starHoldings;
-        QMap<int, cv::Rect> starRects;
-        for (int i = 0; i < entries.size() && i < 6; ++i)
-        {
-            starHoldings.insert(i + 1, entries.at(i).count);
-            starRects.insert(i + 1, entries.at(i).rect);
-        }
-
-        QStringList holdParts;
-        for (auto it = starHoldings.cbegin(); it != starHoldings.cend(); ++it)
-        {
-            holdParts << QString("%1星=%2").arg(it.key()).arg(it.value());
-        }
-        Logger::log(QString("各星级持有数量: %1").arg(holdParts.isEmpty() ? QStringLiteral("(未识别到)") : holdParts.join(QStringLiteral(", "))));
-
-        // 按勾选星级升序（加载配置时已排序）找第一个持有数 > 0 的星级；
-        // 若勾选的星级全部持有为 0，则停止任务
+        // 鬼王未上架时整条不显示（不会出现「持有:0」），按「持有:x」的位置推断星级会误判。
+        // 改为直接识别 1~6 星图标：图标出现即表示该星级有可召唤的鬼王，
+        // 识别命中即点击该条目，保证点击的星级与选中的星级一致。
         int targetStar = 0;
-        for (int star : config.inviteStarLevels)
+        for (int star : config.inviteStarLevels) // 加载配置时已按升序排序
         {
-            if (starHoldings.value(star, 0) > 0)
+            const QString templPath = screenshotPath + QString("super-level-%1.png").arg(star);
+            if (!actions.opencvRecognizesAndClick(templPath, 0.75, true, true).isEmpty())
             {
                 targetStar = star;
+                Logger::log(QString("%1星鬼王已找到，点击对应条目").arg(targetStar));
                 break;
             }
+            waitWithEventProcessing(200);
         }
 
+        // 勾选星级的图标全部未识别到，说明这些星级都没有可召唤的鬼王
         if (targetStar == 0)
         {
             Logger::log(QStringLiteral("勾选星级的鬼王持有数量均为 0，任务停止"));
             return false;
         }
-
-        // 点击对应星级的「持有:x」box
-        const cv::Rect targetRect = starRects.value(targetStar);
-        Logger::log(QString("%1星鬼王持有数量 %2，点击对应条目").arg(targetStar).arg(starHoldings.value(targetStar)));
-        GameWindow::instance().clickInWindow(utils::makeClickPoint(targetRect, false),
-                                             QString("选中 %1 星鬼王").arg(targetStar));
 
         waitRandomWithEventProcessing(1200, 200);
 

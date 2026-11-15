@@ -585,11 +585,8 @@ namespace scenarios {
         waitRandomWithEventProcessing(2000,200);
 
         // 只有还没识别过当前状态时才需要看界面，识别一次后跨轮次复用
-        if (!currentStrongPursuitStatus.has_value())
-        {
-            currentStrongPursuitStatus = actions.opencvContains(screenshotPath + "super-check.png", 0.75, true);
-            Logger::log(QString("当前【强力追击】状态：%1").arg(currentStrongPursuitStatus.value() ? QStringLiteral("是") : QStringLiteral("否")));
-        }
+        currentStrongPursuitStatus = actions.opencvContains(screenshotPath + "super-check.png", 0.85, true);
+        Logger::log(QString("当前【强力追击】状态：%1").arg(currentStrongPursuitStatus.value() ? QStringLiteral("是") : QStringLiteral("否")));
 
         //判断是否需要开启强力追击
         if (param.strongPursuit)
@@ -598,7 +595,7 @@ namespace scenarios {
             if (!currentStrongPursuitStatus.value())
             {
                 //只有关闭状态下需要开启
-                if (actions.ocrRecognizesAndClick("2.5倍伤害", 0.60, true, QRectF(76.3, 39.0, 23.7, 43.8), ocr::Enhance::Upscale).isEmpty())
+                if (actions.ocrRecognizesAndClick("2.5倍伤害", 0.60, false, QRectF(76.3, 39.0, 23.7, 43.8), ocr::Enhance::Upscale).isEmpty())
                 {
                     Logger::log(QString("开启【强力追击】失败"));
                 }
@@ -610,7 +607,7 @@ namespace scenarios {
             if (currentStrongPursuitStatus.value())
             {
                 //只有开启状态下需要关闭
-                if (actions.opencvRecognizesAndClick(screenshotPath + "super-check.png", 0.65, false, true).isEmpty())
+                if (actions.ocrRecognizesAndClick("2.5倍伤害", 0.60, false, QRectF(76.3, 39.0, 23.7, 43.8), ocr::Enhance::Upscale).isEmpty())
                 {
                     Logger::log(QString("关闭【强力追击】失败"));
                     return false;
@@ -761,7 +758,7 @@ namespace scenarios {
                 Logger::log(QString("等待战斗结束...(%1/36)").arg(i+1));
                 waitWithEventProcessing(5000);
                 //是否有【本次伤害】文字
-                if (actions.ocrContainsText("本次伤害", 0.55, QRectF(40.2, 39.0, 19.0, 11.6)))
+                if (actions.ocrContainsText("本次伤害", 0.55, QRectF(27.7, 31.9, 45.0, 37.1), ocr::Enhance::Upscale))
                 {
                     Logger::log(QString("战斗已经结束"));
                     isBattleOfEnd = true;
