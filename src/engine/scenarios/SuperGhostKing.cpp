@@ -48,6 +48,17 @@ namespace scenarios {
             {
                 return QString::number(value.toDouble());
             }
+            // 数组配置（如邀请星级）：逐项转换后逗号连接；空数组表示「全不选」。
+            // 不能落到下面的 toString()——数组转字符串为空，会被误显成「未填」
+            if (value.isArray())
+            {
+                QStringList parts;
+                for (const QJsonValue &item : value.toArray())
+                {
+                    parts << valueToText(item);
+                }
+                return parts.isEmpty() ? QStringLiteral("(全不选)") : parts.join(QStringLiteral(","));
+            }
             const QString text = value.toString();
             return text.isEmpty() ? QStringLiteral("(未填)") : text;
         }

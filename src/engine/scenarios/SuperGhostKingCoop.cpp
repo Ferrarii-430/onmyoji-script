@@ -835,6 +835,7 @@ namespace scenarios {
         // 鬼王未上架时整条不显示（不会出现「持有:0」），按「持有:x」的位置推断星级会误判。
         // 改为直接识别 1~6 星图标：图标出现即表示该星级有可召唤的鬼王，
         // 识别命中即点击该条目，保证点击的星级与选中的星级一致。
+        qDebug() << "inviteStarLevels: " << config.inviteStarLevels;
         int targetStar = 0;
         for (int star : config.inviteStarLevels) // 加载配置时已按升序排序
         {
