@@ -32,12 +32,14 @@ namespace scenarios
     static thread_local bool autoSendRequestEnable = false; //是否开启自动发送 组队/入队 请求
     static thread_local bool isCaptain = false; //是否为队长
     static thread_local bool mitama_isCastingLocked = false; //阵容是否锁定
+    static thread_local int roomVacancy = -1; //上一轮记录的队伍空位数量，-1表示首次执行、暂无参考数据
 
     // 重置跨轮次状态：阵容锁定标记只在单次任务运行内保持，
     // 任务结束/停止后重置，下次启动任务重新执行锁定流程
     void resetMitamaStatus()
     {
         mitama_isCastingLocked = false;
+        roomVacancy = -1; // 空位数据只在单次任务运行内有效，下次启动任务重新视为首次执行
     }
 
     bool executeMitama()
@@ -108,15 +110,41 @@ namespace scenarios
 
                 if (isCaptain)
                 {
-                    // 队长状态
-                    Logger::log(QString("等待队友进入战斗"));
+                    // 队长状态：首次执行（roomVacancy < 0）没有上一轮空位数据，无法判断要等1位还是2位队友，
+                    // 因此不理会空位等待，直接进入挑战点击流程；
+                    // 后续轮次根据上一轮记录的空位数量，等待队友进入后再进入战斗
+                    const int prevVacancy = roomVacancy;
+
+                    if (prevVacancy > 0)
+                    {
+                        // 本轮进入战斗前识别一次队伍空位（队伍最多3人，即2个空位）
+                        roomVacancy = static_cast<int>(actions.opencvFindAll(screenshotPath + "team-vacancy.png", 0.65, true).size());
+                        Logger::log(QString("上一轮空位: %1，本轮等待队友进入，当前空位: %2").arg(prevVacancy).arg(roomVacancy));
+
+                        // 空位清零（队友全部进入）后才进入战斗；等待次数有显示和上限，
+                        // 超时后不再等待，继续执行后续逻辑
+                        // 循环条件检查任务状态：点「停止」后立即中断等待，而非傻等满全部轮询
+                        for (int i = 0; roomVacancy > 0 && i < MAX_WAIT_NUM && TaskRunner::instance().isRunning(); ++i)
+                        {
+                            Logger::log(QString("等待队友进入，剩余空位: %1 (%2/%3)").arg(roomVacancy).arg(i + 1).arg(MAX_WAIT_NUM));
+                            waitWithEventProcessing(MAX_WAIT_TIME);
+
+                            roomVacancy = static_cast<int>(actions.opencvFindAll(screenshotPath + "team-vacancy.png", 0.65, true).size());
+                        }
+
+                        if (roomVacancy > 0)
+                        {
+                            Logger::log(QString("等待队友超时，继续执行后续逻辑"));
+                        }
+                    }
+
+                    // 挑战按钮可点击即进入战斗，同时记录本轮空位供下一轮参考
                     bool enteredBattle = false;
                     // 循环条件检查任务状态：点「停止」后立即中断等待，而非傻等满全部轮询
                     for (int i = 0; i < MAX_WAIT_NUM && TaskRunner::instance().isRunning(); ++i)
                     {
-                        //循环等待队友进入
-                        Logger::log(QString("等待战斗结束...(%1/%2)").arg(i+1).arg(MAX_WAIT_NUM));
-                        waitWithEventProcessing(MAX_WAIT_TIME);
+                        roomVacancy = static_cast<int>(actions.opencvFindAll(screenshotPath + "team-vacancy.png", 0.65, true).size());
+
                         if (!actions.opencvRecognizesAndClick(screenshotPath + "challenge-btn-active.png", 0.65, true, true, ClickExclude{0.2, 0.2, 0.2, 0.2}).isEmpty())
                         {
                             //进入战斗
@@ -124,6 +152,7 @@ namespace scenarios
                             enteredBattle = true;
                             break;
                         }
+                        waitWithEventProcessing(MAX_WAIT_TIME);
                     }
                     if (!enteredBattle)
                     {
