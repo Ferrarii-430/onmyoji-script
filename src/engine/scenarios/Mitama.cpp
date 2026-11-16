@@ -233,34 +233,9 @@ namespace scenarios
             }
         }
 
-        //循环等待战斗结束
-        {
-            bool isEnd = true;
-            // 循环条件检查任务状态：点「停止」后立即中断等待，而非傻等满全部轮询
-            for (int i = 0; i < MAX_WAIT_NUM && TaskRunner::instance().isRunning(); ++i) {
-                waitWithEventProcessing(MAX_WAIT_TIME);
-
-                // 战斗结束结算：一次 OCR 识别，命中「生利(胜利)」或「失败」哪个就点哪个
-                const QString settled = actions.ocrRecognizesAndClickAny(QStringList{"胜利","生利", "失败"}, 0.55, true,
-                                                                         QRectF(16, 7.1, 73, 36.3), ocr::Enhance::Upscale);
-                if (!settled.isEmpty()) {
-                    Logger::log(QString("本轮御魂完成（结算：%1）").arg(
-                        (settled == QStringLiteral("胜利") || settled == QStringLiteral("生利"))
-                            ? QStringLiteral("胜利") : QStringLiteral("失败")));
-                    isEnd = false;
-                    break;
-                }
-            }
-            if (isEnd) {
-                Logger::log(QString("获取御魂副本结算超时"));
-                return false;
-            }
-        }
-
         waitWithEventProcessing(1000);
 
         Logger::log(QString("等待获取战斗结果"));
-
         //判断战斗结果
         {
             bool battleResult = false;
@@ -294,12 +269,13 @@ namespace scenarios
 
         waitRandomWithEventProcessing(3000, 300);
 
-        //进入领取觉醒奖励状态
+        //进入领取御魂奖励状态
         {
             bool isError = false;
             // 循环条件检查任务状态：点「停止」后立即中断等待，而非傻等满全部轮询
             for (int i = 0; i < MAX_WAIT_NUM && TaskRunner::instance().isRunning(); ++i)
             {
+                Logger::log(QString("等待领取觉醒奖励...(%1/%2)").arg(i+1).arg(MAX_WAIT_NUM));
                 //判断是否获取到超鬼王门票
                 if (!actions.ocrRecognizesAndClickAny(QStringList{"今日已获得裂变之眼：", "今日已获得裂变之眼", "今日已获得裂变之眼:"}, 0.65, true, QRectF(26.5, 42.4, 47.9, 23.1), ocr::Enhance::Upscale).isEmpty())
                 {

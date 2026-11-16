@@ -683,10 +683,14 @@ namespace scenarios {
             //仅当已确认锁定阵容时无需准备，未锁定或锁定失败时尝试点击【准备】
             if (!isLock.value_or(false))
             {
-                //有准备就点一下，没有则不用管
-                if (!actions.yoloRecognizesAndClick(0.50, true, "battle-ready").isEmpty())
+                if (actions.yoloContainsLabels(0.50, {"common-popup-confirm"}, false))
                 {
-                    Logger::log(QString("点击【准备】"));
+                    waitRandomWithEventProcessing(1200,200);
+                    //有准备就点一下，没有则不用管
+                    if (!actions.yoloRecognizesAndClick(0.50, true, "battle-ready").isEmpty())
+                    {
+                        Logger::log(QString("点击【准备】"));
+                    }
                 }
             }
 
