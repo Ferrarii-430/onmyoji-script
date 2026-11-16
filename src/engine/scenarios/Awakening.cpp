@@ -110,12 +110,13 @@ namespace scenarios
 
                 if (isCaptain)
                 {
-                    // 队长状态：首次执行（roomVacancy < 0）没有上一轮空位数据，无法判断要等1位还是2位队友，
-                    // 因此不理会空位等待，直接进入挑战点击流程；
-                    // 后续轮次根据上一轮记录的空位数量，等待队友进入后再进入战斗
+                    // 队长状态：首次执行（roomVacancy < 0）没有上一轮空位数据，直接进入挑战点击流程；
+                    // 后续轮次（roomVacancy >= 0）等待队友全部进入后再进入战斗。
+                    // 注意：上一轮能开战说明当时队伍是满的，记录的空位数为 0，因此不能用 > 0 作为判断，
+                    // 否则满人结算后队友离开、空位重新出现时不会进入等待逻辑
                     const int prevVacancy = roomVacancy;
 
-                    if (prevVacancy > 0)
+                    if (prevVacancy >= 0)
                     {
                         // 本轮进入战斗前识别一次队伍空位（队伍最多3人，即2个空位）
                         roomVacancy = static_cast<int>(actions.opencvFindAll(screenshotPath + "team-vacancy.png", 0.65, true).size());
@@ -144,6 +145,7 @@ namespace scenarios
                     for (int i = 0; i < MAX_WAIT_NUM && TaskRunner::instance().isRunning(); ++i)
                     {
                         roomVacancy = static_cast<int>(actions.opencvFindAll(screenshotPath + "team-vacancy.png", 0.65, true).size());
+                        qDebug() << "[debug] roomVacancy:" << roomVacancy;
 
                         if (!actions.opencvRecognizesAndClick(screenshotPath + "challenge-btn-active.png", 0.65, true, true, ClickExclude{0.2, 0.2, 0.2, 0.2}).isEmpty())
                         {
@@ -207,7 +209,7 @@ namespace scenarios
         {
             bool enteredBattleScene = false;
             // 循环条件检查任务状态：点「停止」后立即中断等待，而非傻等满全部轮询
-            for (int i = 0; i < 9 && TaskRunner::instance().isRunning(); ++i)
+            for (int i = 0; i < MAX_WAIT_NUM && TaskRunner::instance().isRunning(); ++i)
             {
                 //有准备就点一下
                 if (!awakening_isCastingLocked)
@@ -222,7 +224,8 @@ namespace scenarios
                     enteredBattleScene = true;
                     break;
                 }
-                waitWithEventProcessing(MAX_WAIT_TIME);
+                waitWithEventProcessing(800);
+                Logger::log(QString("等待进入战斗场景...(%1/%2)").arg(i+1).arg(MAX_WAIT_NUM));
             }
             if (!enteredBattleScene)
             {
@@ -267,21 +270,21 @@ namespace scenarios
 
         waitRandomWithEventProcessing(3000, 300);
 
-        //判断是否获取到超鬼王门票
-        {
-            if (!actions.ocrRecognizesAndClickAny(QStringList{"今日已获得裂变之眼：", "今日已获得裂变之眼", "今日已获得裂变之眼:"}, 0.65, false, QRectF(26.5, 42.4, 47.9, 23.1), ocr::Enhance::Upscale).isEmpty())
-            {
-                Logger::log(QString("领取超鬼王门票"));
-                waitRandomWithEventProcessing(1200, 200);
-            }
-        }
-
         //进入领取觉醒奖励状态
         {
             bool isError = false;
             // 循环条件检查任务状态：点「停止」后立即中断等待，而非傻等满全部轮询
             for (int i = 0; i < MAX_WAIT_NUM && TaskRunner::instance().isRunning(); ++i)
             {
+                Logger::log(QString("等待领取觉醒奖励...(%1/%2)").arg(i+1).arg(MAX_WAIT_NUM));
+
+                //判断是否获取到超鬼王门票
+                if (!actions.ocrRecognizesAndClickAny(QStringList{"今日已获得裂变之眼：", "今日已获得裂变之眼", "今日已获得裂变之眼:"}, 0.65, false, QRectF(26.5, 42.4, 47.9, 23.1), ocr::Enhance::Upscale).isEmpty())
+                {
+                    Logger::log(QString("领取超鬼王门票"));
+                    waitRandomWithEventProcessing(1200, 200);
+                }
+
                 if (actions.ocrContainsText("点击屏幕继续", 0.70, QRectF(36.3, 89.0, 27.5, 11.0), ocr::Enhance::Upscale))
                 {
                     //随机点击退出页面
@@ -342,7 +345,7 @@ namespace scenarios
                     } else
                     {
                         //自动发送邀请 等待队友入队 进入战斗
-                        QString savePathAutoSendRequestEnable = actions.ocrRecognizesAndClick("默认邀请队友", 0.55, true, QRectF(), ocr::Enhance::Upscale);
+                        QString savePathAutoSendRequestEnable = actions.ocrRecognizesAndClick("默认邀请队友", 0.55, false, QRectF(), ocr::Enhance::Upscale);
                         if (!savePathAutoSendRequestEnable.isEmpty())
                         {
                             waitWithEventProcessing(1000); // 等待刷新完成
