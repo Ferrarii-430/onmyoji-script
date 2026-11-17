@@ -623,13 +623,39 @@ namespace scenarios {
             //仅当已确认锁定阵容时无需准备，未锁定或锁定失败时尝试点击【准备】
             if (!isLock.value_or(false))
             {
-                if (actions.yoloContainsLabels(0.50, {"common-popup-confirm"}, false))
+                if (config.base.schemeName == "队伍租借")
                 {
-                    waitRandomWithEventProcessing(1200,200);
-                    //有准备就点一下，没有则不用管
-                    if (!actions.yoloRecognizesAndClick(0.50, true, "battle-ready").isEmpty())
+                    bool isRead = false;
+                    //队伍租借必须点准备
+                    for (int i = 0; i < 10; ++i)
                     {
-                        Logger::log(QString("点击【准备】"));
+                        if (actions.yoloContainsLabels(0.50, {"battle-ready"}, false))
+                        {
+                            waitRandomWithEventProcessing(4000, 500);
+                            if (!actions.yoloRecognizesAndClick(0.50, true, "battle-ready").isEmpty())
+                            {
+                                Logger::log(QString("点击【准备】"));
+                                isRead = true;
+                                break;
+                            }
+                        }
+                        waitWithEventProcessing(2000);
+                    }
+                    if (!isRead)
+                    {
+                        Logger::log(QString("无法识别到【准备】按钮"));
+                        return false;
+                    }
+                } else
+                {
+                    if (actions.yoloContainsLabels(0.50, {"common-popup-confirm"}, false))
+                    {
+                        waitRandomWithEventProcessing(1200,200);
+                        //有准备就点一下，没有则不用管
+                        if (!actions.yoloRecognizesAndClick(0.50, true, "battle-ready", ClickExclude{0.2, 0.2, 0.2, 0.2}).isEmpty())
+                        {
+                            Logger::log(QString("点击【准备】"));
+                        }
                     }
                 }
             }
